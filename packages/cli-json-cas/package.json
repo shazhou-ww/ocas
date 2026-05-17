@@ -1,0 +1,15 @@
+{
+  "name": "@uncaged/cli-json-cas",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "json-cas": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@uncaged/json-cas": "workspace:^",
+    "@uncaged/json-cas-fs": "workspace:^"
+  }
+}
