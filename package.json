@@ -1,0 +1,16 @@
+{
+  "name": "@uncaged/json-cas-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "typescript": "^5.8.0"
+  },
+  "scripts": {
+    "test": "bun test",
+    "check": "biome check .",
+    "format": "biome format --write ."
+  }
+}
