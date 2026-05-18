@@ -1,5 +1,12 @@
 # @uncaged/json-cas-workflow
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @uncaged/json-cas@0.2.0
+
 ## 0.1.3
 
 ### Patch Changes
