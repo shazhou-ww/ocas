@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CasNode } from "@uncaged/json-cas";
@@ -174,6 +174,87 @@ describe("createFsStore – has and list", () => {
   test("get returns null for unknown hash", () => {
     const store = createFsStore(dir);
     expect(store.get("0000000000000")).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// listByType and index migration
+// ──────────────────────────────────────────────────────────────────────────────
+describe("createFsStore – listByType", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = makeTmpDir();
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("returns empty array for unknown type", () => {
+    const store = createFsStore(dir);
+    expect(store.listByType("0000000000000")).toEqual([]);
+  });
+
+  test("returns all hashes for the given type", async () => {
+    const store = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "t" });
+    const otherType = await computeSelfHash({ name: "other" });
+
+    const h1 = await store.put(typeHash, { a: 1 });
+    const h2 = await store.put(typeHash, { a: 2 });
+    await store.put(otherType, { b: 1 });
+
+    const byType = store.listByType(typeHash);
+    expect(byType).toHaveLength(2);
+    expect(byType).toContain(h1);
+    expect(byType).toContain(h2);
+  });
+
+  test("listByType survives round-trip across store instances", async () => {
+    const typeHash = await computeSelfHash({ name: "persist-by-type" });
+
+    const store1 = createFsStore(dir);
+    const h1 = await store1.put(typeHash, { x: 1 });
+    const h2 = await store1.put(typeHash, { x: 2 });
+
+    const store2 = createFsStore(dir);
+    const byType = store2.listByType(typeHash);
+    expect(byType).toHaveLength(2);
+    expect(byType).toContain(h1);
+    expect(byType).toContain(h2);
+  });
+
+  test("idempotent put does not duplicate in listByType", async () => {
+    const typeHash = await computeSelfHash({ name: "idempotent-index" });
+
+    const store1 = createFsStore(dir);
+    const hash = await store1.put(typeHash, { n: 7 });
+    await store1.put(typeHash, { n: 7 });
+
+    const store2 = createFsStore(dir);
+    expect(store2.listByType(typeHash)).toEqual([hash]);
+  });
+
+  test("rebuilds _index from .bin files when index is missing", async () => {
+    const typeHash = await computeSelfHash({ name: "migrate" });
+
+    const store1 = createFsStore(dir);
+    const h1 = await store1.put(typeHash, { a: 1 });
+    const h2 = await store1.put(typeHash, { a: 2 });
+
+    rmSync(join(dir, "_index"), { recursive: true, force: true });
+
+    const store2 = createFsStore(dir);
+    expect(store2.listByType(typeHash)).toEqual([h1, h2]);
+    expect(existsSync(join(dir, "_index", typeHash))).toBe(true);
+    expect(readdirSync(join(dir, "_index"))).toContain(typeHash);
+  });
+
+  test("bootstrap node is listed under its self type after reload", async () => {
+    const store1 = createFsStore(dir);
+    const hash = await bootstrap(store1);
+
+    const store2 = createFsStore(dir);
+    expect(store2.listByType(hash)).toEqual([hash]);
   });
 });
 

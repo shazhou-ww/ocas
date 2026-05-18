@@ -151,6 +151,48 @@ describe("createMemoryStore – has and list", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Step 4b: store.listByType()
+// ──────────────────────────────────────────────────────────────────────────────
+describe("createMemoryStore – listByType", () => {
+  test("returns empty array for unknown type", () => {
+    const store = createMemoryStore();
+    expect(store.listByType("0000000000000")).toEqual([]);
+  });
+
+  test("returns all hashes for the given type", async () => {
+    const store = createMemoryStore();
+    const typeHash = await computeSelfHash({ name: "t" });
+    const otherType = await computeSelfHash({ name: "other" });
+
+    const h1 = await store.put(typeHash, { a: 1 });
+    const h2 = await store.put(typeHash, { a: 2 });
+    await store.put(otherType, { b: 1 });
+
+    const byType = store.listByType(typeHash);
+    expect(byType).toHaveLength(2);
+    expect(byType).toContain(h1);
+    expect(byType).toContain(h2);
+  });
+
+  test("idempotent put does not duplicate in listByType", async () => {
+    const store = createMemoryStore();
+    const typeHash = await computeSelfHash({ name: "t" });
+
+    const h1 = await store.put(typeHash, { n: 1 });
+    await store.put(typeHash, { n: 1 });
+
+    expect(store.listByType(typeHash)).toEqual([h1]);
+  });
+
+  test("bootstrap node is listed under its self type", async () => {
+    const store = createMemoryStore();
+    const hash = await bootstrap(store);
+
+    expect(store.listByType(hash)).toEqual([hash]);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Step 5: verify()
 // ──────────────────────────────────────────────────────────────────────────────
 describe("verify", () => {

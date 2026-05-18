@@ -24,4 +24,5 @@ export type Store = {
   get(hash: Hash): CasNode | null;
   has(hash: Hash): boolean;
   list(): Hash[];
+  listByType(typeHash: Hash): Hash[];
 };
