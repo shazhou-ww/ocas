@@ -17,10 +17,10 @@ export type CasNode<T = unknown> = {
 
 /**
  * Content-addressable store interface.
- * put(null, payload) creates a self-referencing (bootstrap) node.
+ * Self-referencing nodes are created only via bootstrap().
  */
 export type Store = {
-  put(typeHash: Hash | null, payload: unknown): Promise<Hash>;
+  put(typeHash: Hash, payload: unknown): Promise<Hash>;
   get(hash: Hash): CasNode | null;
   has(hash: Hash): boolean;
   list(): Hash[];
