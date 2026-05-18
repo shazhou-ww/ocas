@@ -4,7 +4,7 @@ import { bootstrap } from "./bootstrap.js";
 import { cborEncode } from "./cbor.js";
 import { computeHash, computeSelfHash } from "./hash.js";
 import { createMemoryStore } from "./store.js";
-import type { CasNode } from "./types.js";
+import type { CasNode, Store } from "./types.js";
 import { verify } from "./verify.js";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -98,6 +98,17 @@ describe("createMemoryStore – put and get", () => {
     const h2 = await store.put(typeHash, { n: 42 });
     expect(h1).toBe(h2);
     expect(store.list()).toHaveLength(1);
+  });
+
+  test("put does not create self-referencing nodes", async () => {
+    const store = createMemoryStore();
+    const payload = { name: "type-descriptor" };
+    const typeHash = await computeSelfHash(payload);
+    const hash = await store.put(typeHash, payload);
+
+    const node = store.get(hash);
+    expect(node?.type).toBe(typeHash);
+    expect(node?.type).not.toBe(hash);
   });
 
   test("timestamp is preserved on second put (idempotency)", async () => {
@@ -233,6 +244,19 @@ describe("verify", () => {
 // Step 6: bootstrap()
 // ──────────────────────────────────────────────────────────────────────────────
 describe("bootstrap", () => {
+  test("throws when store lacks internal bootstrap path", async () => {
+    const store: Store = {
+      put: async () => "0000000000000",
+      get: () => null,
+      has: () => false,
+      list: () => [],
+      listByType: () => [],
+    };
+    await expect(bootstrap(store)).rejects.toThrow(
+      "Store does not support bootstrap",
+    );
+  });
+
   test("returns a valid 13-char hash", async () => {
     const store = createMemoryStore();
     const hash = await bootstrap(store);

@@ -1,3 +1,4 @@
+import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import { computeHash, computeSelfHash } from "./hash.js";
 import type { CasNode, Hash, Store } from "./types.js";
 
@@ -14,17 +15,22 @@ export function createMemoryStore(): Store {
     set.add(hash);
   }
 
-  return {
-    async put(typeHash: Hash | null, payload: unknown): Promise<Hash> {
-      const hash =
-        typeHash === null
-          ? await computeSelfHash(payload)
-          : await computeHash(typeHash, payload);
+  async function putSelfReferencing(payload: unknown): Promise<Hash> {
+    const hash = await computeSelfHash(payload);
+    if (!data.has(hash)) {
+      data.set(hash, { type: hash, payload, timestamp: Date.now() });
+      indexHash(hash, hash);
+    }
+    return hash;
+  }
+
+  const store: Store = {
+    async put(typeHash: Hash, payload: unknown): Promise<Hash> {
+      const hash = await computeHash(typeHash, payload);
 
       if (!data.has(hash)) {
-        const type = typeHash === null ? hash : typeHash;
-        data.set(hash, { type, payload, timestamp: Date.now() });
-        indexHash(type, hash);
+        data.set(hash, { type: typeHash, payload, timestamp: Date.now() });
+        indexHash(typeHash, hash);
       }
 
       return hash;
@@ -46,5 +52,9 @@ export function createMemoryStore(): Store {
       const set = byType.get(typeHash);
       return set ? [...set] : [];
     },
+
+    [BOOTSTRAP_STORE]: putSelfReferencing,
   };
+
+  return store;
 }

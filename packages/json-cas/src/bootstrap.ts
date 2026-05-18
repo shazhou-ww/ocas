@@ -1,3 +1,7 @@
+import {
+  BOOTSTRAP_STORE,
+  isBootstrapCapableStore,
+} from "./bootstrap-capable.js";
 import type { Hash, Store } from "./types.js";
 
 /**
@@ -23,5 +27,8 @@ const BOOTSTRAP_PAYLOAD = {
  * Idempotent: calling bootstrap multiple times returns the same hash.
  */
 export async function bootstrap(store: Store): Promise<Hash> {
-  return store.put(null, BOOTSTRAP_PAYLOAD);
+  if (!isBootstrapCapableStore(store)) {
+    throw new Error("Store does not support bootstrap");
+  }
+  return store[BOOTSTRAP_STORE](BOOTSTRAP_PAYLOAD);
 }

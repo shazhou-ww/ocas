@@ -10,7 +10,12 @@ import {
 import { join } from "node:path";
 import type { CasNode, Hash, Store } from "@uncaged/json-cas";
 
-import { cborEncode, computeHash, computeSelfHash } from "@uncaged/json-cas";
+import {
+  BOOTSTRAP_STORE,
+  cborEncode,
+  computeHash,
+  computeSelfHash,
+} from "@uncaged/json-cas";
 import { decode } from "cborg";
 
 const INDEX_DIR = "_index";
@@ -111,16 +116,32 @@ export function createFsStore(dir: string): Store {
   const indexDir = join(dir, INDEX_DIR);
   const typeIndex = loadOrMigrateTypeIndex(dir, data);
 
-  return {
-    async put(typeHash: Hash | null, payload: unknown): Promise<Hash> {
-      const hash =
-        typeHash === null
-          ? await computeSelfHash(payload)
-          : await computeHash(typeHash, payload);
+  async function putSelfReferencing(payload: unknown): Promise<Hash> {
+    const hash = await computeSelfHash(payload);
+    if (!data.has(hash)) {
+      const node: CasNode = { type: hash, payload, timestamp: Date.now() };
+      data.set(hash, node);
+
+      mkdirSync(dir, { recursive: true });
+      const tmp = join(dir, `${hash}.tmp`);
+      const dest = join(dir, `${hash}.bin`);
+      writeFileSync(
+        tmp,
+        cborEncode({ type: hash, payload, timestamp: node.timestamp }),
+      );
+      renameSync(tmp, dest);
+
+      appendToTypeIndex(indexDir, typeIndex, hash, hash);
+    }
+    return hash;
+  }
+
+  const store: Store = {
+    async put(typeHash: Hash, payload: unknown): Promise<Hash> {
+      const hash = await computeHash(typeHash, payload);
 
       if (!data.has(hash)) {
-        const type = typeHash === null ? hash : typeHash;
-        const node: CasNode = { type, payload, timestamp: Date.now() };
+        const node: CasNode = { type: typeHash, payload, timestamp: Date.now() };
         data.set(hash, node);
 
         mkdirSync(dir, { recursive: true });
@@ -128,11 +149,11 @@ export function createFsStore(dir: string): Store {
         const dest = join(dir, `${hash}.bin`);
         writeFileSync(
           tmp,
-          cborEncode({ type, payload, timestamp: node.timestamp }),
+          cborEncode({ type: typeHash, payload, timestamp: node.timestamp }),
         );
         renameSync(tmp, dest);
 
-        appendToTypeIndex(indexDir, typeIndex, type, hash);
+        appendToTypeIndex(indexDir, typeIndex, typeHash, hash);
       }
 
       return hash;
@@ -153,5 +174,9 @@ export function createFsStore(dir: string): Store {
     listByType(typeHash: Hash): Hash[] {
       return typeIndex.get(typeHash) ?? [];
     },
+
+    [BOOTSTRAP_STORE]: putSelfReferencing,
   };
+
+  return store;
 }
