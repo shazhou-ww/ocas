@@ -1,6 +1,6 @@
 {
   "name": "@uncaged/cli-json-cas",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "bin": {
     "json-cas": "./src/index.ts"
@@ -9,7 +9,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@uncaged/json-cas": "^0.2.0",
-    "@uncaged/json-cas-fs": "^0.2.0"
+    "@uncaged/json-cas": "^0.3.0",
+    "@uncaged/json-cas-fs": "^0.3.0"
   }
 }

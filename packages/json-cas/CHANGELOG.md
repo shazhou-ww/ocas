@@ -1,5 +1,11 @@
 # @uncaged/json-cas
 
+## 0.3.0
+
+### Minor Changes
+
+- Disallow self-referencing nodes in put(). typeHash is now required (no null). Self-ref only via bootstrap().
+
 ## 0.2.0
 
 ### Minor Changes
