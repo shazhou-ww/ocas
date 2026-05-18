@@ -44,10 +44,6 @@ export function createMemoryStore(): Store {
       return data.has(hash);
     },
 
-    list(): Hash[] {
-      return [...data.keys()];
-    },
-
     listByType(typeHash: Hash): Hash[] {
       const set = byType.get(typeHash);
       return set ? [...set] : [];

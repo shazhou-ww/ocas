@@ -167,10 +167,6 @@ export function createFsStore(dir: string): Store {
       return data.has(hash);
     },
 
-    list(): Hash[] {
-      return [...data.keys()];
-    },
-
     listByType(typeHash: Hash): Hash[] {
       return typeIndex.get(typeHash) ?? [];
     },

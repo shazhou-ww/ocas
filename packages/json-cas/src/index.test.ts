@@ -97,7 +97,7 @@ describe("createMemoryStore – put and get", () => {
     const h1 = await store.put(typeHash, { n: 42 });
     const h2 = await store.put(typeHash, { n: 42 });
     expect(h1).toBe(h2);
-    expect(store.list()).toHaveLength(1);
+    expect(store.listByType(typeHash)).toHaveLength(1);
   });
 
   test("put does not create self-referencing nodes", async () => {
@@ -127,9 +127,9 @@ describe("createMemoryStore – put and get", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Step 4: store.has() and store.list()
+// Step 4: store.has()
 // ──────────────────────────────────────────────────────────────────────────────
-describe("createMemoryStore – has and list", () => {
+describe("createMemoryStore – has", () => {
   test("has returns false before put, true after", async () => {
     const store = createMemoryStore();
     const typeHash = await computeSelfHash({ name: "t" });
@@ -140,7 +140,7 @@ describe("createMemoryStore – has and list", () => {
     expect(store.has(hash)).toBe(true);
   });
 
-  test("list returns all stored hashes", async () => {
+  test("listByType returns all stored hashes for a type", async () => {
     const store = createMemoryStore();
     const typeHash = await computeSelfHash({ name: "t" });
 
@@ -148,16 +148,16 @@ describe("createMemoryStore – has and list", () => {
     const h2 = await store.put(typeHash, { a: 2 });
     const h3 = await store.put(typeHash, { a: 3 });
 
-    const all = store.list();
+    const all = store.listByType(typeHash);
     expect(all).toHaveLength(3);
     expect(all).toContain(h1);
     expect(all).toContain(h2);
     expect(all).toContain(h3);
   });
 
-  test("list returns empty array on fresh store", () => {
+  test("listByType returns empty array on fresh store", () => {
     const store = createMemoryStore();
-    expect(store.list()).toEqual([]);
+    expect(store.listByType("0000000000000")).toEqual([]);
   });
 });
 
@@ -249,7 +249,6 @@ describe("bootstrap", () => {
       put: async () => "0000000000000",
       get: () => null,
       has: () => false,
-      list: () => [],
       listByType: () => [],
     };
     await expect(bootstrap(store)).rejects.toThrow(
@@ -295,6 +294,6 @@ describe("bootstrap", () => {
     const h2 = await bootstrap(store);
 
     expect(h1).toBe(h2);
-    expect(store.list()).toHaveLength(1);
+    expect(store.listByType(h1)).toHaveLength(1);
   });
 });
