@@ -1,4 +1,11 @@
-import Ajv from "ajv";
+import * as AjvModule from "ajv";
+
+// ajv CJS default export: runtime `.default` holds the constructor,
+// but tsc with verbatimModuleSyntax sees the namespace wrapper.
+// biome-ignore lint/suspicious/noExplicitAny: CJS interop
+const Ajv = ((AjvModule as any).default ?? AjvModule) as {
+	new (): { addFormat(name: string, re: RegExp): void; validate(schema: unknown, data: unknown): boolean };
+};
 
 import { bootstrap } from "./bootstrap.js";
 import type { CasNode, Hash, Store } from "./types.js";
