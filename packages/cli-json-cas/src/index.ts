@@ -2,7 +2,7 @@
 
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { CasNode, Hash, JSONSchema, Store } from "@uncaged/json-cas";
+import type { Hash, JSONSchema, Store } from "@uncaged/json-cas";
 import {
   bootstrap,
   computeHash,
@@ -51,8 +51,8 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
 
 const { flags, positional } = parseArgs(process.argv.slice(2));
 
-const storePath = typeof flags["store"] === "string" ? flags["store"] : ".cas";
-const compact = flags["json"] === true;
+const storePath = typeof flags.store === "string" ? flags.store : ".cas";
+const compact = flags.json === true;
 
 // ---- Helpers ----
 
@@ -120,8 +120,8 @@ async function cmdSchemaList(): Promise<void> {
     if (node !== null && node.type === metaHash) {
       const schema = node.payload as JSONSchema;
       const name =
-        (schema["title"] as string | undefined) ??
-        (schema["description"] as string | undefined) ??
+        (schema.title as string | undefined) ??
+        (schema.description as string | undefined) ??
         "(unnamed)";
       console.log(`${hash}  ${name}`);
     }
@@ -197,7 +197,7 @@ async function cmdWalk(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas walk <hash> [--format tree]");
   const store = openStore();
-  const format = flags["format"];
+  const format = flags.format;
 
   if (format === "tree") {
     const childMap = new Map<Hash, Hash[]>();
@@ -247,7 +247,7 @@ async function cmdCat(args: string[]): Promise<void> {
   const store = openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
-  if (flags["payload"] === true) {
+  if (flags.payload === true) {
     out(node.payload);
   } else {
     out(node);

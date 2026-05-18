@@ -283,7 +283,7 @@ describe("walk", () => {
 
     // A → B, B → A (manual cycle by inserting pre-known hash)
     const hashA = await store.put(schemaHash, { val: 1 });
-    const hashB = await store.put(schemaHash, { peerHash: hashA, val: 2 });
+    const _hashB = await store.put(schemaHash, { peerHash: hashA, val: 2 });
 
     // update A to point at B — since store is content-addressed we can't mutate,
     // so we build a diamond: root → A and root → B, A → C, B → C

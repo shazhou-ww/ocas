@@ -38,6 +38,13 @@
         "cborg": "^4.2.3",
       },
     },
+    "packages/json-cas-workflow": {
+      "name": "@uncaged/json-cas-workflow",
+      "version": "0.1.0",
+      "dependencies": {
+        "@uncaged/json-cas": "workspace:^",
+      },
+    },
   },
   "packages": {
     "@biomejs/biome": ["@biomejs/biome@2.4.15", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.4.15", "@biomejs/cli-darwin-x64": "2.4.15", "@biomejs/cli-linux-arm64": "2.4.15", "@biomejs/cli-linux-arm64-musl": "2.4.15", "@biomejs/cli-linux-x64": "2.4.15", "@biomejs/cli-linux-x64-musl": "2.4.15", "@biomejs/cli-win32-arm64": "2.4.15", "@biomejs/cli-win32-x64": "2.4.15" }, "bin": { "biome": "bin/biome" } }, "sha512-j5VH3a/h/HXTKBM50MDMxRCzkeLv9S2XJcW2WgnZT1+xyisi+0bISrXR82gCX+8S9lvK0skEvHJRN+3Ktr2hlw=="],
@@ -65,6 +72,8 @@
     "@uncaged/json-cas": ["@uncaged/json-cas@workspace:packages/json-cas"],
 
     "@uncaged/json-cas-fs": ["@uncaged/json-cas-fs@workspace:packages/json-cas-fs"],
+
+    "@uncaged/json-cas-workflow": ["@uncaged/json-cas-workflow@workspace:packages/json-cas-workflow"],
 
     "ajv": ["ajv@8.20.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA=="],
 

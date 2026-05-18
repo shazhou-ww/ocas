@@ -6,6 +6,7 @@ import type { CasNode, Hash, Store } from "./types.js";
 export type JSONSchema = Record<string, unknown>;
 
 const ajv = new Ajv();
+ajv.addFormat("cas_ref", /^[0-9A-HJKMNP-TV-Z]{13}$/);
 
 /**
  * Store a JSON Schema as a CAS node typed by the meta-schema hash.
@@ -44,6 +45,8 @@ export function validate(store: Store, node: CasNode): boolean {
 
 /**
  * Recursively collect values of all properties whose schema has format: 'cas_ref'.
+ * Handles: direct format, anyOf (nullable refs), items (array refs),
+ * properties (nested objects), and additionalProperties (record refs).
  */
 function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
   const result: Hash[] = [];
@@ -55,17 +58,39 @@ function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
     return result;
   }
 
-  if (
-    schema.properties &&
-    typeof schema.properties === "object" &&
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value)
-  ) {
-    const props = schema.properties as Record<string, JSONSchema>;
-    const obj = value as Record<string, unknown>;
-    for (const [key, subSchema] of Object.entries(props)) {
-      result.push(...collectRefs(subSchema, obj[key]));
+  if (Array.isArray(schema.anyOf)) {
+    for (const sub of schema.anyOf as JSONSchema[]) {
+      result.push(...collectRefs(sub, value));
+    }
+    return result;
+  }
+
+  if (schema.type === "array" && schema.items && Array.isArray(value)) {
+    const itemSchema = schema.items as JSONSchema;
+    for (const item of value as unknown[]) {
+      result.push(...collectRefs(itemSchema, item));
+    }
+    return result;
+  }
+
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    if (schema.properties && typeof schema.properties === "object") {
+      const props = schema.properties as Record<string, JSONSchema>;
+      const obj = value as Record<string, unknown>;
+      for (const [key, subSchema] of Object.entries(props)) {
+        result.push(...collectRefs(subSchema, obj[key]));
+      }
+    }
+
+    if (
+      schema.additionalProperties &&
+      typeof schema.additionalProperties === "object"
+    ) {
+      const addlSchema = schema.additionalProperties as JSONSchema;
+      const obj = value as Record<string, unknown>;
+      for (const val of Object.values(obj)) {
+        result.push(...collectRefs(addlSchema, val));
+      }
     }
   }
 

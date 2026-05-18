@@ -1,0 +1,15 @@
+{
+  "name": "@uncaged/json-cas-workflow",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@uncaged/json-cas": "workspace:^"
+  }
+}
