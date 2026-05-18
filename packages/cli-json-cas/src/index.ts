@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
 import type { Hash, JSONSchema, Store } from "@uncaged/json-cas";
 import {
   bootstrap,
@@ -51,7 +52,8 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
 
 const { flags, positional } = parseArgs(process.argv.slice(2));
 
-const storePath = typeof flags.store === "string" ? flags.store : ".cas";
+const defaultStorePath = join(homedir(), ".uncaged", "json-cas");
+const storePath = typeof flags.store === "string" ? flags.store : defaultStorePath;
 const compact = flags.json === true;
 
 // ---- Helpers ----
@@ -259,7 +261,7 @@ function printUsage(): void {
 Usage: json-cas [--store <path>] [--json] <command> [args]
 
 Commands:
-  init                              Create .cas/ and write bootstrap seed
+  init                              Create store dir and write bootstrap seed
   bootstrap                         Write meta-schema seed, print hash
   schema put <file.json>            Register schema, print type hash
   schema get <type-hash>            Print schema JSON
@@ -276,7 +278,7 @@ Commands:
   cat <hash> [--payload]            Output node (--payload for payload only)
 
 Flags:
-  --store <path>   Store directory (default: .cas)
+  --store <path>   Store directory (default: ~/.uncaged/json-cas)
   --json           Compact JSON output`);
 }
 
