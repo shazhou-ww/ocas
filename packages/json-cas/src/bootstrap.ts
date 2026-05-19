@@ -13,9 +13,15 @@ const BOOTSTRAP_PAYLOAD = {
   hashAlgorithm: "xxh64",
   hashEncoding: "crockford-base32-13",
   nodeSchema: {
-    payload: "any",
-    timestamp: "number",
-    type: "Hash",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    required: ["type", "payload", "timestamp"],
+    properties: {
+      type: { type: "string", description: "Hash of the type descriptor node (or self for bootstrap)" },
+      payload: { description: "Arbitrary data" },
+      timestamp: { type: "number", description: "Unix epoch ms when the node was first stored" },
+    },
+    additionalProperties: false,
   },
   payloadEncoding: "cbor-rfc8949-deterministic",
   version: "1",

@@ -2,10 +2,15 @@
   "name": "@uncaged/json-cas-fs",
   "version": "0.3.0",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
+  "files": ["dist", "src"],
   "scripts": {
     "test": "bun test"
   },

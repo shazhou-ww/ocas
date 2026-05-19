@@ -8,7 +8,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import type { CasNode, Hash, Store } from "@uncaged/json-cas";
+import type {
+  BootstrapCapableStore,
+  CasNode,
+  Hash,
+} from "@uncaged/json-cas";
 
 import {
   BOOTSTRAP_STORE,
@@ -110,7 +114,7 @@ function appendToTypeIndex(
   typeIndex.set(type, list);
 }
 
-export function createFsStore(dir: string): Store {
+export function createFsStore(dir: string): BootstrapCapableStore {
   const data = new Map<Hash, CasNode>();
   loadDir(dir, data);
   const indexDir = join(dir, INDEX_DIR);
@@ -136,7 +140,7 @@ export function createFsStore(dir: string): Store {
     return hash;
   }
 
-  const store: Store = {
+  const store: BootstrapCapableStore = {
     async put(typeHash: Hash, payload: unknown): Promise<Hash> {
       const hash = await computeHash(typeHash, payload);
 

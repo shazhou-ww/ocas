@@ -12,6 +12,7 @@
     "typescript": "^5.8.0"
   },
   "scripts": {
+    "build": "tsc --build packages/json-cas packages/json-cas-fs packages/json-cas-workflow",
     "test": "bun test",
     "check": "biome check .",
     "format": "biome format --write ."

@@ -4,5 +4,9 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    { "path": "../json-cas" }
+  ]
 }

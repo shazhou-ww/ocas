@@ -1,8 +1,11 @@
-import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
+import {
+  BOOTSTRAP_STORE,
+  type BootstrapCapableStore,
+} from "./bootstrap-capable.js";
 import { computeHash, computeSelfHash } from "./hash.js";
-import type { CasNode, Hash, Store } from "./types.js";
+import type { CasNode, Hash } from "./types.js";
 
-export function createMemoryStore(): Store {
+export function createMemoryStore(): BootstrapCapableStore {
   const data = new Map<Hash, CasNode>();
   const byType = new Map<Hash, Set<Hash>>();
 
@@ -24,7 +27,7 @@ export function createMemoryStore(): Store {
     return hash;
   }
 
-  const store: Store = {
+  const store: BootstrapCapableStore = {
     async put(typeHash: Hash, payload: unknown): Promise<Hash> {
       const hash = await computeHash(typeHash, payload);
 
