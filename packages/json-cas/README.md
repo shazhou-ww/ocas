@@ -6,7 +6,7 @@ Core CAS engine — hashing, schema, store, verify, bootstrap.
 
 `@uncaged/json-cas` is the foundation of the json-cas monorepo. It defines content-addressed nodes (`CasNode`), the `Store` interface, XXH64-based hashing with deterministic CBOR, JSON Schema registration and validation (including `cas_ref` links between nodes), bootstrap seeding, and integrity verification.
 
-Other packages build on this layer: `json-cas-fs` provides persistence, `json-cas-workflow` registers domain schemas, and `cli-json-cas` exposes store operations on the command line.
+Other packages build on this layer: `json-cas-fs` provides persistence, and `cli-json-cas` exposes store operations on the command line.
 
 **Dependencies:** `ajv`, `cborg`, `xxhash-wasm`
 

@@ -24,7 +24,7 @@ Exported from `src/index.ts`:
 function createFsStore(dir: string): BootstrapCapableStore;
 ```
 
-`BootstrapCapableStore` is re-exported from `@uncaged/json-cas` (via the return type). The store loads existing `.bin` files on open and migrates or builds the type index on first use.
+Returns a `BootstrapCapableStore` from `@uncaged/json-cas`. The store loads existing `.bin` files on open and migrates or builds the type index on first use.
 
 ### Example
 

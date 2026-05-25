@@ -8,33 +8,30 @@ json-cas is a monorepo for storing and validating JSON data in a content-address
 
 A bootstrap meta-schema is stored as a self-referencing seed node (`type === hash`). All other schemas are registered as nodes typed by that meta-schema. Payloads can reference other nodes via `format: "cas_ref"` fields; the library provides traversal, reference extraction, and integrity verification.
 
-Use the in-memory store for tests and embedded apps, the filesystem store for persistence, the workflow package for pre-built agent/workflow schemas, and the CLI for local store management.
+Use the in-memory store for tests and embedded apps, the filesystem store for persistence, and the CLI for local store management.
 
 ## Architecture
 
 ```
-                    ┌─────────────────┐
-                    │  cli-json-cas   │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              ▼                             ▼
-     ┌─────────────────┐          ┌──────────────────────┐
-     │  json-cas-fs    │          │ json-cas-workflow    │
-     └────────┬────────┘          └──────────┬───────────┘
-              │                              │
-              └──────────────┬───────────────┘
-                             ▼
-                    ┌─────────────────┐
-                    │    json-cas     │  (core)
-                    └─────────────────┘
+     ┌─────────────────┐
+     │  cli-json-cas   │
+     └────────┬────────┘
+              │
+              ▼
+     ┌─────────────────┐
+     │  json-cas-fs    │
+     └────────┬────────┘
+              │
+              ▼
+     ┌─────────────────┐
+     │    json-cas     │  (core)
+     └─────────────────┘
 ```
 
 | Layer | Package | Role |
 |-------|---------|------|
 | Core | `@uncaged/json-cas` | Hashing, schemas, stores, verify, bootstrap |
 | Storage | `@uncaged/json-cas-fs` | Filesystem-backed `Store` |
-| Domain | `@uncaged/json-cas-workflow` | Workflow/agent JSON Schemas and payload types |
 | CLI | `@uncaged/cli-json-cas` | `json-cas` command-line tool |
 
 ## Packages
@@ -43,7 +40,6 @@ Use the in-memory store for tests and embedded apps, the filesystem store for pe
 |---------|-------------|------|
 | [`@uncaged/json-cas`](packages/json-cas/README.md) | Core CAS engine — hashing, schema, store, verify, bootstrap | lib |
 | [`@uncaged/json-cas-fs`](packages/json-cas-fs/README.md) | Filesystem-backed CAS store | lib |
-| [`@uncaged/json-cas-workflow`](packages/json-cas-workflow/README.md) | Workflow integration layer (schemas + types) | lib |
 | [`@uncaged/cli-json-cas`](packages/cli-json-cas/README.md) | CLI tool (`json-cas` binary) | cli |
 
 ## Quick Start

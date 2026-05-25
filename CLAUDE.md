@@ -10,7 +10,6 @@ Monorepo with 4 packages under `packages/`:
 |---------|-------------|
 | `json-cas` | Core CAS engine — hashing, schema, store, verify, bootstrap |
 | `json-cas-fs` | Filesystem-backed CAS store |
-| `json-cas-workflow` | Workflow integration layer (schemas + types) |
 | `cli-json-cas` | CLI tool |
 
 ## Tech Stack
