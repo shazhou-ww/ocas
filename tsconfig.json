@@ -12,10 +12,7 @@
     "skipLibCheck": true,
     "paths": {
       "@uncaged/json-cas": ["./packages/json-cas/src/index.ts"],
-      "@uncaged/json-cas-fs": ["./packages/json-cas-fs/src/index.ts"],
-      "@uncaged/json-cas-workflow": [
-        "./packages/json-cas-workflow/src/index.ts"
-      ]
+      "@uncaged/json-cas-fs": ["./packages/json-cas-fs/src/index.ts"]
     },
     "composite": true,
     "declaration": true,
