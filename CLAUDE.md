@@ -67,6 +67,10 @@ bun run format    # Biome format (auto-fix)
 - Reference issues: `Fixes #N` / `Closes #N`
 - Author: `小橘 <xiaoju@shazhou.work>`
 
+## Project Rules
+
+- [docs/sync-readme.md](docs/sync-readme.md) — README sync conventions
+
 ## Before Submitting
 
 1. `bun test` — all tests pass
