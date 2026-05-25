@@ -40,10 +40,11 @@ roles:
     procedure: |
       IMPORTANT: Always work in a git worktree, NEVER modify the main working directory directly.
 
-      Detect the project repo from the current working directory:
-      - REPO_ROOT=$(git rev-parse --show-toplevel)
-      - REPO_NAME=$(basename $REPO_ROOT)
-      - WORKTREE_BASE=~/repos/${REPO_NAME}-worktrees
+      Set up variables from the current working directory:
+      ```
+      REPO_ROOT=$(git rev-parse --show-toplevel)
+      WORKTREE_BASE=$(dirname $REPO_ROOT)/$(basename $REPO_ROOT)-worktrees
+      ```
 
       Before starting any work, set up an isolated worktree:
       1. `cd $REPO_ROOT && git fetch origin` to get latest refs
@@ -51,7 +52,6 @@ roles:
          - `git worktree add $WORKTREE_BASE/fix/<issue-number>-<short-slug> -b fix/<issue-number>-<short-slug> origin/main`
          - `cd $WORKTREE_BASE/fix/<issue-number>-<short-slug> && bun install`
       3. If bounced back from reviewer or tester (branch already exists):
-         - The worktree should already exist at `$WORKTREE_BASE/fix/<issue-number>-<short-slug>`
          - `cd $WORKTREE_BASE/fix/<issue-number>-<short-slug>`
          - `git fetch origin && git rebase origin/main`
       4. ALL subsequent work must happen inside the worktree directory.
@@ -134,9 +134,12 @@ roles:
     procedure: |
       Find and cd into the worktree directory for this issue.
 
-      Detect repo info:
-      - REPO_ROOT=$(git rev-parse --show-toplevel)
-      - OWNER_REPO=$(git remote get-url origin | sed 's/.*[:/]\([^/]*\/[^.]*\).*/\1/')
+      Set up variables:
+      ```
+      OWNER_REPO=$(git remote get-url origin | sed 's/.*[:/]\([^/]*\/[^.]*\).*/\1/')
+      REPO_ROOT=$(git rev-parse --show-toplevel)
+      MAIN_REPO=$(cd $REPO_ROOT && git worktree list --porcelain | head -1 | sed 's/worktree //')
+      ```
 
       Note: You inherit the developer's worktree and branch. Do NOT create a new branch.
       1. Stage all changes: `git add -A`
@@ -148,8 +151,8 @@ roles:
          - PR description must follow: What / Why / Changes / Ref sections, with `Fixes #N` in Ref
          - On tea failure: capture stderr/stdout, log the error clearly, include PR details for manual creation, and mark success=false
       5. After PR creation, clean up the worktree:
-         - cd back to the main repo root
-         - `git worktree remove <worktree-path>`
+         - `cd $MAIN_REPO`
+         - `git worktree remove $REPO_ROOT`
     output: "Include PR URL on success or error log on failure. Frontmatter must include: success (true or false)."
     frontmatter:
       type: object
