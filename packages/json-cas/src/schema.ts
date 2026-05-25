@@ -12,8 +12,120 @@ import type { CasNode, Hash, Store } from "./types.js";
 
 export type JSONSchema = Record<string, unknown>;
 
+export class SchemaValidationError extends Error {
+  override readonly name = "SchemaValidationError";
+
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 const ajv = new Ajv();
 ajv.addFormat("cas_ref", /^[0-9A-HJKMNP-TV-Z]{13}$/);
+
+const ALLOWED_SCHEMA_KEYS = new Set([
+  "type",
+  "properties",
+  "required",
+  "additionalProperties",
+  "anyOf",
+  "items",
+  "format",
+  "title",
+  "enum",
+  "const",
+  "description",
+]);
+
+const JSON_SCHEMA_TYPES = new Set([
+  "string",
+  "number",
+  "integer",
+  "boolean",
+  "object",
+  "array",
+  "null",
+]);
+
+function isValidTypeValue(type: unknown): boolean {
+  if (typeof type === "string") {
+    return JSON_SCHEMA_TYPES.has(type);
+  }
+  if (Array.isArray(type)) {
+    if (type.length === 0) return false;
+    return type.every(
+      (entry) => typeof entry === "string" && JSON_SCHEMA_TYPES.has(entry),
+    );
+  }
+  return false;
+}
+
+function isValidSchema(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const schema = value as JSONSchema;
+  for (const key of Object.keys(schema)) {
+    if (!ALLOWED_SCHEMA_KEYS.has(key)) return false;
+  }
+
+  if ("type" in schema && !isValidTypeValue(schema.type)) return false;
+
+  if ("properties" in schema) {
+    const properties = schema.properties;
+    if (
+      properties === null ||
+      typeof properties !== "object" ||
+      Array.isArray(properties)
+    ) {
+      return false;
+    }
+    for (const nested of Object.values(properties as Record<string, unknown>)) {
+      if (!isValidSchema(nested)) return false;
+    }
+  }
+
+  if ("required" in schema) {
+    if (!Array.isArray(schema.required)) return false;
+    for (const entry of schema.required) {
+      if (typeof entry !== "string") return false;
+    }
+  }
+
+  if ("additionalProperties" in schema) {
+    const additionalProperties = schema.additionalProperties;
+    if (typeof additionalProperties === "boolean") {
+      // allowed
+    } else if (!isValidSchema(additionalProperties)) {
+      return false;
+    }
+  }
+
+  if ("anyOf" in schema) {
+    if (!Array.isArray(schema.anyOf) || schema.anyOf.length === 0) return false;
+    for (const entry of schema.anyOf) {
+      if (!isValidSchema(entry)) return false;
+    }
+  }
+
+  if ("items" in schema && !isValidSchema(schema.items)) return false;
+  if ("format" in schema && typeof schema.format !== "string") return false;
+  if ("title" in schema && typeof schema.title !== "string") return false;
+  if ("description" in schema && typeof schema.description !== "string") {
+    return false;
+  }
+  if ("enum" in schema) {
+    if (!Array.isArray(schema.enum) || schema.enum.length === 0) return false;
+  }
+
+  return true;
+}
+
+function isMetaSchemaNode(store: Store, node: CasNode): boolean {
+  const schema = getSchema(store, node.type);
+  return schema !== null && schema === node.payload;
+}
 
 /**
  * Store a JSON Schema as a CAS node typed by the meta-schema hash.
@@ -24,6 +136,11 @@ export async function putSchema(
   jsonSchema: JSONSchema,
 ): Promise<Hash> {
   const metaHash = await bootstrap(store);
+  if (!isValidSchema(jsonSchema)) {
+    throw new SchemaValidationError(
+      "Invalid schema: input does not conform to the json-cas JSON Schema meta-schema",
+    );
+  }
   return store.put(metaHash, jsonSchema);
 }
 
@@ -44,6 +161,9 @@ export function getSchema(store: Store, typeHash: Hash): JSONSchema | null {
 export function validate(store: Store, node: CasNode): boolean {
   const schema = getSchema(store, node.type);
   if (schema === null) return false;
+  if (isMetaSchemaNode(store, node)) {
+    return isValidSchema(node.payload);
+  }
   return ajv.validate(
     schema as Parameters<typeof ajv.validate>[0],
     node.payload,

@@ -14,18 +14,18 @@
     },
     "packages/cli-json-cas": {
       "name": "@uncaged/cli-json-cas",
-      "version": "0.1.0",
+      "version": "0.3.0",
       "bin": {
         "json-cas": "./src/index.ts",
       },
       "dependencies": {
-        "@uncaged/json-cas": "workspace:^",
-        "@uncaged/json-cas-fs": "workspace:^",
+        "@uncaged/json-cas": "^0.3.0",
+        "@uncaged/json-cas-fs": "^0.3.0",
       },
     },
     "packages/json-cas": {
       "name": "@uncaged/json-cas",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "dependencies": {
         "ajv": "^8.20.0",
         "cborg": "^4.2.3",
@@ -34,17 +34,17 @@
     },
     "packages/json-cas-fs": {
       "name": "@uncaged/json-cas-fs",
-      "version": "0.1.0",
+      "version": "0.4.1",
       "dependencies": {
-        "@uncaged/json-cas": "workspace:^",
+        "@uncaged/json-cas": "^0.4.0",
         "cborg": "^4.2.3",
       },
     },
     "packages/json-cas-workflow": {
       "name": "@uncaged/json-cas-workflow",
-      "version": "0.1.0",
+      "version": "0.4.1",
       "dependencies": {
-        "@uncaged/json-cas": "workspace:^",
+        "@uncaged/json-cas": "^0.4.0",
       },
     },
   },
@@ -310,6 +310,14 @@
     "@manypkg/get-packages/@changesets/types": ["@changesets/types@4.1.0", "", {}, "sha512-LDQvVDv5Kb50ny2s25Fhm3d9QSZimsoUGBsUioj6MC3qbMUCuC8GPIvk/M6IvXx3lYhAs0lwWUQLb+VIEUCECw=="],
 
     "@manypkg/get-packages/fs-extra": ["fs-extra@8.1.0", "", { "dependencies": { "graceful-fs": "^4.2.0", "jsonfile": "^4.0.0", "universalify": "^0.1.0" } }, "sha512-yhlQgA6mnOJUKOsRUFsgJdQCvkKhcz8tlZG5HBQfReYZy46OwLcY+Zia0mtdHsOo9y/hP+CxMN0TU9QxoOtG4g=="],
+
+    "@uncaged/cli-json-cas/@uncaged/json-cas": ["@uncaged/json-cas@0.3.0", "", { "dependencies": { "ajv": "^8.20.0", "cborg": "^4.2.3", "xxhash-wasm": "^1.1.0" } }, "sha512-LR8Uow7cBdvH+6y9mh9Fd7zDs8fWhfhpVZVsexfdK1KKnGaR7WvukuhBj6r0FbOZ78j7jhjeEfzsUXR2cHELwQ=="],
+
+    "@uncaged/cli-json-cas/@uncaged/json-cas-fs": ["@uncaged/json-cas-fs@0.3.0", "", { "dependencies": { "@uncaged/json-cas": "^0.3.0", "cborg": "^4.2.3" } }, "sha512-shelE7PXtBAsJtJ2Axo5yBScErV/kgi2OUiIUXnEP8BL6L760BRz9W6PDb6jHVKrWOh1HIdYUYODYaHRWY0UxA=="],
+
+    "@uncaged/json-cas-fs/@uncaged/json-cas": ["@uncaged/json-cas@0.4.0", "", { "dependencies": { "ajv": "^8.20.0", "cborg": "^4.2.3", "xxhash-wasm": "^1.1.0" } }, "sha512-DQ65BiMwPeitxEmMYEyQoVO99GQeOBMv0Lgc/ZZkUCKFpTkxZ0tngDD1NsF7suLkIOLxnuBgUKon7t7Yc8eWgw=="],
+
+    "@uncaged/json-cas-workflow/@uncaged/json-cas": ["@uncaged/json-cas@0.4.0", "", { "dependencies": { "ajv": "^8.20.0", "cborg": "^4.2.3", "xxhash-wasm": "^1.1.0" } }, "sha512-DQ65BiMwPeitxEmMYEyQoVO99GQeOBMv0Lgc/ZZkUCKFpTkxZ0tngDD1NsF7suLkIOLxnuBgUKon7t7Yc8eWgw=="],
 
     "read-yaml-file/js-yaml": ["js-yaml@3.14.2", "", { "dependencies": { "argparse": "^1.0.7", "esprima": "^4.0.0" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-PMSmkqxr106Xa156c2M265Z+FTrPl+oxd/rgOQy2tijQeK5TxQ43psO1ZCwhVOSdnn+RzkzlRz/eY4BgJBYVpg=="],
 
