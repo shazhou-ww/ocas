@@ -41,7 +41,10 @@ const BOOTSTRAP_PAYLOAD = {
       items: { type: "string" },
     },
     additionalProperties: {
-      anyOf: [{ type: "boolean" }, { type: "object", additionalProperties: false }],
+      anyOf: [
+        { type: "boolean" },
+        { type: "object", additionalProperties: false },
+      ],
     },
     anyOf: {
       type: "array",

@@ -6,7 +6,5 @@
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts"],
-  "references": [
-    { "path": "../json-cas" }
-  ]
+  "references": [{ "path": "../json-cas" }]
 }

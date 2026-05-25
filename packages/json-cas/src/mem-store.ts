@@ -1,5 +1,5 @@
-import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import type { BootstrapCapableStore } from "./bootstrap-capable.js";
+import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import { createMemoryStore } from "./store.js";
 import type { CasNode, Hash } from "./types.js";
 

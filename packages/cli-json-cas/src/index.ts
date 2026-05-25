@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
 import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import type { Hash, JSONSchema, Store } from "@uncaged/json-cas";
 import {
   bootstrap,
@@ -53,7 +53,8 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
 const { flags, positional } = parseArgs(process.argv.slice(2));
 
 const defaultStorePath = join(homedir(), ".uncaged", "json-cas");
-const storePath = typeof flags.store === "string" ? flags.store : defaultStorePath;
+const storePath =
+  typeof flags.store === "string" ? flags.store : defaultStorePath;
 const compact = flags.json === true;
 
 // ---- Helpers ----
@@ -175,8 +176,6 @@ async function cmdVerify(args: string[]): Promise<void> {
   const ok = await verify(hash, node);
   console.log(ok ? "ok" : "corrupted");
 }
-
-
 
 async function cmdRefs(args: string[]): Promise<void> {
   const hash = args[0];

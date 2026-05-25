@@ -4,7 +4,10 @@ import * as AjvModule from "ajv";
 // but tsc with verbatimModuleSyntax sees the namespace wrapper.
 // biome-ignore lint/suspicious/noExplicitAny: CJS interop
 const Ajv = ((AjvModule as any).default ?? AjvModule) as {
-	new (): { addFormat(name: string, re: RegExp): void; validate(schema: unknown, data: unknown): boolean };
+  new (): {
+    addFormat(name: string, re: RegExp): void;
+    validate(schema: unknown, data: unknown): boolean;
+  };
 };
 
 import { bootstrap } from "./bootstrap.js";
@@ -14,10 +17,6 @@ export type JSONSchema = Record<string, unknown>;
 
 export class SchemaValidationError extends Error {
   override readonly name = "SchemaValidationError";
-
-  constructor(message: string) {
-    super(message);
-  }
 }
 
 const ajv = new Ajv();

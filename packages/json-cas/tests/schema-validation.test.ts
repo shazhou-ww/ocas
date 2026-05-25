@@ -1,14 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { bootstrap } from "../src/bootstrap.js";
-import {
-  putSchema,
-  getSchema,
-  validate,
-  refs,
-  walk,
-  SchemaValidationError,
-} from "../src/schema.js";
 import { MemStore } from "../src/mem-store.js";
+import type { JSONSchema } from "../src/schema.js";
+import {
+  getSchema,
+  putSchema,
+  refs,
+  SchemaValidationError,
+  validate,
+  walk,
+} from "../src/schema.js";
 import type { CasNode } from "../src/types.js";
 
 describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
@@ -37,7 +38,8 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();
-    const properties = (metaSchema?.properties as Record<string, unknown>) || {};
+    const properties =
+      (metaSchema?.properties as Record<string, unknown>) || {};
 
     // Check that all supported keywords are defined
     expect(properties).toHaveProperty("type");
@@ -59,7 +61,8 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();
-    const properties = (metaSchema?.properties as Record<string, unknown>) || {};
+    const properties =
+      (metaSchema?.properties as Record<string, unknown>) || {};
 
     // Unsupported keywords should not be in properties
     expect(properties).not.toHaveProperty("$ref");
@@ -225,7 +228,10 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
   test("3.2: Reject schema with type as number", async () => {
     const store = new MemStore();
     await bootstrap(store);
-    expect(async () => await putSchema(store, { type: 123 } as any)).toThrow();
+    expect(
+      async () =>
+        await putSchema(store, { type: 123 } as unknown as JSONSchema),
+    ).toThrow();
   });
 
   test("3.3: Reject schema with properties not an object", async () => {
@@ -236,7 +242,7 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
         await putSchema(store, {
           type: "object",
           properties: "not-an-object",
-        } as any)
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -248,7 +254,7 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
         await putSchema(store, {
           type: "object",
           required: "name",
-        } as any)
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -260,7 +266,7 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
         await putSchema(store, {
           type: "object",
           required: ["name", 123, true],
-        } as any)
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -272,7 +278,7 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
         await putSchema(store, {
           type: "object",
           additionalProperties: "yes",
-        } as any)
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -281,7 +287,9 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     await bootstrap(store);
     expect(
       async () =>
-        await putSchema(store, { anyOf: { type: "string" } } as any)
+        await putSchema(store, {
+          anyOf: { type: "string" },
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -296,7 +304,10 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     await bootstrap(store);
     expect(
       async () =>
-        await putSchema(store, { type: "array", items: "string" } as any)
+        await putSchema(store, {
+          type: "array",
+          items: "string",
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -305,7 +316,10 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     await bootstrap(store);
     expect(
       async () =>
-        await putSchema(store, { type: "string", format: 123 } as any)
+        await putSchema(store, {
+          type: "string",
+          format: 123,
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -314,7 +328,10 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     await bootstrap(store);
     expect(
       async () =>
-        await putSchema(store, { type: "string", enum: "red" } as any)
+        await putSchema(store, {
+          type: "string",
+          enum: "red",
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -322,7 +339,7 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     const store = new MemStore();
     await bootstrap(store);
     expect(
-      async () => await putSchema(store, { type: "string", enum: [] })
+      async () => await putSchema(store, { type: "string", enum: [] }),
     ).toThrow();
   });
 
@@ -331,7 +348,10 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     await bootstrap(store);
     expect(
       async () =>
-        await putSchema(store, { type: "string", title: 123 } as any)
+        await putSchema(store, {
+          type: "string",
+          title: 123,
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -343,7 +363,7 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
         await putSchema(store, {
           type: "string",
           description: ["not a string"],
-        } as any)
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -352,7 +372,9 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     await bootstrap(store);
     expect(
       async () =>
-        await putSchema(store, { $ref: "#/definitions/user" } as any)
+        await putSchema(store, {
+          $ref: "#/definitions/user",
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -360,7 +382,8 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
     const store = new MemStore();
     await bootstrap(store);
     expect(
-      async () => await putSchema(store, "not-a-schema" as any)
+      async () =>
+        await putSchema(store, "not-a-schema" as unknown as JSONSchema),
     ).toThrow();
   });
 
@@ -374,7 +397,7 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
           properties: {
             name: { type: "invalid-type" },
           },
-        } as any)
+        } as unknown as JSONSchema),
     ).toThrow();
   });
 });
@@ -384,7 +407,7 @@ describe("Test Suite 4: Error Messages and Debugging", () => {
     const store = new MemStore();
     await bootstrap(store);
     try {
-      await putSchema(store, { type: 123 } as any);
+      await putSchema(store, { type: 123 } as unknown as JSONSchema);
       expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(SchemaValidationError);
@@ -396,7 +419,7 @@ describe("Test Suite 4: Error Messages and Debugging", () => {
     const store = new MemStore();
     await bootstrap(store);
     try {
-      await putSchema(store, { type: "invalid-type" } as any);
+      await putSchema(store, { type: "invalid-type" } as unknown as JSONSchema);
       expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(SchemaValidationError);
@@ -444,9 +467,7 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
       },
     });
 
-    const dataNode = store.get(
-      await store.put(schemaHash, { name: "test" })
-    );
+    const dataNode = store.get(await store.put(schemaHash, { name: "test" }));
 
     expect(dataNode).not.toBeNull();
     expect(validate(store, dataNode as CasNode)).toBe(true);
@@ -465,7 +486,7 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
     });
 
     const dataNode = store.get(
-      await store.put(schemaHash, { name: 123 }) // wrong type
+      await store.put(schemaHash, { name: 123 }), // wrong type
     );
 
     expect(dataNode).not.toBeNull();
@@ -509,9 +530,7 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
     });
 
     const refHash = "0000000000001";
-    const dataNode = store.get(
-      await store.put(schemaHash, { ref: refHash })
-    );
+    const dataNode = store.get(await store.put(schemaHash, { ref: refHash }));
 
     const extractedRefs = refs(store, dataNode as CasNode);
     expect(extractedRefs).toContain(refHash);
@@ -525,10 +544,7 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
       type: "object",
       properties: {
         next: {
-          anyOf: [
-            { type: "string", format: "cas_ref" },
-            { type: "null" },
-          ],
+          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
         },
       },
     });
@@ -563,7 +579,8 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
 
     expect(metaSchema).not.toBeNull();
     // The meta-schema should have properties that can contain schemas
-    const properties = (metaSchema?.properties as Record<string, unknown>) || {};
+    const properties =
+      (metaSchema?.properties as Record<string, unknown>) || {};
     expect(properties).toHaveProperty("properties");
   });
 
@@ -576,7 +593,7 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
       await putSchema(store, {
         type: "string",
         unknownKeyword: "value",
-      } as any);
+      } as unknown as JSONSchema);
       // If we get here, meta-schema allows additional properties
       // This is acceptable behavior
     } catch (error) {
@@ -594,12 +611,15 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
     expect(hash1).toBeTruthy();
 
     // Array of types
-    const hash2 = await putSchema(store, { type: ["string", "null"] } as any);
+    const hash2 = await putSchema(store, {
+      type: ["string", "null"],
+    } as unknown as JSONSchema);
     expect(hash2).toBeTruthy();
 
     // Invalid type (number)
     expect(
-      async () => await putSchema(store, { type: 123 } as any)
+      async () =>
+        await putSchema(store, { type: 123 } as unknown as JSONSchema),
     ).toThrow();
   });
 });

@@ -8,11 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import type {
-  BootstrapCapableStore,
-  CasNode,
-  Hash,
-} from "@uncaged/json-cas";
+import type { BootstrapCapableStore, CasNode, Hash } from "@uncaged/json-cas";
 
 import {
   BOOTSTRAP_STORE,
@@ -145,7 +141,11 @@ export function createFsStore(dir: string): BootstrapCapableStore {
       const hash = await computeHash(typeHash, payload);
 
       if (!data.has(hash)) {
-        const node: CasNode = { type: typeHash, payload, timestamp: Date.now() };
+        const node: CasNode = {
+          type: typeHash,
+          payload,
+          timestamp: Date.now(),
+        };
         data.set(hash, node);
 
         mkdirSync(dir, { recursive: true });
