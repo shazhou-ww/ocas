@@ -1,5 +1,13 @@
 # @uncaged/cli-json-cas
 
+## 0.5.3
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @uncaged/json-cas@0.5.3
+  - @uncaged/json-cas-fs@0.5.3
+
 ## 0.3.0
 
 ### Patch Changes

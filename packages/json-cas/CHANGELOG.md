@@ -1,5 +1,15 @@
 # @uncaged/json-cas
 
+## 0.5.3
+
+### Patch Changes
+
+- feat: add oneOf support to meta-schema validation
+
+  Added `oneOf` to `ALLOWED_SCHEMA_KEYS` and corresponding validation logic
+  in `isValidSchema`. This enables workflow frontmatter schemas that use
+  `oneOf` discriminated unions for multi-exit role definitions.
+
 ## 0.3.0
 
 ### Minor Changes

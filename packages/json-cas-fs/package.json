@@ -1,6 +1,6 @@
 {
   "name": "@uncaged/json-cas-fs",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,7 +19,7 @@
     "prepublishOnly": "echo '请用 bun run release 从根目录发版' && exit 1"
   },
   "dependencies": {
-    "@uncaged/json-cas": "^0.5.0",
+    "@uncaged/json-cas": "^0.5.3",
     "cborg": "^4.2.3"
   }
 }
