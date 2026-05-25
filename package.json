@@ -15,6 +15,7 @@
     "build": "tsc --build packages/json-cas packages/json-cas-fs packages/json-cas-workflow",
     "test": "bun test",
     "check": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "release": "changeset version && bun run build && changeset publish"
   }
 }
