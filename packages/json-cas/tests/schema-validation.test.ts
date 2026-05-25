@@ -69,7 +69,6 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
     expect(properties).not.toHaveProperty("$id");
     expect(properties).not.toHaveProperty("$defs");
     expect(properties).not.toHaveProperty("allOf");
-    expect(properties).not.toHaveProperty("oneOf");
     expect(properties).not.toHaveProperty("not");
   });
 
@@ -144,6 +143,18 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
     await bootstrap(store);
     const hash = await putSchema(store, {
       anyOf: [{ type: "string" }, { type: "null" }],
+    });
+    expect(hash).toBeTruthy();
+  });
+
+  test("2.7b: Accept schema with oneOf", async () => {
+    const store = new MemStore();
+    await bootstrap(store);
+    const hash = await putSchema(store, {
+      oneOf: [
+        { properties: { status: { const: "ready" } }, required: ["status"] },
+        { properties: { status: { const: "failed" } }, required: ["status"] },
+      ],
     });
     expect(hash).toBeTruthy();
   });

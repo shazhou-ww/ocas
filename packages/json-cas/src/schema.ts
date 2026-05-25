@@ -28,6 +28,7 @@ const ALLOWED_SCHEMA_KEYS = new Set([
   "required",
   "additionalProperties",
   "anyOf",
+  "oneOf",
   "items",
   "format",
   "title",
@@ -104,6 +105,13 @@ function isValidSchema(value: unknown): boolean {
   if ("anyOf" in schema) {
     if (!Array.isArray(schema.anyOf) || schema.anyOf.length === 0) return false;
     for (const entry of schema.anyOf) {
+      if (!isValidSchema(entry)) return false;
+    }
+  }
+
+  if ("oneOf" in schema) {
+    if (!Array.isArray(schema.oneOf) || schema.oneOf.length === 0) return false;
+    for (const entry of schema.oneOf) {
       if (!isValidSchema(entry)) return false;
     }
   }

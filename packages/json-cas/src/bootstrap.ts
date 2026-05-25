@@ -50,6 +50,10 @@ const BOOTSTRAP_PAYLOAD = {
       type: "array",
       items: { type: "object", additionalProperties: false },
     },
+    oneOf: {
+      type: "array",
+      items: { type: "object", additionalProperties: false },
+    },
     items: { type: "object", additionalProperties: false },
     format: { type: "string" },
     title: { type: "string" },
