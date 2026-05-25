@@ -4,27 +4,56 @@ import {
 } from "./bootstrap-capable.js";
 import type { Hash, Store } from "./types.js";
 
+const JSON_SCHEMA_TYPES = [
+  "string",
+  "number",
+  "integer",
+  "boolean",
+  "object",
+  "array",
+  "null",
+] as const;
+
 /**
- * The meta-schema seed payload: describes the structure of every CAS node.
- * This is the root type from which all other type nodes derive.
+ * Self-describing JSON Schema meta-schema for the supported schema subset.
+ * Stored as the bootstrap node's payload; its hash equals the node's type field.
  */
 const BOOTSTRAP_PAYLOAD = {
-  description: "json-cas meta-schema seed",
-  hashAlgorithm: "xxh64",
-  hashEncoding: "crockford-base32-13",
-  nodeSchema: {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    type: "object",
-    required: ["type", "payload", "timestamp"],
-    properties: {
-      type: { type: "string", description: "Hash of the type descriptor node (or self for bootstrap)" },
-      payload: { description: "Arbitrary data" },
-      timestamp: { type: "number", description: "Unix epoch ms when the node was first stored" },
+  type: "object",
+  additionalProperties: false,
+  description: "json-cas JSON Schema meta-schema",
+  properties: {
+    type: {
+      anyOf: [
+        { type: "string", enum: [...JSON_SCHEMA_TYPES] },
+        {
+          type: "array",
+          items: { type: "string", enum: [...JSON_SCHEMA_TYPES] },
+        },
+      ],
     },
-    additionalProperties: false,
+    properties: {
+      type: "object",
+      additionalProperties: { type: "object", additionalProperties: false },
+    },
+    required: {
+      type: "array",
+      items: { type: "string" },
+    },
+    additionalProperties: {
+      anyOf: [{ type: "boolean" }, { type: "object", additionalProperties: false }],
+    },
+    anyOf: {
+      type: "array",
+      items: { type: "object", additionalProperties: false },
+    },
+    items: { type: "object", additionalProperties: false },
+    format: { type: "string" },
+    title: { type: "string" },
+    enum: { type: "array" },
+    const: {},
+    description: { type: "string" },
   },
-  payloadEncoding: "cbor-rfc8949-deterministic",
-  version: "1",
 } as const;
 
 /**
