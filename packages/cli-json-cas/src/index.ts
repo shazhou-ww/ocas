@@ -116,10 +116,10 @@ async function cmdSchemaGet(args: string[]): Promise<void> {
 async function cmdSchemaList(): Promise<void> {
   const store = openStore();
   const metaHash = await bootstrap(store);
-  for (const hash of store.list()) {
+  for (const hash of store.listByType(metaHash)) {
     if (hash === metaHash) continue;
     const node = store.get(hash);
-    if (node !== null && node.type === metaHash) {
+    if (node !== null) {
       const schema = node.payload as JSONSchema;
       const name =
         (schema.title as string | undefined) ??
@@ -176,12 +176,7 @@ async function cmdVerify(args: string[]): Promise<void> {
   console.log(ok ? "ok" : "corrupted");
 }
 
-async function cmdList(): Promise<void> {
-  const store = openStore();
-  for (const hash of store.list()) {
-    console.log(hash);
-  }
-}
+
 
 async function cmdRefs(args: string[]): Promise<void> {
   const hash = args[0];
@@ -271,7 +266,6 @@ Commands:
   get <hash>                        Print node as JSON
   has <hash>                        Print true/false
   verify <hash>                     Verify integrity, print ok/corrupted
-  list                              List all hashes
   refs <hash>                       List direct cas_ref edges
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
@@ -335,10 +329,6 @@ switch (cmd) {
 
   case "verify":
     await cmdVerify(rest);
-    break;
-
-  case "list":
-    await cmdList();
     break;
 
   case "refs":

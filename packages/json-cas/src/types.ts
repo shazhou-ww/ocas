@@ -23,6 +23,5 @@ export type Store = {
   put(typeHash: Hash, payload: unknown): Promise<Hash>;
   get(hash: Hash): CasNode | null;
   has(hash: Hash): boolean;
-  list(): Hash[];
   listByType(typeHash: Hash): Hash[];
 };

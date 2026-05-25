@@ -30,15 +30,15 @@ describe("createFsStore – init and bootstrap", () => {
 
   test("store opens against an existing empty dir", () => {
     const store = createFsStore(dir);
-    expect(store.list()).toEqual([]);
+    expect(store.listByType("0000000000000")).toEqual([]);
   });
 
   test("store creates the directory on first put", async () => {
     const nested = join(dir, "sub", "store");
     const store = createFsStore(nested);
     const typeHash = await computeSelfHash({ name: "t" });
-    await store.put(typeHash, { x: 1 });
-    expect(store.list()).toHaveLength(1);
+    const hash = await store.put(typeHash, { x: 1 });
+    expect(store.has(hash)).toBe(true);
   });
 
   test("bootstrap returns a valid 13-char self-referencing hash", async () => {
@@ -58,7 +58,7 @@ describe("createFsStore – init and bootstrap", () => {
     const h2 = await bootstrap(store);
 
     expect(h1).toBe(h2);
-    expect(store.list()).toHaveLength(1);
+    expect(store.listByType(h1)).toHaveLength(1);
   });
 });
 
@@ -84,7 +84,7 @@ describe("createFsStore – persistence round-trip", () => {
     const store2 = createFsStore(dir);
     expect(store2.has(h1)).toBe(true);
     expect(store2.has(h2)).toBe(true);
-    expect(store2.list()).toHaveLength(2);
+    expect(store2.listByType(typeHash)).toHaveLength(2);
   });
 
   test("round-trip preserves type, payload, and timestamp", async () => {
@@ -125,7 +125,7 @@ describe("createFsStore – persistence round-trip", () => {
     const ts2 = store2.get(hash)?.timestamp;
 
     expect(ts1).toBe(ts2);
-    expect(store2.list()).toHaveLength(1);
+    expect(store2.listByType(typeHash)).toHaveLength(1);
   });
 });
 
@@ -151,7 +151,7 @@ describe("createFsStore – has and list", () => {
     expect(store.has(hash)).toBe(true);
   });
 
-  test("list returns all stored hashes", async () => {
+  test("listByType returns all stored hashes for a type", async () => {
     const store = createFsStore(dir);
     const typeHash = await computeSelfHash({ name: "t" });
 
@@ -159,16 +159,16 @@ describe("createFsStore – has and list", () => {
     const h2 = await store.put(typeHash, { a: 2 });
     const h3 = await store.put(typeHash, { a: 3 });
 
-    const all = store.list();
+    const all = store.listByType(typeHash);
     expect(all).toHaveLength(3);
     expect(all).toContain(h1);
     expect(all).toContain(h2);
     expect(all).toContain(h3);
   });
 
-  test("list returns empty array on fresh store", () => {
+  test("listByType returns empty array on fresh store", () => {
     const store = createFsStore(dir);
-    expect(store.list()).toEqual([]);
+    expect(store.listByType("0000000000000")).toEqual([]);
   });
 
   test("get returns null for unknown hash", () => {
