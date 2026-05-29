@@ -15,7 +15,8 @@
     "src"
   ],
   "scripts": {
-    "test": "bun test",
+    "test": "vitest run --passWithNoTests",
+    "test:ci": "vitest run --passWithNoTests",
     "prepublishOnly": "echo '请用 bun run release 从根目录发版' && exit 1"
   },
   "dependencies": {

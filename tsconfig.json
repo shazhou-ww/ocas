@@ -2,23 +2,23 @@
   "compilerOptions": {
     "types": ["bun-types"],
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "paths": {
-      "@uncaged/json-cas": ["./packages/json-cas/src/index.ts"],
-      "@uncaged/json-cas-fs": ["./packages/json-cas-fs/src/index.ts"]
-    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "dist"
+    "sourceMap": true
   },
-  "exclude": ["node_modules", "dist"]
+  "files": [],
+  "references": [
+    { "path": "packages/json-cas" },
+    { "path": "packages/json-cas-fs" },
+    { "path": "packages/cli-json-cas" }
+  ]
 }
