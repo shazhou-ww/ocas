@@ -15,4 +15,6 @@ export type Variable = {
   schema: Hash; // extracted from value's CAS node.type
   created: number; // epoch ms
   updated: number; // epoch ms
+  tags: Record<string, string>; // key-value pairs
+  labels: string[]; // bare identifiers
 };

@@ -11,9 +11,11 @@ import {
   createVariableStore,
   getSchema,
   InvalidScopeError,
+  InvalidTagFormatError,
   putSchema,
   refs,
   SchemaMismatchError,
+  TagLabelConflictError,
   VariableNotFoundError,
   validate,
   verify,
@@ -23,10 +25,17 @@ import { createFsStore } from "@uncaged/json-cas-fs";
 
 // ---- Argument parsing ----
 
-type Flags = Record<string, string | boolean>;
+type Flags = Record<string, string | boolean | string[]>;
 
 /** Flags that consume the next token as their value. All others are boolean. */
-const VALUE_FLAGS = new Set(["store", "format", "scope", "value", "var-db"]);
+const VALUE_FLAGS = new Set([
+  "store",
+  "format",
+  "scope",
+  "value",
+  "var-db",
+  "tag",
+]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
   const flags: Flags = {};
@@ -39,7 +48,19 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
       if (VALUE_FLAGS.has(key)) {
         const next = argv[i + 1];
         if (next !== undefined && !next.startsWith("--")) {
-          flags[key] = next;
+          // Handle repeatable flags (like --tag)
+          if (key === "tag") {
+            const existing = flags[key];
+            if (Array.isArray(existing)) {
+              existing.push(next);
+            } else if (typeof existing === "string") {
+              flags[key] = [existing, next];
+            } else {
+              flags[key] = [next];
+            }
+          } else {
+            flags[key] = next;
+          }
           i++;
         } else {
           flags[key] = true;
@@ -113,8 +134,19 @@ async function getVariableSchemaHash(): Promise<Hash> {
       schema: { type: "string" },
       created: { type: "number" },
       updated: { type: "number" },
+      tags: { type: "object" },
+      labels: { type: "array", items: { type: "string" } },
     },
-    required: ["id", "scope", "value", "schema", "created", "updated"],
+    required: [
+      "id",
+      "scope",
+      "value",
+      "schema",
+      "created",
+      "updated",
+      "tags",
+      "labels",
+    ],
   };
 
   // Compute hash or retrieve from store
@@ -133,6 +165,38 @@ async function wrapVariableEnvelope(
     type: typeHash,
     value: variable,
   };
+}
+
+/**
+ * Parse tag/label arguments
+ * Returns: { tags: Record<string, string>, labels: string[], deleteNames: string[] }
+ */
+function parseTagsLabels(args: string[]): {
+  tags: Record<string, string>;
+  labels: string[];
+  deleteNames: string[];
+} {
+  const tags: Record<string, string> = {};
+  const labels: string[] = [];
+  const deleteNames: string[] = [];
+
+  for (const arg of args) {
+    if (arg.startsWith(":")) {
+      // Deletion syntax: :name
+      deleteNames.push(arg.slice(1));
+    } else if (arg.includes(":")) {
+      // Tag: key:value (split on first colon)
+      const colonIdx = arg.indexOf(":");
+      const key = arg.slice(0, colonIdx);
+      const value = arg.slice(colonIdx + 1);
+      tags[key] = value;
+    } else {
+      // Label: bare identifier
+      labels.push(arg);
+    }
+  }
+
+  return { tags, labels, deleteNames };
 }
 
 // ---- Commands ----
@@ -308,6 +372,7 @@ async function cmdCat(args: string[]): Promise<void> {
 async function cmdVarCreate(_args: string[]): Promise<void> {
   const scope = flags.scope as string | undefined;
   const value = flags.value as string | undefined;
+  const tagFlags = flags.tag;
 
   if (!scope) die("Usage: json-cas var create --scope <scope> --value <hash>");
   if (!value) die("Usage: json-cas var create --scope <scope> --value <hash>");
@@ -315,11 +380,31 @@ async function cmdVarCreate(_args: string[]): Promise<void> {
   const varStore = openVarStore();
 
   try {
-    const variable = varStore.create(scope, value);
+    // Parse tags/labels from --tag flags
+    const tagArgs = Array.isArray(tagFlags)
+      ? tagFlags
+      : typeof tagFlags === "string"
+        ? [tagFlags]
+        : [];
+    const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+
+    // Check for conflicts in initial tags/labels
+    if (deleteNames.length > 0) {
+      die("Error: Cannot use deletion syntax (:name) in var create");
+    }
+
+    const variable = varStore.create(scope, value, {
+      tags: Object.keys(tags).length > 0 ? tags : undefined,
+      labels: labels.length > 0 ? labels : undefined,
+    });
     const envelope = await wrapVariableEnvelope(variable);
     out(envelope);
   } catch (e) {
-    if (e instanceof InvalidScopeError || e instanceof CasNodeNotFoundError) {
+    if (
+      e instanceof InvalidScopeError ||
+      e instanceof CasNodeNotFoundError ||
+      e instanceof TagLabelConflictError
+    ) {
       die(`Error: ${e.message}`);
     }
     throw e;
@@ -394,13 +479,67 @@ async function cmdVarDelete(args: string[]): Promise<void> {
   }
 }
 
-async function cmdVarList(_args: string[]): Promise<void> {
-  const scope = (flags.scope as string | undefined) ?? "";
+async function cmdVarTag(args: string[]): Promise<void> {
+  const id = args[0];
+  if (!id) die("Usage: json-cas var tag <id> <tag>...");
+
+  const tagArgs = args.slice(1);
+  if (tagArgs.length === 0) {
+    die("Usage: json-cas var tag <id> <tag>...");
+  }
 
   const varStore = openVarStore();
 
   try {
-    const variables = varStore.list({ scope });
+    const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+
+    const variable = varStore.tag(id, {
+      add: Object.keys(tags).length > 0 ? tags : undefined,
+      addLabels: labels.length > 0 ? labels : undefined,
+      delete: deleteNames.length > 0 ? deleteNames : undefined,
+    });
+
+    const envelope = await wrapVariableEnvelope(variable);
+    out(envelope);
+  } catch (e) {
+    if (
+      e instanceof VariableNotFoundError ||
+      e instanceof TagLabelConflictError ||
+      e instanceof InvalidTagFormatError
+    ) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdVarList(_args: string[]): Promise<void> {
+  const scope = (flags.scope as string | undefined) ?? "";
+  const tagFlags = flags.tag;
+
+  const varStore = openVarStore();
+
+  try {
+    // Parse tags/labels from --tag flags
+    const tagArgs = Array.isArray(tagFlags)
+      ? tagFlags
+      : typeof tagFlags === "string"
+        ? [tagFlags]
+        : [];
+    const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+
+    // Check for invalid deletion syntax in filters
+    if (deleteNames.length > 0) {
+      die("Error: Cannot use deletion syntax (:name) in var list filters");
+    }
+
+    const variables = varStore.list({
+      scope,
+      tags: Object.keys(tags).length > 0 ? tags : undefined,
+      labels: labels.length > 0 ? labels : undefined,
+    });
     const envelope = await wrapVariableEnvelope(variables);
     out(envelope);
   } catch (e) {
@@ -432,16 +571,18 @@ Commands:
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
   cat <hash> [--payload]            Output node (--payload for payload only)
-  var create --scope <s> --value <h> Create a variable
+  var create --scope <s> --value <h> [--tag <tag>...] Create a variable
   var get <id>                      Get a variable by ID
   var update <id> <hash>            Update variable value
   var delete <id>                   Delete a variable
-  var list [--scope <prefix>]       List variables (optionally filter by scope prefix)
+  var tag <id> <tag>...             Add/update/delete tags and labels
+  var list [--scope <prefix>] [--tag <tag>...] List variables (filter by scope/tags/labels)
 
 Flags:
   --store <path>   Store directory (default: ~/.uncaged/json-cas)
   --var-db <path>  Variable database path (default: <store>/variables.db)
-  --json           Compact JSON output`);
+  --json           Compact JSON output
+  --tag <tag>      Tag/label (can be repeated): key:value (tag), name (label), :name (delete)`);
 }
 
 // ---- Dispatch ----
@@ -529,6 +670,9 @@ switch (cmd) {
         break;
       case "delete":
         await cmdVarDelete(subRest);
+        break;
+      case "tag":
+        await cmdVarTag(subRest);
         break;
       case "list":
         await cmdVarList(subRest);

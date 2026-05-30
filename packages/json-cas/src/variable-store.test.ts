@@ -68,6 +68,8 @@ describe("VariableStore", () => {
       expect(variable.created).toBeGreaterThan(Date.now() - 5000);
       expect(variable.created).toBeLessThanOrEqual(Date.now());
       expect(variable.updated).toBe(variable.created);
+      expect(variable.tags).toEqual({});
+      expect(variable.labels).toEqual([]);
 
       // Verify persistence
       const retrieved = varStore.get(variable.id);
@@ -75,6 +77,8 @@ describe("VariableStore", () => {
       expect(retrieved?.id).toBe(variable.id);
       expect(retrieved?.scope).toBe(variable.scope);
       expect(retrieved?.value).toBe(variable.value);
+      expect(retrieved?.tags).toEqual({});
+      expect(retrieved?.labels).toEqual([]);
     });
 
     test("1.2: Create variable fails with scope not ending in /", () => {

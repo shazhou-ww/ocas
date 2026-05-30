@@ -19,7 +19,9 @@ export {
   CasNodeNotFoundError,
   createVariableStore,
   InvalidScopeError,
+  InvalidTagFormatError,
   SchemaMismatchError,
+  TagLabelConflictError,
   VariableNotFoundError,
   VariableStore,
 } from "./variable-store.js";
