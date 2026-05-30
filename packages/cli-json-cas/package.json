@@ -3,7 +3,8 @@
   "version": "0.5.3",
   "type": "module",
   "bin": {
-    "json-cas": "./src/index.ts"
+    "json-cas": "./src/index.ts",
+    "ucas": "./src/index.ts"
   },
   "scripts": {
     "test": "bun test",
