@@ -16,7 +16,7 @@ describe("Variable Type", () => {
     expect(variable.name).toBe("config");
     expect(variable.schema).toBe("ABC123DEF4567");
     // id and scope should not exist
-    expect((variable as any).id).toBeUndefined();
-    expect((variable as any).scope).toBeUndefined();
+    expect((variable as unknown as { id?: unknown }).id).toBeUndefined();
+    expect((variable as unknown as { scope?: unknown }).scope).toBeUndefined();
   });
 });

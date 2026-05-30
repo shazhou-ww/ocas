@@ -28,8 +28,11 @@ export class VariableDuplicateError extends Error {
 }
 
 export class InvalidVariableNameError extends Error {
-  constructor(public variableName: string) {
-    super(`Variable name cannot be empty`);
+  constructor(
+    public variableName: string,
+    public reason: string,
+  ) {
+    super(`Invalid variable name "${variableName}": ${reason}`);
     this.name = "InvalidVariableNameError";
   }
 }
@@ -124,6 +127,51 @@ export class VariableStore {
   }
 
   /**
+   * Validate variable name format
+   */
+  private validateName(name: string): void {
+    // Rule 1: Cannot be empty
+    if (name === "") {
+      throw new InvalidVariableNameError(name, "Name cannot be empty");
+    }
+
+    // Rule 2: No leading slash
+    if (name.startsWith("/")) {
+      throw new InvalidVariableNameError(
+        name,
+        "Name cannot start with leading slash",
+      );
+    }
+
+    // Rule 3: No trailing slash
+    if (name.endsWith("/")) {
+      throw new InvalidVariableNameError(
+        name,
+        "Name cannot end with trailing slash",
+      );
+    }
+
+    // Rule 4: Each segment must match [a-zA-Z0-9._-]+ and no empty segments
+    const segments = name.split("/");
+    for (const segment of segments) {
+      if (segment === "") {
+        throw new InvalidVariableNameError(
+          name,
+          "Name contains empty segment (consecutive slashes //)",
+        );
+      }
+
+      // Check for invalid characters
+      if (!/^[a-zA-Z0-9._-]+$/.test(segment)) {
+        throw new InvalidVariableNameError(
+          name,
+          `Segment "${segment}" contains invalid characters (only a-z, A-Z, 0-9, ., _, - allowed)`,
+        );
+      }
+    }
+  }
+
+  /**
    * Extract schema hash from CAS node
    */
   private extractSchema(hash: string): string {
@@ -171,6 +219,163 @@ export class VariableStore {
   }
 
   /**
+   * Set a variable (upsert: create or update)
+   */
+  set(
+    name: string,
+    value: string,
+    options?: {
+      tags?: Record<string, string>;
+      labels?: string[];
+    },
+  ): Variable {
+    // Validate name format
+    this.validateName(name);
+
+    const schema = this.extractSchema(value);
+
+    // Check if variable exists
+    const existing = this.get(name, schema);
+
+    if (existing !== null) {
+      // Update existing variable
+      const now = Date.now();
+
+      // If options provided, use them; otherwise preserve existing
+      const tags = options?.tags ?? existing.tags;
+      const labels = options?.labels ?? existing.labels;
+
+      this.db.exec("BEGIN TRANSACTION");
+
+      try {
+        // Update value and timestamp
+        const updateStmt = this.db.prepare(`
+          UPDATE variables
+          SET value = ?, updated = ?
+          WHERE name = ? AND schema = ?
+        `);
+        updateStmt.run(value, now, name, schema);
+
+        // If options provided, update tags/labels
+        if (options !== undefined) {
+          // Delete existing tags and labels
+          this.db
+            .prepare(`
+            DELETE FROM variable_tags WHERE variable_name = ? AND variable_schema = ?
+          `)
+            .run(name, schema);
+
+          this.db
+            .prepare(`
+            DELETE FROM variable_labels WHERE variable_name = ? AND variable_schema = ?
+          `)
+            .run(name, schema);
+
+          // Insert new tags
+          const tagKeys = Object.keys(tags);
+          if (tagKeys.length > 0) {
+            const tagStmt = this.db.prepare(`
+              INSERT INTO variable_tags (variable_name, variable_schema, key, value)
+              VALUES (?, ?, ?, ?)
+            `);
+            for (const [key, val] of Object.entries(tags)) {
+              tagStmt.run(name, schema, key, val);
+            }
+          }
+
+          // Insert new labels
+          if (labels.length > 0) {
+            const labelStmt = this.db.prepare(`
+              INSERT INTO variable_labels (variable_name, variable_schema, name)
+              VALUES (?, ?, ?)
+            `);
+            for (const labelName of labels) {
+              labelStmt.run(name, schema, labelName);
+            }
+          }
+        }
+
+        this.db.exec("COMMIT");
+      } catch (e) {
+        this.db.exec("ROLLBACK");
+        throw e;
+      }
+
+      return {
+        name,
+        schema,
+        value,
+        created: existing.created,
+        updated: now,
+        tags,
+        labels: [...labels],
+      };
+    }
+
+    // Create new variable
+    const tags = options?.tags ?? {};
+    const labels = options?.labels ?? [];
+
+    // Check for tag/label conflicts
+    const tagKeys = Object.keys(tags);
+    for (const key of tagKeys) {
+      if (labels.includes(key)) {
+        throw new TagLabelConflictError(key, "label", "tag");
+      }
+    }
+
+    const now = Date.now();
+
+    this.db.exec("BEGIN TRANSACTION");
+
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO variables (name, schema, value, created, updated)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      stmt.run(name, schema, value, now, now);
+
+      // Insert tags
+      if (tagKeys.length > 0) {
+        const tagStmt = this.db.prepare(`
+          INSERT INTO variable_tags (variable_name, variable_schema, key, value)
+          VALUES (?, ?, ?, ?)
+        `);
+        for (const [key, val] of Object.entries(tags)) {
+          tagStmt.run(name, schema, key, val);
+        }
+      }
+
+      // Insert labels
+      if (labels.length > 0) {
+        const labelStmt = this.db.prepare(`
+          INSERT INTO variable_labels (variable_name, variable_schema, name)
+          VALUES (?, ?, ?)
+        `);
+        for (const labelName of labels) {
+          labelStmt.run(name, schema, labelName);
+        }
+      }
+
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+
+    return {
+      name,
+      schema,
+      value,
+      created: now,
+      updated: now,
+      tags,
+      labels: [...labels],
+    };
+  }
+
+  /**
    * Create a new variable
    */
   create(
@@ -181,10 +386,8 @@ export class VariableStore {
       labels?: string[];
     },
   ): Variable {
-    // Validate name is not empty
-    if (name === "") {
-      throw new InvalidVariableNameError(name);
-    }
+    // Validate name format
+    this.validateName(name);
 
     const schema = this.extractSchema(value);
 
@@ -211,8 +414,14 @@ export class VariableStore {
 
       try {
         stmt.run(name, schema, value, now, now);
-      } catch (e: any) {
-        if (e?.message?.includes("UNIQUE constraint failed")) {
+      } catch (e: unknown) {
+        if (
+          e !== null &&
+          typeof e === "object" &&
+          "message" in e &&
+          typeof e.message === "string" &&
+          e.message.includes("UNIQUE constraint failed")
+        ) {
           throw new VariableDuplicateError(name, schema);
         }
         throw e;
@@ -258,50 +467,90 @@ export class VariableStore {
   }
 
   /**
-   * Get a variable by (name, schema)
+   * Get a variable by name, optionally with schema
    */
-  get(name: string, schema: Hash): Variable | null {
+  get(name: string): Variable | Variable[] | null;
+  get(name: string, schema: Hash): Variable | null;
+  get(name: string, schema?: Hash): Variable | Variable[] | null {
+    if (schema !== undefined) {
+      // Precise match with schema
+      const stmt = this.db.prepare(`
+        SELECT name, schema, value, created, updated
+        FROM variables
+        WHERE name = ? AND schema = ?
+      `);
+
+      const row = stmt.get(name, schema) as
+        | {
+            name: string;
+            schema: string;
+            value: string;
+            created: number;
+            updated: number;
+          }
+        | undefined
+        | null;
+
+      if (row === undefined || row === null) {
+        return null;
+      }
+
+      const tags = this.loadTags(row.name, row.schema);
+      const labels = this.loadLabels(row.name, row.schema);
+
+      return {
+        name: row.name,
+        schema: row.schema,
+        value: row.value,
+        created: row.created,
+        updated: row.updated,
+        tags,
+        labels,
+      };
+    }
+
+    // No schema: query all variants with matching name
     const stmt = this.db.prepare(`
       SELECT name, schema, value, created, updated
       FROM variables
-      WHERE name = ? AND schema = ?
+      WHERE name = ?
     `);
 
-    const row = stmt.get(name, schema) as
-      | {
-          name: string;
-          schema: string;
-          value: string;
-          created: number;
-          updated: number;
-        }
-      | undefined
-      | null;
+    const rows = stmt.all(name) as Array<{
+      name: string;
+      schema: string;
+      value: string;
+      created: number;
+      updated: number;
+    }>;
 
-    if (row === undefined || row === null) {
+    if (rows.length === 0) {
       return null;
     }
 
-    const tags = this.loadTags(row.name, row.schema);
-    const labels = this.loadLabels(row.name, row.schema);
-
-    return {
+    const variables: Variable[] = rows.map((row) => ({
       name: row.name,
       schema: row.schema,
       value: row.value,
       created: row.created,
       updated: row.updated,
-      tags,
-      labels,
-    };
+      tags: this.loadTags(row.name, row.schema),
+      labels: this.loadLabels(row.name, row.schema),
+    }));
+
+    // Return single Variable if only one, array if multiple
+    return variables.length === 1 ? (variables[0] as Variable) : variables;
   }
 
   /**
    * Update a variable's value (with schema validation)
    */
   update(name: string, schema: Hash, value: string): Variable {
+    // Validate name format
+    this.validateName(name);
+
     const existing = this.get(name, schema);
-    if (existing === null) {
+    if (existing === null || Array.isArray(existing)) {
       throw new VariableNotFoundError(name, schema);
     }
 
@@ -328,7 +577,47 @@ export class VariableStore {
   }
 
   /**
-   * Delete a variable
+   * Remove a variable (or all variants if schema omitted)
+   */
+  remove(name: string): Variable[];
+  remove(name: string, schema: Hash): Variable;
+  remove(name: string, schema?: Hash): Variable | Variable[] {
+    if (schema !== undefined) {
+      // Remove specific (name, schema) variant
+      const existing = this.get(name, schema);
+      if (existing === null || Array.isArray(existing)) {
+        throw new VariableNotFoundError(name, schema);
+      }
+
+      const stmt = this.db.prepare(`
+        DELETE FROM variables WHERE name = ? AND schema = ?
+      `);
+
+      stmt.run(name, schema);
+
+      return existing;
+    }
+
+    // Remove all schema variants for this name
+    const variants = this.get(name);
+
+    if (variants === null) {
+      return [];
+    }
+
+    const variantsArray = Array.isArray(variants) ? variants : [variants];
+
+    const stmt = this.db.prepare(`
+      DELETE FROM variables WHERE name = ?
+    `);
+
+    stmt.run(name);
+
+    return variantsArray;
+  }
+
+  /**
+   * Delete a variable (deprecated: use remove() instead)
    */
   delete(name: string, schema: Hash): Variable {
     const existing = this.get(name, schema);
@@ -405,7 +694,7 @@ export class VariableStore {
     }
 
     if (whereClauses.length > 0) {
-      query += " WHERE " + whereClauses.join(" AND ");
+      query += ` WHERE ${whereClauses.join(" AND ")}`;
     }
 
     query += " ORDER BY v.created ASC";
@@ -442,8 +731,11 @@ export class VariableStore {
       delete?: string[]; // tag keys or label names to delete
     },
   ): Variable {
+    // Validate name format
+    this.validateName(name);
+
     const existing = this.get(name, schema);
-    if (existing === null) {
+    if (existing === null || Array.isArray(existing)) {
       throw new VariableNotFoundError(name, schema);
     }
 
@@ -533,7 +825,7 @@ export class VariableStore {
 
     // Return updated variable
     const updated = this.get(name, schema);
-    if (updated === null) {
+    if (updated === null || Array.isArray(updated)) {
       throw new VariableNotFoundError(name, schema);
     }
     return updated;
