@@ -15,12 +15,12 @@ export {
 } from "./schema.js";
 export { createMemoryStore } from "./store.js";
 export type { CasNode, Hash, Store } from "./types.js";
-export type { Variable, VariableId } from "./variable.js";
+export type { Variable } from "./variable.js";
 export {
   CasNodeNotFoundError,
   createVariableStore,
-  InvalidScopeError,
   InvalidTagFormatError,
+  InvalidVariableNameError,
   SchemaMismatchError,
   TagLabelConflictError,
   VariableNotFoundError,
