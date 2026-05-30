@@ -1,55 +1,103 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { bootstrap } from "./bootstrap.js";
+import { putSchema } from "./schema.js";
 import { createMemoryStore } from "./store.js";
 import type { Store } from "./types.js";
 import {
   CasNodeNotFoundError,
-  InvalidScopeError,
+  InvalidVariableNameError,
   SchemaMismatchError,
+  TagLabelConflictError,
+  VariableDuplicateError,
   VariableNotFoundError,
   VariableStore,
 } from "./variable-store.js";
 
-describe("VariableStore", () => {
-  let store: Store;
-  let varStore: VariableStore;
-  let dbPath: string;
-  let schemaA: string;
-  let schemaB: string;
-  let hashA: string;
-  let hashB: string;
-  let hashC: string;
+const tmpDbPath = () =>
+  join(
+    tmpdir(),
+    `test-var-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
+  );
 
-  beforeEach(async () => {
-    // Create a temporary database
-    dbPath = join(tmpdir(), `test-variables-${Date.now()}.db`);
+describe("VariableStore - Database Schema", () => {
+  test("Database schema has (name, schema) composite primary key", () => {
+    const store = createMemoryStore();
+    const dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
 
-    // Create a CAS store with test data
-    store = createMemoryStore();
+    // Query schema from SQLite
+    const db = (varStore as any).db;
+    const tableInfo = db.prepare("PRAGMA table_info(variables)").all();
 
-    // Create two different schemas
-    schemaA = await store.put("BOOTSTRAPHASH", {
-      type: "object",
-      properties: { name: { type: "string" } },
-    });
-    schemaB = await store.put("BOOTSTRAPHASH", {
-      type: "object",
-      properties: { count: { type: "number" } },
-    });
+    // Check columns
+    const columns = tableInfo.map((col: any) => col.name);
+    expect(columns).toContain("name");
+    expect(columns).toContain("schema");
+    expect(columns).not.toContain("id");
+    expect(columns).not.toContain("scope");
 
-    // Create CAS nodes with different schemas
-    hashA = await store.put(schemaA, { name: "hello" });
-    hashB = await store.put(schemaA, { name: "world" });
-    hashC = await store.put(schemaB, { count: 42 });
+    // Check primary key
+    const pkColumns = tableInfo
+      .filter((col: any) => col.pk > 0)
+      .sort((a: any, b: any) => a.pk - b.pk)
+      .map((col: any) => col.name);
+    expect(pkColumns).toEqual(["name", "schema"]);
 
-    // Create variable store
-    varStore = new VariableStore(dbPath, store);
+    varStore.close();
+    unlinkSync(dbPath);
   });
 
-  afterEach(() => {
+  test("Database indexes reference name instead of id/scope", () => {
+    const store = createMemoryStore();
+    const dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const db = (varStore as any).db;
+    const indexes = db
+      .prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='variables'",
+      )
+      .all();
+
+    // Should have indexes on name, value, schema
+    const indexNames = indexes.map((idx: any) => idx.name);
+    expect(indexNames).toContain("idx_var_name");
+    expect(indexNames).toContain("idx_var_value");
+    expect(indexNames).toContain("idx_var_schema");
+
+    // Should NOT have scope index
+    expect(indexNames).not.toContain("idx_var_scope");
+
     varStore.close();
+    unlinkSync(dbPath);
+  });
+
+  test("variable_tags table has composite foreign key", () => {
+    const store = createMemoryStore();
+    const dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const db = (varStore as any).db;
+    const tableInfo = db.prepare("PRAGMA table_info(variable_tags)").all();
+
+    const columns = tableInfo.map((col: any) => col.name);
+    expect(columns).toContain("variable_name");
+    expect(columns).toContain("variable_schema");
+    expect(columns).not.toContain("variable_id");
+
+    varStore.close();
+    unlinkSync(dbPath);
+  });
+});
+
+describe("VariableStore - Create Operation", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
     try {
       unlinkSync(dbPath);
     } catch {
@@ -57,351 +105,853 @@ describe("VariableStore", () => {
     }
   });
 
-  describe("Test Group 1: Variable Creation", () => {
-    test("1.1: Create variable with valid scope", () => {
-      const variable = varStore.create("uwf/thread/", hashA);
-
-      expect(variable.id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
-      expect(variable.scope).toBe("uwf/thread/");
-      expect(variable.value).toBe(hashA);
-      expect(variable.schema).toBe(schemaA);
-      expect(variable.created).toBeGreaterThan(Date.now() - 5000);
-      expect(variable.created).toBeLessThanOrEqual(Date.now());
-      expect(variable.updated).toBe(variable.created);
-      expect(variable.tags).toEqual({});
-      expect(variable.labels).toEqual([]);
-
-      // Verify persistence
-      const retrieved = varStore.get(variable.id);
-      expect(retrieved).not.toBeNull();
-      expect(retrieved?.id).toBe(variable.id);
-      expect(retrieved?.scope).toBe(variable.scope);
-      expect(retrieved?.value).toBe(variable.value);
-      expect(retrieved?.tags).toEqual({});
-      expect(retrieved?.labels).toEqual([]);
+  test("Create variable with unique (name, schema)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
     });
+    const dataHash = await store.put(schemaHash, { x: 42 });
 
-    test("1.2: Create variable fails with scope not ending in /", () => {
-      expect(() => varStore.create("uwf/thread", hashA)).toThrow(
-        InvalidScopeError,
-      );
-      expect(() => varStore.create("uwf/thread", hashA)).toThrow(
-        "scope must end with /",
-      );
-    });
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
 
-    test("1.3: Create variable fails with non-existent CAS node", () => {
-      const fakeHash = "FAKEHASH00000";
-      expect(() => varStore.create("uwf/", fakeHash)).toThrow(
-        CasNodeNotFoundError,
-      );
-      expect(() => varStore.create("uwf/", fakeHash)).toThrow(
-        `CAS node not found: ${fakeHash}`,
-      );
-    });
+    const variable = varStore.create("config", dataHash);
+
+    expect(variable.name).toBe("config");
+    expect(variable.schema).toBe(schemaHash);
+    expect(variable.value).toBe(dataHash);
+    expect(variable.created).toBeGreaterThan(0);
+    expect(variable.updated).toBe(variable.created);
+    expect(variable.tags).toEqual({});
+    expect(variable.labels).toEqual([]);
+
+    varStore.close();
   });
 
-  describe("Test Group 2: Variable Retrieval", () => {
-    test("2.1: Get existing variable", () => {
-      const created = varStore.create("uwf/thread/", hashA);
-      const retrieved = varStore.get(created.id);
-
-      expect(retrieved).not.toBeNull();
-      expect(retrieved?.id).toBe(created.id);
-      expect(retrieved?.scope).toBe("uwf/thread/");
-      expect(retrieved?.value).toBe(hashA);
-      expect(retrieved?.schema).toBe(schemaA);
-      expect(retrieved?.created).toBe(created.created);
-      expect(retrieved?.updated).toBe(created.updated);
+  test("Create fails for duplicate (name, schema)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
     });
+    const hash1 = await store.put(schemaHash, { x: 42 });
+    const hash2 = await store.put(schemaHash, { x: 99 });
 
-    test("2.2: Get non-existent variable", () => {
-      const fakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-      const result = varStore.get(fakeId);
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
 
-      expect(result).toBeNull();
-    });
+    varStore.create("config", hash1);
+
+    expect(() => varStore.create("config", hash2)).toThrow(
+      VariableDuplicateError,
+    );
+    expect(() => varStore.create("config", hash2)).toThrow(
+      "Variable already exists: name=config, schema=",
+    );
+
+    varStore.close();
   });
 
-  describe("Test Group 3: Variable Update (Schema Consistent)", () => {
-    test("3.1: Update variable with matching schema", async () => {
-      const created = varStore.create("uwf/thread/", hashA);
-      const t1 = created.created;
-
-      // Wait a bit to ensure different timestamp
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const updated = varStore.update(created.id, hashB);
-
-      expect(updated.id).toBe(created.id);
-      expect(updated.scope).toBe("uwf/thread/");
-      expect(updated.value).toBe(hashB);
-      expect(updated.schema).toBe(schemaA);
-      expect(updated.created).toBe(t1);
-      expect(updated.updated).toBeGreaterThan(t1);
-      expect(updated.updated).toBeGreaterThan(Date.now() - 5000);
-      expect(updated.updated).toBeLessThanOrEqual(Date.now());
-
-      // Verify persistence
-      const retrieved = varStore.get(created.id);
-      expect(retrieved?.value).toBe(hashB);
-      expect(retrieved?.updated).toBe(updated.updated);
+  test("Create allows same name with different schemas", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
     });
-
-    test("3.2: Update variable to same value is idempotent", () => {
-      const created = varStore.create("uwf/thread/", hashA);
-      const updated = varStore.update(created.id, hashA);
-
-      expect(updated.value).toBe(hashA);
-      expect(updated.schema).toBe(schemaA);
-      // Updated timestamp may change, this is implementation-defined
+    const schemaB = await putSchema(store, {
+      type: "object",
+      properties: { y: { type: "string" } },
     });
+    const hashA = await store.put(schemaA, { x: 42 });
+    const hashB = await store.put(schemaB, { y: "hello" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const varA = varStore.create("config", hashA);
+    const varB = varStore.create("config", hashB);
+
+    expect(varA.name).toBe("config");
+    expect(varA.schema).toBe(schemaA);
+    expect(varB.name).toBe("config");
+    expect(varB.schema).toBe(schemaB);
+    expect(varA.value).not.toBe(varB.value);
+
+    varStore.close();
   });
 
-  describe("Test Group 4: Variable Update (Schema Mismatch)", () => {
-    test("4.1: Update variable fails with schema mismatch", () => {
-      const created = varStore.create("uwf/thread/", hashA);
+  test("Create variable with tags and labels", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const dataHash = await store.put(schemaHash, { x: 42 });
 
-      expect(() => varStore.update(created.id, hashC)).toThrow(
-        SchemaMismatchError,
-      );
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
 
-      const error = (() => {
-        try {
-          varStore.update(created.id, hashC);
-          return null;
-        } catch (e) {
-          return e as SchemaMismatchError;
-        }
-      })();
-
-      expect(error).not.toBeNull();
-      expect(error?.expected).toBe(schemaA);
-      expect(error?.actual).toBe(schemaB);
-      expect(error?.message.toLowerCase()).toContain("schema mismatch");
-
-      // Verify variable is unchanged
-      const retrieved = varStore.get(created.id);
-      expect(retrieved?.value).toBe(hashA);
+    const variable = varStore.create("config", dataHash, {
+      tags: { env: "prod", region: "us-east" },
+      labels: ["critical", "monitored"],
     });
 
-    test("4.2: Update variable fails with non-existent CAS node", () => {
-      const created = varStore.create("uwf/thread/", hashA);
-      const fakeHash = "FAKEHASH00000";
+    expect(variable.tags).toEqual({ env: "prod", region: "us-east" });
+    expect(variable.labels).toEqual(["critical", "monitored"]);
 
-      expect(() => varStore.update(created.id, fakeHash)).toThrow(
-        CasNodeNotFoundError,
-      );
-    });
-
-    test("4.3: Update non-existent variable", () => {
-      const fakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-
-      expect(() => varStore.update(fakeId, hashA)).toThrow(
-        VariableNotFoundError,
-      );
-      expect(() => varStore.update(fakeId, hashA)).toThrow(
-        `Variable not found: ${fakeId}`,
-      );
-    });
+    varStore.close();
   });
 
-  describe("Test Group 5: Variable Deletion", () => {
-    test("5.1: Delete existing variable", () => {
-      const created = varStore.create("uwf/thread/", hashA);
-      const deleted = varStore.delete(created.id);
+  test("Create fails for non-existent CAS node", async () => {
+    store = createMemoryStore();
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
 
-      expect(deleted.id).toBe(created.id);
-      expect(deleted.scope).toBe(created.scope);
-      expect(deleted.value).toBe(created.value);
-      expect(deleted.schema).toBe(created.schema);
+    const fakeHash = "FAKEHASH00000";
 
-      // Verify it's removed from database
-      const retrieved = varStore.get(created.id);
-      expect(retrieved).toBeNull();
-    });
+    expect(() => varStore.create("config", fakeHash)).toThrow(
+      CasNodeNotFoundError,
+    );
+    expect(() => varStore.create("config", fakeHash)).toThrow(
+      `CAS node not found: ${fakeHash}`,
+    );
 
-    test("5.2: Get deleted variable", () => {
-      const created = varStore.create("uwf/thread/", hashA);
-      varStore.delete(created.id);
-
-      const retrieved = varStore.get(created.id);
-      expect(retrieved).toBeNull();
-    });
-
-    test("5.3: Delete non-existent variable", () => {
-      const fakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-
-      expect(() => varStore.delete(fakeId)).toThrow(VariableNotFoundError);
-      expect(() => varStore.delete(fakeId)).toThrow(
-        `Variable not found: ${fakeId}`,
-      );
-    });
+    varStore.close();
   });
 
-  describe("Test Group 6: Variable Listing", () => {
-    test("6.1: list() returns all variables with matching scope prefix", async () => {
-      const var1 = varStore.create("uwf/thread/", hashA);
-      const var2 = varStore.create("uwf/thread/", hashB);
-      const var3 = varStore.create("uwf/agent/", hashA);
-      varStore.create("app/config/", hashA);
+  test("Create validates name is non-empty", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const dataHash = await store.put(schemaHash, {});
 
-      // Wait a bit to ensure different timestamps
-      await new Promise((resolve) => setTimeout(resolve, 10));
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
 
-      const results = varStore.list({ scope: "uwf/" });
+    expect(() => varStore.create("", dataHash)).toThrow(
+      InvalidVariableNameError,
+    );
+    expect(() => varStore.create("", dataHash)).toThrow(
+      "Variable name cannot be empty",
+    );
 
-      expect(results).toHaveLength(3);
-      expect(results.every((v) => v.scope.startsWith("uwf/"))).toBe(true);
+    varStore.close();
+  });
+});
 
-      // Verify ordering by created timestamp
-      expect(results[0]?.id).toBe(var1.id);
-      expect(results[1]?.id).toBe(var2.id);
-      expect(results[2]?.id).toBe(var3.id);
-    });
+describe("VariableStore - Get Operation", () => {
+  let store: Store;
+  let dbPath: string;
 
-    test("6.2: list() returns empty array when no matches", () => {
-      varStore.create("uwf/thread/", hashA);
-
-      const results = varStore.list({ scope: "nonexistent/" });
-
-      expect(results).toHaveLength(0);
-      expect(Array.isArray(results)).toBe(true);
-    });
-
-    test("6.3: list() returns all variables when scope is empty string", () => {
-      const var1 = varStore.create("uwf/thread/", hashA);
-      const var2 = varStore.create("app/config/", hashB);
-      const var3 = varStore.create("test/", hashC);
-
-      const results = varStore.list({ scope: "" });
-
-      expect(results).toHaveLength(3);
-      expect(results.map((v) => v.id)).toContain(var1.id);
-      expect(results.map((v) => v.id)).toContain(var2.id);
-      expect(results.map((v) => v.id)).toContain(var3.id);
-    });
-
-    test("6.4: list() validates scope format (must end with /)", () => {
-      varStore.create("uwf/thread/", hashA);
-
-      expect(() => varStore.list({ scope: "uwf" })).toThrow(InvalidScopeError);
-      expect(() => varStore.list({ scope: "uwf" })).toThrow(
-        "scope must end with /",
-      );
-    });
-
-    test("6.5: list() returns exact scope match and sub-scopes", () => {
-      varStore.create("uwf/thread/", hashA);
-      varStore.create("uwf/thread/active/", hashB);
-
-      const results = varStore.list({ scope: "uwf/thread/" });
-
-      expect(results).toHaveLength(2);
-      expect(results[0]?.scope).toBe("uwf/thread/");
-      expect(results[1]?.scope).toBe("uwf/thread/active/");
-    });
-
-    test("6.6: list() result ordering is deterministic", async () => {
-      // Create 5 variables with the same scope prefix
-      const var1 = varStore.create("test/", hashA);
-      await new Promise((resolve) => setTimeout(resolve, 2));
-      const var2 = varStore.create("test/", hashB);
-      await new Promise((resolve) => setTimeout(resolve, 2));
-      const var3 = varStore.create("test/", hashA);
-      await new Promise((resolve) => setTimeout(resolve, 2));
-      const var4 = varStore.create("test/", hashB);
-      await new Promise((resolve) => setTimeout(resolve, 2));
-      const var5 = varStore.create("test/", hashA);
-
-      // Call list multiple times
-      const results1 = varStore.list({ scope: "test/" });
-      const results2 = varStore.list({ scope: "test/" });
-      const results3 = varStore.list({ scope: "test/" });
-
-      // All results should be identical
-      expect(results1.map((v) => v.id)).toEqual(results2.map((v) => v.id));
-      expect(results2.map((v) => v.id)).toEqual(results3.map((v) => v.id));
-
-      // Verify ordering by created timestamp (oldest first)
-      expect(results1[0]?.id).toBe(var1.id);
-      expect(results1[1]?.id).toBe(var2.id);
-      expect(results1[2]?.id).toBe(var3.id);
-      expect(results1[3]?.id).toBe(var4.id);
-      expect(results1[4]?.id).toBe(var5.id);
-    });
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
-  describe("Test Group 7: Integration Tests", () => {
-    test("7.1: Full lifecycle workflow", async () => {
-      // Create variable
-      const var1 = varStore.create("uwf/thread/", hashA);
-      expect(var1.value).toBe(hashA);
+  test("Get variable by (name, schema)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const dataHash = await store.put(schemaHash, { x: 42 });
 
-      // Get variable
-      const retrieved1 = varStore.get(var1.id);
-      expect(retrieved1?.value).toBe(hashA);
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
 
-      // Wait to ensure different timestamp
-      await new Promise((resolve) => setTimeout(resolve, 10));
+    const created = varStore.create("config", dataHash);
+    const retrieved = varStore.get("config", schemaHash);
 
-      // Update variable
-      const updated = varStore.update(var1.id, hashB);
-      expect(updated.value).toBe(hashB);
-      expect(updated.updated).toBeGreaterThan(var1.created);
+    expect(retrieved).not.toBeNull();
+    expect(retrieved?.name).toBe("config");
+    expect(retrieved?.schema).toBe(schemaHash);
+    expect(retrieved?.value).toBe(dataHash);
+    expect(retrieved?.created).toBe(created.created);
 
-      // Get updated variable
-      const retrieved2 = varStore.get(var1.id);
-      expect(retrieved2?.value).toBe(hashB);
+    varStore.close();
+  });
 
-      // Delete variable
-      const deleted = varStore.delete(var1.id);
-      expect(deleted.value).toBe(hashB);
+  test("Get returns null for non-existent variable", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
 
-      // Verify deletion
-      const retrieved3 = varStore.get(var1.id);
-      expect(retrieved3).toBeNull();
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const result = varStore.get("nonexistent", schemaHash);
+
+    expect(result).toBeNull();
+
+    varStore.close();
+  });
+
+  test("Get distinguishes variables by schema", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const schemaB = await putSchema(store, {
+      type: "object",
+      properties: { y: { type: "string" } },
+    });
+    const hashA = await store.put(schemaA, { x: 42 });
+    const hashB = await store.put(schemaB, { y: "hello" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("config", hashA);
+    varStore.create("config", hashB);
+
+    const varA = varStore.get("config", schemaA);
+    const varB = varStore.get("config", schemaB);
+
+    expect(varA?.value).toBe(hashA);
+    expect(varB?.value).toBe(hashB);
+    expect(varA?.value).not.toBe(varB?.value);
+
+    varStore.close();
+  });
+});
+
+describe("VariableStore - Update Operation", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  test("Update variable with matching schema", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const hash1 = await store.put(schemaHash, { x: 42 });
+    const hash2 = await store.put(schemaHash, { x: 99 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const created = varStore.create("config", hash1);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const updated = varStore.update("config", schemaHash, hash2);
+
+    expect(updated.name).toBe("config");
+    expect(updated.schema).toBe(schemaHash);
+    expect(updated.value).toBe(hash2);
+    expect(updated.created).toBe(created.created);
+    expect(updated.updated).toBeGreaterThan(created.updated);
+
+    varStore.close();
+  });
+
+  test("Update fails with schema mismatch", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const schemaB = await putSchema(store, {
+      type: "object",
+      properties: { y: { type: "string" } },
+    });
+    const hashA = await store.put(schemaA, { x: 42 });
+    const hashB = await store.put(schemaB, { y: "hello" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("config", hashA);
+
+    expect(() => varStore.update("config", schemaA, hashB)).toThrow(
+      SchemaMismatchError,
+    );
+
+    const retrieved = varStore.get("config", schemaA);
+    expect(retrieved?.value).toBe(hashA); // unchanged
+
+    varStore.close();
+  });
+
+  test("Update fails for non-existent variable", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    expect(() => varStore.update("nonexistent", schemaHash, dataHash)).toThrow(
+      VariableNotFoundError,
+    );
+
+    varStore.close();
+  });
+});
+
+describe("VariableStore - Delete Operation", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  test("Delete variable by (name, schema)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const dataHash = await store.put(schemaHash, { x: 42 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("config", dataHash);
+    const deleted = varStore.delete("config", schemaHash);
+
+    expect(deleted.name).toBe("config");
+    expect(deleted.value).toBe(dataHash);
+
+    const retrieved = varStore.get("config", schemaHash);
+    expect(retrieved).toBeNull();
+
+    varStore.close();
+  });
+
+  test("Delete fails for non-existent variable", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    expect(() => varStore.delete("nonexistent", schemaHash)).toThrow(
+      VariableNotFoundError,
+    );
+
+    varStore.close();
+  });
+
+  test("Delete cascades to tags and labels", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("config", dataHash, {
+      tags: { env: "prod" },
+      labels: ["critical"],
     });
 
-    test("7.2: Multiple variables with same scope", () => {
-      const var1 = varStore.create("uwf/thread/", hashA);
-      const var2 = varStore.create("uwf/thread/", hashB);
+    varStore.delete("config", schemaHash);
 
-      // Verify independence
-      expect(var1.id).not.toBe(var2.id);
+    // Verify tags/labels are also deleted
+    const db = (varStore as any).db;
+    const tags = db
+      .prepare(
+        "SELECT * FROM variable_tags WHERE variable_name = ? AND variable_schema = ?",
+      )
+      .all("config", schemaHash);
+    const labels = db
+      .prepare(
+        "SELECT * FROM variable_labels WHERE variable_name = ? AND variable_schema = ?",
+      )
+      .all("config", schemaHash);
 
-      const retrieved1 = varStore.get(var1.id);
-      const retrieved2 = varStore.get(var2.id);
+    expect(tags).toHaveLength(0);
+    expect(labels).toHaveLength(0);
 
-      expect(retrieved1?.value).toBe(hashA);
-      expect(retrieved2?.value).toBe(hashB);
+    varStore.close();
+  });
 
-      // Update var1, verify var2 is unaffected
-      varStore.update(var1.id, hashB);
-      const retrieved2After = varStore.get(var2.id);
-      expect(retrieved2After?.value).toBe(hashB);
-      expect(retrieved2After?.updated).toBe(var2.updated);
+  test("Delete only affects specified (name, schema)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const schemaB = await putSchema(store, {
+      type: "object",
+      properties: { y: { type: "string" } },
+    });
+    const hashA = await store.put(schemaA, { x: 42 });
+    const hashB = await store.put(schemaB, { y: "hello" });
 
-      // Delete var1, verify var2 still exists
-      varStore.delete(var1.id);
-      const retrieved2Final = varStore.get(var2.id);
-      expect(retrieved2Final).not.toBeNull();
-      expect(retrieved2Final?.value).toBe(hashB);
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("config", hashA);
+    varStore.create("config", hashB);
+
+    varStore.delete("config", schemaA);
+
+    expect(varStore.get("config", schemaA)).toBeNull();
+    expect(varStore.get("config", schemaB)).not.toBeNull();
+
+    varStore.close();
+  });
+});
+
+describe("VariableStore - List Operation", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  test("List all variables", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const hash1 = await store.put(schemaHash, { x: 1 });
+    const hash2 = await store.put(schemaHash, { x: 2 });
+    const hash3 = await store.put(schemaHash, { x: 3 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("var1", hash1);
+    varStore.create("var2", hash2);
+    varStore.create("var3", hash3);
+
+    const variables = varStore.list();
+
+    expect(variables).toHaveLength(3);
+    expect(variables.map((v) => v.name).sort()).toEqual([
+      "var1",
+      "var2",
+      "var3",
+    ]);
+
+    varStore.close();
+  });
+
+  test("List filters by name prefix", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const hash1 = await store.put(schemaHash, { a: 1 });
+    const hash2 = await store.put(schemaHash, { b: 2 });
+    const hash3 = await store.put(schemaHash, { c: 3 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("uwf.thread.123", hash1);
+    varStore.create("uwf.workflow.456", hash2);
+    varStore.create("app.config", hash3);
+
+    const filtered = varStore.list({ namePrefix: "uwf." });
+
+    expect(filtered).toHaveLength(2);
+    expect(filtered.map((v) => v.name).sort()).toEqual([
+      "uwf.thread.123",
+      "uwf.workflow.456",
+    ]);
+
+    varStore.close();
+  });
+
+  test("List filters by schema", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const schemaB = await putSchema(store, {
+      type: "object",
+      properties: { y: { type: "string" } },
+    });
+    const hashA1 = await store.put(schemaA, { x: 1 });
+    const hashA2 = await store.put(schemaA, { x: 2 });
+    const hashB = await store.put(schemaB, { y: "hello" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("var1", hashA1);
+    varStore.create("var2", hashA2);
+    varStore.create("var3", hashB);
+
+    const filtered = varStore.list({ schema: schemaA });
+
+    expect(filtered).toHaveLength(2);
+    expect(filtered.map((v) => v.name).sort()).toEqual(["var1", "var2"]);
+    expect(filtered.every((v) => v.schema === schemaA)).toBe(true);
+
+    varStore.close();
+  });
+
+  test("List filters by tags (AND logic)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const hash1 = await store.put(schemaHash, { n: 1 });
+    const hash2 = await store.put(schemaHash, { n: 2 });
+    const hash3 = await store.put(schemaHash, { n: 3 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("var1", hash1, { tags: { env: "prod", region: "us" } });
+    varStore.create("var2", hash2, { tags: { env: "prod", region: "eu" } });
+    varStore.create("var3", hash3, { tags: { env: "dev", region: "us" } });
+
+    const filtered = varStore.list({ tags: { env: "prod", region: "us" } });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.name).toBe("var1");
+
+    varStore.close();
+  });
+
+  test("List filters by labels (AND logic)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const hash1 = await store.put(schemaHash, { n: 1 });
+    const hash2 = await store.put(schemaHash, { n: 2 });
+    const hash3 = await store.put(schemaHash, { n: 3 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("var1", hash1, { labels: ["critical", "monitored"] });
+    varStore.create("var2", hash2, { labels: ["critical"] });
+    varStore.create("var3", hash3, { labels: ["monitored"] });
+
+    const filtered = varStore.list({ labels: ["critical", "monitored"] });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.name).toBe("var1");
+
+    varStore.close();
+  });
+
+  test("List combines namePrefix, schema, tags, and labels", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, {
+      type: "object",
+      properties: { x: { type: "number" } },
+    });
+    const schemaB = await putSchema(store, {
+      type: "object",
+      properties: { y: { type: "string" } },
+    });
+    const hashA1 = await store.put(schemaA, { x: 1 });
+    const hashA2 = await store.put(schemaA, { x: 2 });
+    const hashB = await store.put(schemaB, { y: "hello" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("uwf.var1", hashA1, {
+      tags: { env: "prod" },
+      labels: ["critical"],
+    });
+    varStore.create("uwf.var2", hashA2, {
+      tags: { env: "dev" },
+      labels: ["critical"],
+    });
+    varStore.create("app.var3", hashB, {
+      tags: { env: "prod" },
+      labels: ["critical"],
     });
 
-    test("7.3: Variables with hierarchical scopes", () => {
-      const var1 = varStore.create("uwf/", hashA);
-      const var2 = varStore.create("uwf/thread/", hashA);
-      const var3 = varStore.create("uwf/workflow/", hashA);
-
-      expect(var1.scope).toBe("uwf/");
-      expect(var2.scope).toBe("uwf/thread/");
-      expect(var3.scope).toBe("uwf/workflow/");
-
-      // All should exist independently
-      expect(varStore.get(var1.id)).not.toBeNull();
-      expect(varStore.get(var2.id)).not.toBeNull();
-      expect(varStore.get(var3.id)).not.toBeNull();
+    const filtered = varStore.list({
+      namePrefix: "uwf.",
+      schema: schemaA,
+      tags: { env: "prod" },
+      labels: ["critical"],
     });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.name).toBe("uwf.var1");
+
+    varStore.close();
+  });
+});
+
+describe("VariableStore - Tag/Label Management", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  test("Tag operation adds tags and labels", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const created = varStore.create("config", dataHash);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const updated = varStore.tag("config", schemaHash, {
+      add: { env: "prod", region: "us" },
+      addLabels: ["critical", "monitored"],
+    });
+
+    expect(updated.tags).toEqual({ env: "prod", region: "us" });
+    expect(updated.labels.sort()).toEqual(["critical", "monitored"]);
+    expect(updated.updated).toBeGreaterThan(created.updated);
+
+    varStore.close();
+  });
+
+  test("Tag operation deletes tags and labels", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("config", dataHash, {
+      tags: { env: "prod", region: "us" },
+      labels: ["critical", "monitored"],
+    });
+
+    const updated = varStore.tag("config", schemaHash, {
+      delete: ["env", "monitored"],
+    });
+
+    expect(updated.tags).toEqual({ region: "us" });
+    expect(updated.labels).toEqual(["critical"]);
+
+    varStore.close();
+  });
+
+  test("Tag operation prevents tag/label conflicts", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "object" });
+    const dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.create("config", dataHash, {
+      tags: { env: "prod" },
+    });
+
+    // Try to add label with same name as existing tag
+    expect(() =>
+      varStore.tag("config", schemaHash, {
+        addLabels: ["env"],
+      }),
+    ).toThrow(TagLabelConflictError);
+
+    varStore.close();
+  });
+});
+
+describe("VariableStore - Error Types", () => {
+  test("VariableDuplicateError includes name and schema", () => {
+    const error = new VariableDuplicateError("config", "ABC123");
+
+    expect(error.name).toBe("VariableDuplicateError");
+    expect(error.variableName).toBe("config");
+    expect(error.variableSchema).toBe("ABC123");
+    expect(error.message).toContain("config");
+    expect(error.message).toContain("ABC123");
+  });
+
+  test("InvalidVariableNameError for empty name", () => {
+    const error = new InvalidVariableNameError("");
+
+    expect(error.name).toBe("InvalidVariableNameError");
+    expect(error.variableName).toBe("");
+    expect(error.message).toContain("empty");
+  });
+
+  test("VariableNotFoundError references name and schema", () => {
+    const error = new VariableNotFoundError("config", "ABC123");
+
+    expect(error.name).toBe("VariableNotFoundError");
+    expect(error.variableName).toBe("config");
+    expect(error.variableSchema).toBe("ABC123");
+    expect(error.message).toContain("config");
+    expect(error.message).toContain("ABC123");
+  });
+});
+
+describe("VariableStore - Integration Tests", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  test("Complete CRUD lifecycle with (name, schema) composite key", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, {
+      type: "object",
+      properties: { counter: { type: "number" } },
+    });
+    const hash1 = await store.put(schemaHash, { counter: 1 });
+    const hash2 = await store.put(schemaHash, { counter: 2 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Create
+    const created = varStore.create("counter", hash1, {
+      tags: { env: "dev" },
+      labels: ["test"],
+    });
+    expect(created.name).toBe("counter");
+    expect(created.value).toBe(hash1);
+
+    // Read
+    let retrieved = varStore.get("counter", schemaHash);
+    expect(retrieved?.value).toBe(hash1);
+
+    // Update
+    const updated = varStore.update("counter", schemaHash, hash2);
+    expect(updated.value).toBe(hash2);
+
+    // Tag
+    const tagged = varStore.tag("counter", schemaHash, {
+      add: { version: "2.0" },
+      addLabels: ["stable"],
+    });
+    expect(tagged.tags).toEqual({ env: "dev", version: "2.0" });
+    expect(tagged.labels.sort()).toEqual(["stable", "test"]);
+
+    // List
+    const list1 = varStore.list({ namePrefix: "count" });
+    expect(list1).toHaveLength(1);
+
+    const list2 = varStore.list({ tags: { env: "dev" } });
+    expect(list2).toHaveLength(1);
+
+    // Delete
+    varStore.delete("counter", schemaHash);
+    retrieved = varStore.get("counter", schemaHash);
+    expect(retrieved).toBeNull();
+
+    varStore.close();
+  });
+
+  test("Manage variables with same name across multiple schemas", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+
+    const schemaConfig = await putSchema(store, {
+      type: "object",
+      properties: { host: { type: "string" }, port: { type: "number" } },
+    });
+    const schemaState = await putSchema(store, {
+      type: "object",
+      properties: { status: { type: "string" } },
+    });
+
+    const configHash = await store.put(schemaConfig, {
+      host: "localhost",
+      port: 8080,
+    });
+    const stateHash = await store.put(schemaState, { status: "running" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Create variables with same name but different schemas
+    const varConfig = varStore.create("app.server", configHash);
+    const varState = varStore.create("app.server", stateHash);
+
+    expect(varConfig.name).toBe("app.server");
+    expect(varConfig.schema).toBe(schemaConfig);
+    expect(varState.name).toBe("app.server");
+    expect(varState.schema).toBe(schemaState);
+
+    // List by schema
+    const configVars = varStore.list({ schema: schemaConfig });
+    expect(configVars).toHaveLength(1);
+    expect(configVars[0]?.schema).toBe(schemaConfig);
+
+    const stateVars = varStore.list({ schema: schemaState });
+    expect(stateVars).toHaveLength(1);
+    expect(stateVars[0]?.schema).toBe(schemaState);
+
+    // Update only affects correct variable
+    const newStateHash = await store.put(schemaState, { status: "stopped" });
+    varStore.update("app.server", schemaState, newStateHash);
+
+    const updatedState = varStore.get("app.server", schemaState);
+    const unchangedConfig = varStore.get("app.server", schemaConfig);
+
+    expect(updatedState?.value).toBe(newStateHash);
+    expect(unchangedConfig?.value).toBe(configHash);
+
+    // Delete only affects correct variable
+    varStore.delete("app.server", schemaState);
+
+    expect(varStore.get("app.server", schemaState)).toBeNull();
+    expect(varStore.get("app.server", schemaConfig)).not.toBeNull();
+
+    varStore.close();
   });
 });
