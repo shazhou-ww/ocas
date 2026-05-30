@@ -5,6 +5,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -173,6 +174,44 @@ export function createFsStore(dir: string): BootstrapCapableStore {
 
     listByType(typeHash: Hash): Hash[] {
       return typeIndex.get(typeHash) ?? [];
+    },
+
+    listAll(): Hash[] {
+      return Array.from(data.keys());
+    },
+
+    delete(hash: Hash): void {
+      const node = data.get(hash);
+      if (node) {
+        data.delete(hash);
+        // Delete file
+        try {
+          unlinkSync(join(dir, `${hash}.bin`));
+        } catch {
+          // ignore if file doesn't exist
+        }
+        // Remove from type index
+        const list = typeIndex.get(node.type);
+        if (list) {
+          const idx = list.indexOf(hash);
+          if (idx !== -1) {
+            list.splice(idx, 1);
+          }
+          if (list.length === 0) {
+            typeIndex.delete(node.type);
+            // Delete empty index file
+            try {
+              unlinkSync(join(indexDir, node.type));
+            } catch {
+              // ignore
+            }
+          } else {
+            // Rewrite index file
+            const body = `${list.join("\n")}\n`;
+            writeFileSync(join(indexDir, node.type), body, "utf8");
+          }
+        }
+      }
     },
 
     [BOOTSTRAP_STORE]: putSelfReferencing,

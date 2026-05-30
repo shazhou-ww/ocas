@@ -9,6 +9,7 @@ import {
   CasNodeNotFoundError,
   computeHash,
   createVariableStore,
+  gc,
   getSchema,
   InvalidScopeError,
   InvalidTagFormatError,
@@ -552,6 +553,18 @@ async function cmdVarList(_args: string[]): Promise<void> {
   }
 }
 
+async function cmdGc(_args: string[]): Promise<void> {
+  const store = createFsStore(storePath);
+  const varStore = createVariableStore(varDbPath, store);
+
+  try {
+    const stats = gc(store, varStore);
+    out(stats);
+  } finally {
+    varStore.close();
+  }
+}
+
 function printUsage(): void {
   console.log(`\
 Usage: json-cas [--store <path>] [--json] <command> [args]
@@ -577,6 +590,7 @@ Commands:
   var delete <id>                   Delete a variable
   var tag <id> <tag>...             Add/update/delete tags and labels
   var list [--scope <prefix>] [--tag <tag>...] List variables (filter by scope/tags/labels)
+  gc                                Run garbage collection
 
 Flags:
   --store <path>   Store directory (default: ~/.uncaged/json-cas)
@@ -682,6 +696,10 @@ switch (cmd) {
     }
     break;
   }
+
+  case "gc":
+    await cmdGc(rest);
+    break;
 
   default:
     die(`Unknown command: ${cmd}`);
