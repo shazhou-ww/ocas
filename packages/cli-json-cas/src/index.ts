@@ -11,11 +11,10 @@ import {
   createVariableStore,
   gc,
   getSchema,
-  InvalidScopeError,
   InvalidTagFormatError,
+  InvalidVariableNameError,
   putSchema,
   refs,
-  SchemaMismatchError,
   TagLabelConflictError,
   VariableNotFoundError,
   validate,
@@ -29,14 +28,7 @@ import { createFsStore } from "@uncaged/json-cas-fs";
 type Flags = Record<string, string | boolean | string[]>;
 
 /** Flags that consume the next token as their value. All others are boolean. */
-const VALUE_FLAGS = new Set([
-  "store",
-  "format",
-  "scope",
-  "value",
-  "var-db",
-  "tag",
-]);
+const VALUE_FLAGS = new Set(["store", "format", "var-db", "tag", "schema"]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
   const flags: Flags = {};
@@ -124,25 +116,23 @@ function openVarStore(): VariableStore {
 async function getVariableSchemaHash(): Promise<Hash> {
   const store = openStore();
 
-  // Define the Variable JSON Schema (simple version for envelope)
+  // Define the Variable JSON Schema (updated for new model with composite key)
   const variableSchema: JSONSchema = {
     title: "Variable",
     type: "object",
     properties: {
-      id: { type: "string" },
-      scope: { type: "string" },
-      value: { type: "string" },
+      name: { type: "string" },
       schema: { type: "string" },
+      value: { type: "string" },
       created: { type: "number" },
       updated: { type: "number" },
       tags: { type: "object" },
       labels: { type: "array", items: { type: "string" } },
     },
     required: [
-      "id",
-      "scope",
-      "value",
+      "name",
       "schema",
+      "value",
       "created",
       "updated",
       "tags",
@@ -370,13 +360,14 @@ async function cmdCat(args: string[]): Promise<void> {
   }
 }
 
-async function cmdVarCreate(_args: string[]): Promise<void> {
-  const scope = flags.scope as string | undefined;
-  const value = flags.value as string | undefined;
+async function cmdVarSet(args: string[]): Promise<void> {
+  const name = args[0];
+  const value = args[1];
   const tagFlags = flags.tag;
 
-  if (!scope) die("Usage: json-cas var create --scope <scope> --value <hash>");
-  if (!value) die("Usage: json-cas var create --scope <scope> --value <hash>");
+  if (!name || !value) {
+    die("Usage: json-cas var set <name> <hash> [--tag <tag>...]");
+  }
 
   const varStore = openVarStore();
 
@@ -391,18 +382,25 @@ async function cmdVarCreate(_args: string[]): Promise<void> {
 
     // Check for conflicts in initial tags/labels
     if (deleteNames.length > 0) {
-      die("Error: Cannot use deletion syntax (:name) in var create");
+      die("Error: Cannot use deletion syntax (:name) in var set");
     }
 
-    const variable = varStore.create(scope, value, {
-      tags: Object.keys(tags).length > 0 ? tags : undefined,
-      labels: labels.length > 0 ? labels : undefined,
-    });
+    // If --tag flags are provided at all, always pass options to replace tags/labels
+    // If no --tag flags, pass undefined to preserve existing tags/labels
+    const options =
+      tagArgs.length > 0
+        ? {
+            tags: Object.keys(tags).length > 0 ? tags : {},
+            labels: labels.length > 0 ? labels : [],
+          }
+        : undefined;
+
+    const variable = varStore.set(name, value, options);
     const envelope = await wrapVariableEnvelope(variable);
     out(envelope);
   } catch (e) {
     if (
-      e instanceof InvalidScopeError ||
+      e instanceof InvalidVariableNameError ||
       e instanceof CasNodeNotFoundError ||
       e instanceof TagLabelConflictError
     ) {
@@ -415,61 +413,49 @@ async function cmdVarCreate(_args: string[]): Promise<void> {
 }
 
 async function cmdVarGet(args: string[]): Promise<void> {
-  const id = args[0];
-  if (!id) die("Usage: json-cas var get <id>");
+  const name = args[0];
+  const schema = flags.schema as string | undefined;
+
+  if (!name || !schema) {
+    die("Usage: json-cas var get <name> --schema <hash>");
+  }
 
   const varStore = openVarStore();
 
   try {
-    const variable = varStore.get(id);
+    const variable = varStore.get(name, schema);
     if (variable === null) {
-      die(`Error: Variable not found: ${id}`);
+      die(`Error: Variable not found: name=${name}, schema=${schema}`);
     }
     const envelope = await wrapVariableEnvelope(variable);
     out(envelope);
-  } finally {
-    varStore.close();
-  }
-}
-
-async function cmdVarUpdate(args: string[]): Promise<void> {
-  const id = args[0];
-  const value = args[1];
-
-  if (!id || !value) {
-    die("Usage: json-cas var update <id> <hash>");
-  }
-
-  const varStore = openVarStore();
-
-  try {
-    const variable = varStore.update(id, value);
-    const envelope = await wrapVariableEnvelope(variable);
-    out(envelope);
-  } catch (e) {
-    if (
-      e instanceof VariableNotFoundError ||
-      e instanceof SchemaMismatchError ||
-      e instanceof CasNodeNotFoundError
-    ) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
   } finally {
     varStore.close();
   }
 }
 
 async function cmdVarDelete(args: string[]): Promise<void> {
-  const id = args[0];
-  if (!id) die("Usage: json-cas var delete <id>");
+  const name = args[0];
+  const schema = flags.schema as string | undefined;
+
+  if (!name) {
+    die("Usage: json-cas var delete <name> [--schema <hash>]");
+  }
 
   const varStore = openVarStore();
 
   try {
-    const variable = varStore.delete(id);
-    const envelope = await wrapVariableEnvelope(variable);
-    out(envelope);
+    if (schema !== undefined) {
+      // Precise deletion: remove specific (name, schema) variant
+      const variable = varStore.remove(name, schema);
+      const envelope = await wrapVariableEnvelope(variable);
+      out(envelope);
+    } else {
+      // Batch deletion: remove all variants for this name
+      const variables = varStore.remove(name);
+      const envelope = await wrapVariableEnvelope(variables);
+      out(envelope);
+    }
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
       die(`Error: ${e.message}`);
@@ -481,12 +467,16 @@ async function cmdVarDelete(args: string[]): Promise<void> {
 }
 
 async function cmdVarTag(args: string[]): Promise<void> {
-  const id = args[0];
-  if (!id) die("Usage: json-cas var tag <id> <tag>...");
+  const name = args[0];
+  const schema = flags.schema as string | undefined;
+
+  if (!name || !schema) {
+    die("Usage: json-cas var tag <name> --schema <hash> <operations...>");
+  }
 
   const tagArgs = args.slice(1);
   if (tagArgs.length === 0) {
-    die("Usage: json-cas var tag <id> <tag>...");
+    die("Usage: json-cas var tag <name> --schema <hash> <operations...>");
   }
 
   const varStore = openVarStore();
@@ -494,7 +484,7 @@ async function cmdVarTag(args: string[]): Promise<void> {
   try {
     const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
 
-    const variable = varStore.tag(id, {
+    const variable = varStore.tag(name, schema, {
       add: Object.keys(tags).length > 0 ? tags : undefined,
       addLabels: labels.length > 0 ? labels : undefined,
       delete: deleteNames.length > 0 ? deleteNames : undefined,
@@ -516,8 +506,9 @@ async function cmdVarTag(args: string[]): Promise<void> {
   }
 }
 
-async function cmdVarList(_args: string[]): Promise<void> {
-  const scope = (flags.scope as string | undefined) ?? "";
+async function cmdVarList(args: string[]): Promise<void> {
+  const namePrefix = args[0] ?? "";
+  const schema = flags.schema as string | undefined;
   const tagFlags = flags.tag;
 
   const varStore = openVarStore();
@@ -537,14 +528,15 @@ async function cmdVarList(_args: string[]): Promise<void> {
     }
 
     const variables = varStore.list({
-      scope,
+      namePrefix,
+      schema,
       tags: Object.keys(tags).length > 0 ? tags : undefined,
       labels: labels.length > 0 ? labels : undefined,
     });
     const envelope = await wrapVariableEnvelope(variables);
     out(envelope);
   } catch (e) {
-    if (e instanceof InvalidScopeError) {
+    if (e instanceof InvalidVariableNameError) {
       die(`Error: ${e.message}`);
     }
     throw e;
@@ -584,18 +576,18 @@ Commands:
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
   cat <hash> [--payload]            Output node (--payload for payload only)
-  var create --scope <s> --value <h> [--tag <tag>...] Create a variable
-  var get <id>                      Get a variable by ID
-  var update <id> <hash>            Update variable value
-  var delete <id>                   Delete a variable
-  var tag <id> <tag>...             Add/update/delete tags and labels
-  var list [--scope <prefix>] [--tag <tag>...] List variables (filter by scope/tags/labels)
+  var set <name> <hash> [--tag <tag>...] Create/update a variable
+  var get <name> --schema <hash>    Get a variable by name + schema
+  var delete <name> [--schema <hash>] Delete variable(s)
+  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables
+  var tag <name> --schema <hash> <operations...> Modify tags/labels
   gc                                Run garbage collection
 
 Flags:
   --store <path>   Store directory (default: ~/.uncaged/json-cas)
   --var-db <path>  Variable database path (default: <store>/variables.db)
   --json           Compact JSON output
+  --schema <hash>  Schema hash filter for var get/delete/tag/list
   --tag <tag>      Tag/label (can be repeated): key:value (tag), name (label), :name (delete)`);
 }
 
@@ -673,14 +665,11 @@ switch (cmd) {
   case "var": {
     const [sub, ...subRest] = rest;
     switch (sub) {
-      case "create":
-        await cmdVarCreate(subRest);
+      case "set":
+        await cmdVarSet(subRest);
         break;
       case "get":
         await cmdVarGet(subRest);
-        break;
-      case "update":
-        await cmdVarUpdate(subRest);
         break;
       case "delete":
         await cmdVarDelete(subRest);
