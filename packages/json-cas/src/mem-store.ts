@@ -27,6 +27,14 @@ export class MemStore implements BootstrapCapableStore {
     return this.#inner.listByType(typeHash);
   }
 
+  listAll(): Hash[] {
+    return this.#inner.listAll();
+  }
+
+  delete(hash: Hash): void {
+    this.#inner.delete(hash);
+  }
+
   [BOOTSTRAP_STORE](payload: unknown): Promise<Hash> {
     return this.#inner[BOOTSTRAP_STORE](payload);
   }

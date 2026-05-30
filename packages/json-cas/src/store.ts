@@ -52,6 +52,25 @@ export function createMemoryStore(): BootstrapCapableStore {
       return set ? [...set] : [];
     },
 
+    listAll(): Hash[] {
+      return Array.from(data.keys());
+    },
+
+    delete(hash: Hash): void {
+      const node = data.get(hash);
+      if (node) {
+        data.delete(hash);
+        // Remove from type index
+        const set = byType.get(node.type);
+        if (set) {
+          set.delete(hash);
+          if (set.size === 0) {
+            byType.delete(node.type);
+          }
+        }
+      }
+    },
+
     [BOOTSTRAP_STORE]: putSelfReferencing,
   };
 
