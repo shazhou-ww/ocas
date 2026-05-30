@@ -235,6 +235,99 @@ describe("VariableStore", () => {
     });
   });
 
+  describe("Test Group 6: Variable Listing", () => {
+    test("6.1: list() returns all variables with matching scope prefix", async () => {
+      const var1 = varStore.create("uwf/thread/", hashA);
+      const var2 = varStore.create("uwf/thread/", hashB);
+      const var3 = varStore.create("uwf/agent/", hashA);
+      varStore.create("app/config/", hashA);
+
+      // Wait a bit to ensure different timestamps
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const results = varStore.list({ scope: "uwf/" });
+
+      expect(results).toHaveLength(3);
+      expect(results.every((v) => v.scope.startsWith("uwf/"))).toBe(true);
+
+      // Verify ordering by created timestamp
+      expect(results[0]?.id).toBe(var1.id);
+      expect(results[1]?.id).toBe(var2.id);
+      expect(results[2]?.id).toBe(var3.id);
+    });
+
+    test("6.2: list() returns empty array when no matches", () => {
+      varStore.create("uwf/thread/", hashA);
+
+      const results = varStore.list({ scope: "nonexistent/" });
+
+      expect(results).toHaveLength(0);
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    test("6.3: list() returns all variables when scope is empty string", () => {
+      const var1 = varStore.create("uwf/thread/", hashA);
+      const var2 = varStore.create("app/config/", hashB);
+      const var3 = varStore.create("test/", hashC);
+
+      const results = varStore.list({ scope: "" });
+
+      expect(results).toHaveLength(3);
+      expect(results.map((v) => v.id)).toContain(var1.id);
+      expect(results.map((v) => v.id)).toContain(var2.id);
+      expect(results.map((v) => v.id)).toContain(var3.id);
+    });
+
+    test("6.4: list() validates scope format (must end with /)", () => {
+      varStore.create("uwf/thread/", hashA);
+
+      expect(() => varStore.list({ scope: "uwf" })).toThrow(InvalidScopeError);
+      expect(() => varStore.list({ scope: "uwf" })).toThrow(
+        "scope must end with /",
+      );
+    });
+
+    test("6.5: list() returns exact scope match and sub-scopes", () => {
+      varStore.create("uwf/thread/", hashA);
+      varStore.create("uwf/thread/active/", hashB);
+
+      const results = varStore.list({ scope: "uwf/thread/" });
+
+      expect(results).toHaveLength(2);
+      expect(results[0]?.scope).toBe("uwf/thread/");
+      expect(results[1]?.scope).toBe("uwf/thread/active/");
+    });
+
+    test("6.6: list() result ordering is deterministic", async () => {
+      // Create 5 variables with the same scope prefix
+      const var1 = varStore.create("test/", hashA);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      const var2 = varStore.create("test/", hashB);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      const var3 = varStore.create("test/", hashA);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      const var4 = varStore.create("test/", hashB);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      const var5 = varStore.create("test/", hashA);
+
+      // Call list multiple times
+      const results1 = varStore.list({ scope: "test/" });
+      const results2 = varStore.list({ scope: "test/" });
+      const results3 = varStore.list({ scope: "test/" });
+
+      // All results should be identical
+      expect(results1.map((v) => v.id)).toEqual(results2.map((v) => v.id));
+      expect(results2.map((v) => v.id)).toEqual(results3.map((v) => v.id));
+
+      // Verify ordering by created timestamp (oldest first)
+      expect(results1[0]?.id).toBe(var1.id);
+      expect(results1[1]?.id).toBe(var2.id);
+      expect(results1[2]?.id).toBe(var3.id);
+      expect(results1[3]?.id).toBe(var4.id);
+      expect(results1[4]?.id).toBe(var5.id);
+    });
+  });
+
   describe("Test Group 7: Integration Tests", () => {
     test("7.1: Full lifecycle workflow", async () => {
       // Create variable

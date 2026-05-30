@@ -62,7 +62,7 @@ const storePath =
   typeof flags.store === "string" ? flags.store : defaultStorePath;
 const compact = flags.json === true;
 
-const defaultVarDbPath = join(defaultStorePath, "variables.db");
+const defaultVarDbPath = join(storePath, "variables.db");
 const varDbPath =
   typeof flags["var-db"] === "string" ? flags["var-db"] : defaultVarDbPath;
 
@@ -93,6 +93,46 @@ function openVarStore(): VariableStore {
   const store = openStore();
   mkdirSync(resolve(storePath), { recursive: true });
   return createVariableStore(resolve(varDbPath), store);
+}
+
+/**
+ * Get the Variable schema's CAS hash
+ * This is the type hash used in JSON envelopes
+ */
+async function getVariableSchemaHash(): Promise<Hash> {
+  const store = openStore();
+
+  // Define the Variable JSON Schema (simple version for envelope)
+  const variableSchema: JSONSchema = {
+    title: "Variable",
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      scope: { type: "string" },
+      value: { type: "string" },
+      schema: { type: "string" },
+      created: { type: "number" },
+      updated: { type: "number" },
+    },
+    required: ["id", "scope", "value", "schema", "created", "updated"],
+  };
+
+  // Compute hash or retrieve from store
+  const hash = await putSchema(store, variableSchema);
+  return hash;
+}
+
+/**
+ * Wrap Variable output in JSON envelope
+ */
+async function wrapVariableEnvelope(
+  variable: unknown,
+): Promise<{ type: Hash; value: unknown }> {
+  const typeHash = await getVariableSchemaHash();
+  return {
+    type: typeHash,
+    value: variable,
+  };
 }
 
 // ---- Commands ----
@@ -276,7 +316,8 @@ async function cmdVarCreate(_args: string[]): Promise<void> {
 
   try {
     const variable = varStore.create(scope, value);
-    out(variable);
+    const envelope = await wrapVariableEnvelope(variable);
+    out(envelope);
   } catch (e) {
     if (e instanceof InvalidScopeError || e instanceof CasNodeNotFoundError) {
       die(`Error: ${e.message}`);
@@ -298,7 +339,8 @@ async function cmdVarGet(args: string[]): Promise<void> {
     if (variable === null) {
       die(`Error: Variable not found: ${id}`);
     }
-    out(variable);
+    const envelope = await wrapVariableEnvelope(variable);
+    out(envelope);
   } finally {
     varStore.close();
   }
@@ -316,7 +358,8 @@ async function cmdVarUpdate(args: string[]): Promise<void> {
 
   try {
     const variable = varStore.update(id, value);
-    out(variable);
+    const envelope = await wrapVariableEnvelope(variable);
+    out(envelope);
   } catch (e) {
     if (
       e instanceof VariableNotFoundError ||
@@ -339,9 +382,29 @@ async function cmdVarDelete(args: string[]): Promise<void> {
 
   try {
     const variable = varStore.delete(id);
-    out(variable);
+    const envelope = await wrapVariableEnvelope(variable);
+    out(envelope);
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdVarList(_args: string[]): Promise<void> {
+  const scope = (flags.scope as string | undefined) ?? "";
+
+  const varStore = openVarStore();
+
+  try {
+    const variables = varStore.list({ scope });
+    const envelope = await wrapVariableEnvelope(variables);
+    out(envelope);
+  } catch (e) {
+    if (e instanceof InvalidScopeError) {
       die(`Error: ${e.message}`);
     }
     throw e;
@@ -373,6 +436,7 @@ Commands:
   var get <id>                      Get a variable by ID
   var update <id> <hash>            Update variable value
   var delete <id>                   Delete a variable
+  var list [--scope <prefix>]       List variables (optionally filter by scope prefix)
 
 Flags:
   --store <path>   Store directory (default: ~/.uncaged/json-cas)
@@ -465,6 +529,9 @@ switch (cmd) {
         break;
       case "delete":
         await cmdVarDelete(subRest);
+        break;
+      case "list":
+        await cmdVarList(subRest);
         break;
       default:
         die(`Unknown var subcommand: ${sub ?? "(none)"}`);
