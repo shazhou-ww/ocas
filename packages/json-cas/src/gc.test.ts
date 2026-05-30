@@ -39,7 +39,7 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.create("config", hashRef);
+    varStore.set("config", hashRef);
 
     const stats = gc(store, varStore);
 
@@ -66,8 +66,8 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.create("config", hashA);
-    varStore.create("config", hashB);
+    varStore.set("config", hashA);
+    varStore.set("config", hashB);
 
     const stats = gc(store, varStore);
 
@@ -90,7 +90,7 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.create("config", hashRef);
+    varStore.set("config", hashRef);
     varStore.remove("config", schemaHash);
 
     const stats = gc(store, varStore);
@@ -117,9 +117,9 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.create("uwf.thread", hash1);
-    varStore.create("uwf.workflow", hash2);
-    varStore.create("app.config", hash3);
+    varStore.set("uwf.thread", hash1);
+    varStore.set("uwf.workflow", hash2);
+    varStore.set("app.config", hash3);
 
     const stats = gc(store, varStore);
 
@@ -151,9 +151,9 @@ describe("GC - Variable Model Refactoring", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create variables
-    varStore.create("var1", hashA1);
-    varStore.create("var2", hashA2);
-    varStore.create("var3", hashB);
+    varStore.set("var1", hashA1);
+    varStore.set("var2", hashA2);
+    varStore.set("var3", hashB);
 
     // First GC: orphans removed
     let stats = gc(store, varStore);

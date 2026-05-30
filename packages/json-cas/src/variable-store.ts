@@ -15,18 +15,6 @@ export class VariableNotFoundError extends Error {
   }
 }
 
-export class VariableDuplicateError extends Error {
-  constructor(
-    public variableName: string,
-    public variableSchema: Hash,
-  ) {
-    super(
-      `Variable already exists: name=${variableName}, schema=${variableSchema}`,
-    );
-    this.name = "VariableDuplicateError";
-  }
-}
-
 export class InvalidVariableNameError extends Error {
   constructor(
     public variableName: string,
@@ -245,6 +233,16 @@ export class VariableStore {
       const tags = options?.tags ?? existing.tags;
       const labels = options?.labels ?? existing.labels;
 
+      // Check for tag/label conflicts when updating with new options
+      if (options !== undefined) {
+        const tagKeys = Object.keys(tags);
+        for (const key of tagKeys) {
+          if (labels.includes(key)) {
+            throw new TagLabelConflictError(key, "label", "tag");
+          }
+        }
+      }
+
       this.db.exec("BEGIN TRANSACTION");
 
       try {
@@ -376,97 +374,6 @@ export class VariableStore {
   }
 
   /**
-   * Create a new variable
-   */
-  create(
-    name: string,
-    value: string,
-    options?: {
-      tags?: Record<string, string>;
-      labels?: string[];
-    },
-  ): Variable {
-    // Validate name format
-    this.validateName(name);
-
-    const schema = this.extractSchema(value);
-
-    const tags = options?.tags ?? {};
-    const labels = options?.labels ?? [];
-
-    // Check for tag/label conflicts
-    const tagKeys = Object.keys(tags);
-    for (const key of tagKeys) {
-      if (labels.includes(key)) {
-        throw new TagLabelConflictError(key, "label", "tag");
-      }
-    }
-
-    const now = Date.now();
-
-    this.db.exec("BEGIN TRANSACTION");
-
-    try {
-      const stmt = this.db.prepare(`
-        INSERT INTO variables (name, schema, value, created, updated)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-
-      try {
-        stmt.run(name, schema, value, now, now);
-      } catch (e: unknown) {
-        if (
-          e !== null &&
-          typeof e === "object" &&
-          "message" in e &&
-          typeof e.message === "string" &&
-          e.message.includes("UNIQUE constraint failed")
-        ) {
-          throw new VariableDuplicateError(name, schema);
-        }
-        throw e;
-      }
-
-      // Insert tags
-      if (tagKeys.length > 0) {
-        const tagStmt = this.db.prepare(`
-          INSERT INTO variable_tags (variable_name, variable_schema, key, value)
-          VALUES (?, ?, ?, ?)
-        `);
-        for (const [key, val] of Object.entries(tags)) {
-          tagStmt.run(name, schema, key, val);
-        }
-      }
-
-      // Insert labels
-      if (labels.length > 0) {
-        const labelStmt = this.db.prepare(`
-          INSERT INTO variable_labels (variable_name, variable_schema, name)
-          VALUES (?, ?, ?)
-        `);
-        for (const labelName of labels) {
-          labelStmt.run(name, schema, labelName);
-        }
-      }
-
-      this.db.exec("COMMIT");
-    } catch (e) {
-      this.db.exec("ROLLBACK");
-      throw e;
-    }
-
-    return {
-      name,
-      schema,
-      value,
-      created: now,
-      updated: now,
-      tags,
-      labels: [...labels],
-    };
-  }
-
-  /**
    * Get a variable by name, optionally with schema
    */
   /**
@@ -520,7 +427,7 @@ export class VariableStore {
     this.validateName(name);
 
     const existing = this.get(name, schema);
-    if (existing === null || Array.isArray(existing)) {
+    if (existing === null) {
       throw new VariableNotFoundError(name, schema);
     }
 
@@ -555,7 +462,7 @@ export class VariableStore {
     if (schema !== undefined) {
       // Remove specific (name, schema) variant
       const existing = this.get(name, schema);
-      if (existing === null || Array.isArray(existing)) {
+      if (existing === null) {
         throw new VariableNotFoundError(name, schema);
       }
 
@@ -584,9 +491,6 @@ export class VariableStore {
     return variants;
   }
 
-  /**
-   * Delete a variable (deprecated: use remove() instead)
-   */
   /**
    * List variables with optional filters
    */
@@ -790,7 +694,7 @@ export class VariableStore {
 
     // Return updated variable
     const updated = this.get(name, schema);
-    if (updated === null || Array.isArray(updated)) {
+    if (updated === null) {
       throw new VariableNotFoundError(name, schema);
     }
     return updated;

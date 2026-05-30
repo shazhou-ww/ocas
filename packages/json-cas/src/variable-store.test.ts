@@ -381,6 +381,86 @@ describe("VariableStore - set() Upsert Method", () => {
 
     varStore.close();
   });
+
+  test("set() throws TagLabelConflictError when updating with tag key that matches new label", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = { type: "object", properties: { x: { type: "number" } } };
+    const schemaHash = await putSchema(store, schema);
+    const hash1 = await store.put(schemaHash, { x: 1 });
+    const hash2 = await store.put(schemaHash, { x: 2 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Create with tags
+    varStore.set("config", hash1, { tags: { env: "prod" } });
+
+    // Try to update with conflicting tag/label
+    expect(() => {
+      varStore.set("config", hash2, {
+        tags: { region: "us" },
+        labels: ["region"], // conflicts with tag key
+      });
+    }).toThrow(TagLabelConflictError);
+
+    varStore.close();
+  });
+
+  test("set() throws TagLabelConflictError when updating with label that matches new tag key", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = { type: "object", properties: { x: { type: "number" } } };
+    const schemaHash = await putSchema(store, schema);
+    const hash1 = await store.put(schemaHash, { x: 1 });
+    const hash2 = await store.put(schemaHash, { x: 2 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Create with labels
+    varStore.set("config", hash1, { labels: ["production"] });
+
+    // Try to update with conflicting label/tag
+    expect(() => {
+      varStore.set("config", hash2, {
+        tags: { production: "true" }, // conflicts with existing label "production"
+        // labels not provided - existing ["production"] preserved, causing conflict
+      });
+    }).toThrow(TagLabelConflictError);
+
+    varStore.close();
+  });
+
+  test("set() allows updating tags/labels when no conflicts", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = { type: "object", properties: { x: { type: "number" } } };
+    const schemaHash = await putSchema(store, schema);
+    const hash1 = await store.put(schemaHash, { x: 1 });
+    const hash2 = await store.put(schemaHash, { x: 2 });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Create with tags and labels
+    varStore.set("config", hash1, {
+      tags: { env: "dev" },
+      labels: ["experimental"],
+    });
+
+    // Update with different tags/labels (no conflicts)
+    const updated = varStore.set("config", hash2, {
+      tags: { region: "us", version: "2" },
+      labels: ["stable", "reviewed"],
+    });
+
+    expect(updated.tags).toEqual({ region: "us", version: "2" });
+    expect(updated.labels).toEqual(["stable", "reviewed"]);
+    expect(updated.value).toBe(hash2);
+
+    varStore.close();
+  });
 });
 
 describe("VariableStore - get() with Optional Schema", () => {

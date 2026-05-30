@@ -23,7 +23,6 @@ export {
   InvalidVariableNameError,
   SchemaMismatchError,
   TagLabelConflictError,
-  VariableDuplicateError,
   VariableNotFoundError,
   VariableStore,
 } from "./variable-store.js";
