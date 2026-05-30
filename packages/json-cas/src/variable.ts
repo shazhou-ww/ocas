@@ -8,11 +8,11 @@ export type VariableId = string;
 /**
  * Variable: mutable binding to an immutable CAS node
  */
-export interface Variable {
+export type Variable = {
   id: VariableId;
   scope: string; // hierarchical path, must end with /
   value: Hash; // CAS node hash
   schema: Hash; // extracted from value's CAS node.type
   created: number; // epoch ms
   updated: number; // epoch ms
-}
+};

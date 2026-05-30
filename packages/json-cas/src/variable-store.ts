@@ -201,6 +201,43 @@ export class VariableStore {
   }
 
   /**
+   * List variables matching a scope prefix
+   */
+  list(options?: { scope?: string }): Variable[] {
+    const scope = options?.scope ?? "";
+
+    // Validate scope format (must end with / if non-empty)
+    if (scope !== "" && !scope.endsWith("/")) {
+      throw new InvalidScopeError(scope);
+    }
+
+    const stmt = this.db.prepare(`
+      SELECT id, scope, value, schema, created, updated
+      FROM variables
+      WHERE scope LIKE ? || '%'
+      ORDER BY created ASC
+    `);
+
+    const rows = stmt.all(scope) as Array<{
+      id: string;
+      scope: string;
+      value: string;
+      schema: string;
+      created: number;
+      updated: number;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      scope: row.scope,
+      value: row.value,
+      schema: row.schema,
+      created: row.created,
+      updated: row.updated,
+    }));
+  }
+
+  /**
    * Close the database connection
    */
   close(): void {
