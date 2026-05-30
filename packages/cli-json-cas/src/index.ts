@@ -3,13 +3,18 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Hash, JSONSchema, Store } from "@uncaged/json-cas";
+import type { Hash, JSONSchema, Store, VariableStore } from "@uncaged/json-cas";
 import {
   bootstrap,
+  CasNodeNotFoundError,
   computeHash,
+  createVariableStore,
   getSchema,
+  InvalidScopeError,
   putSchema,
   refs,
+  SchemaMismatchError,
+  VariableNotFoundError,
   validate,
   verify,
   walk,
@@ -21,7 +26,7 @@ import { createFsStore } from "@uncaged/json-cas-fs";
 type Flags = Record<string, string | boolean>;
 
 /** Flags that consume the next token as their value. All others are boolean. */
-const VALUE_FLAGS = new Set(["store", "format"]);
+const VALUE_FLAGS = new Set(["store", "format", "scope", "value", "var-db"]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
   const flags: Flags = {};
@@ -57,6 +62,10 @@ const storePath =
   typeof flags.store === "string" ? flags.store : defaultStorePath;
 const compact = flags.json === true;
 
+const defaultVarDbPath = join(defaultStorePath, "variables.db");
+const varDbPath =
+  typeof flags["var-db"] === "string" ? flags["var-db"] : defaultVarDbPath;
+
 // ---- Helpers ----
 
 function out(data: unknown): void {
@@ -78,6 +87,12 @@ function readJsonFile(file: string): unknown {
 
 function openStore(): Store {
   return createFsStore(resolve(storePath));
+}
+
+function openVarStore(): VariableStore {
+  const store = openStore();
+  mkdirSync(resolve(storePath), { recursive: true });
+  return createVariableStore(resolve(varDbPath), store);
 }
 
 // ---- Commands ----
@@ -250,6 +265,91 @@ async function cmdCat(args: string[]): Promise<void> {
   }
 }
 
+async function cmdVarCreate(_args: string[]): Promise<void> {
+  const scope = flags.scope as string | undefined;
+  const value = flags.value as string | undefined;
+
+  if (!scope) die("Usage: json-cas var create --scope <scope> --value <hash>");
+  if (!value) die("Usage: json-cas var create --scope <scope> --value <hash>");
+
+  const varStore = openVarStore();
+
+  try {
+    const variable = varStore.create(scope, value);
+    out(variable);
+  } catch (e) {
+    if (e instanceof InvalidScopeError || e instanceof CasNodeNotFoundError) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdVarGet(args: string[]): Promise<void> {
+  const id = args[0];
+  if (!id) die("Usage: json-cas var get <id>");
+
+  const varStore = openVarStore();
+
+  try {
+    const variable = varStore.get(id);
+    if (variable === null) {
+      die(`Error: Variable not found: ${id}`);
+    }
+    out(variable);
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdVarUpdate(args: string[]): Promise<void> {
+  const id = args[0];
+  const value = args[1];
+
+  if (!id || !value) {
+    die("Usage: json-cas var update <id> <hash>");
+  }
+
+  const varStore = openVarStore();
+
+  try {
+    const variable = varStore.update(id, value);
+    out(variable);
+  } catch (e) {
+    if (
+      e instanceof VariableNotFoundError ||
+      e instanceof SchemaMismatchError ||
+      e instanceof CasNodeNotFoundError
+    ) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdVarDelete(args: string[]): Promise<void> {
+  const id = args[0];
+  if (!id) die("Usage: json-cas var delete <id>");
+
+  const varStore = openVarStore();
+
+  try {
+    const variable = varStore.delete(id);
+    out(variable);
+  } catch (e) {
+    if (e instanceof VariableNotFoundError) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  } finally {
+    varStore.close();
+  }
+}
+
 function printUsage(): void {
   console.log(`\
 Usage: json-cas [--store <path>] [--json] <command> [args]
@@ -269,9 +369,14 @@ Commands:
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
   cat <hash> [--payload]            Output node (--payload for payload only)
+  var create --scope <s> --value <h> Create a variable
+  var get <id>                      Get a variable by ID
+  var update <id> <hash>            Update variable value
+  var delete <id>                   Delete a variable
 
 Flags:
   --store <path>   Store directory (default: ~/.uncaged/json-cas)
+  --var-db <path>  Variable database path (default: <store>/variables.db)
   --json           Compact JSON output`);
 }
 
@@ -345,6 +450,27 @@ switch (cmd) {
   case "cat":
     await cmdCat(rest);
     break;
+
+  case "var": {
+    const [sub, ...subRest] = rest;
+    switch (sub) {
+      case "create":
+        await cmdVarCreate(subRest);
+        break;
+      case "get":
+        await cmdVarGet(subRest);
+        break;
+      case "update":
+        await cmdVarUpdate(subRest);
+        break;
+      case "delete":
+        await cmdVarDelete(subRest);
+        break;
+      default:
+        die(`Unknown var subcommand: ${sub ?? "(none)"}`);
+    }
+    break;
+  }
 
   default:
     die(`Unknown command: ${cmd}`);
