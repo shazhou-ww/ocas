@@ -469,77 +469,47 @@ export class VariableStore {
   /**
    * Get a variable by name, optionally with schema
    */
-  get(name: string): Variable | Variable[] | null;
-  get(name: string, schema: Hash): Variable | null;
-  get(name: string, schema?: Hash): Variable | Variable[] | null {
-    if (schema !== undefined) {
-      // Precise match with schema
-      const stmt = this.db.prepare(`
-        SELECT name, schema, value, created, updated
-        FROM variables
-        WHERE name = ? AND schema = ?
-      `);
-
-      const row = stmt.get(name, schema) as
-        | {
-            name: string;
-            schema: string;
-            value: string;
-            created: number;
-            updated: number;
-          }
-        | undefined
-        | null;
-
-      if (row === undefined || row === null) {
-        return null;
-      }
-
-      const tags = this.loadTags(row.name, row.schema);
-      const labels = this.loadLabels(row.name, row.schema);
-
-      return {
-        name: row.name,
-        schema: row.schema,
-        value: row.value,
-        created: row.created,
-        updated: row.updated,
-        tags,
-        labels,
-      };
-    }
-
-    // No schema: query all variants with matching name
+  /**
+   * Get a variable by name and schema
+   * @param name - Variable name
+   * @param schema - Schema hash (required)
+   * @returns Variable if found, null otherwise
+   */
+  get(name: string, schema: Hash): Variable | null {
+    // Precise match with schema
     const stmt = this.db.prepare(`
       SELECT name, schema, value, created, updated
       FROM variables
-      WHERE name = ?
+      WHERE name = ? AND schema = ?
     `);
 
-    const rows = stmt.all(name) as Array<{
-      name: string;
-      schema: string;
-      value: string;
-      created: number;
-      updated: number;
-    }>;
+    const row = stmt.get(name, schema) as
+      | {
+          name: string;
+          schema: string;
+          value: string;
+          created: number;
+          updated: number;
+        }
+      | undefined
+      | null;
 
-    if (rows.length === 0) {
+    if (row === undefined || row === null) {
       return null;
     }
 
-    const variables: Variable[] = rows.map((row) => ({
+    const tags = this.loadTags(row.name, row.schema);
+    const labels = this.loadLabels(row.name, row.schema);
+
+    return {
       name: row.name,
       schema: row.schema,
       value: row.value,
       created: row.created,
       updated: row.updated,
-      tags: this.loadTags(row.name, row.schema),
-      labels: this.loadLabels(row.name, row.schema),
-    }));
-
-    // Return single Variable if only one, array if multiple
-    return variables.length === 1 ? (variables[0] as Variable) : variables;
+      tags,
+      labels,
+    };
   }
 
   /**
@@ -599,13 +569,11 @@ export class VariableStore {
     }
 
     // Remove all schema variants for this name
-    const variants = this.get(name);
+    const variants = this.list({ exactName: name });
 
-    if (variants === null) {
+    if (variants.length === 0) {
       return [];
     }
-
-    const variantsArray = Array.isArray(variants) ? variants : [variants];
 
     const stmt = this.db.prepare(`
       DELETE FROM variables WHERE name = ?
@@ -613,37 +581,31 @@ export class VariableStore {
 
     stmt.run(name);
 
-    return variantsArray;
+    return variants;
   }
 
   /**
    * Delete a variable (deprecated: use remove() instead)
    */
-  delete(name: string, schema: Hash): Variable {
-    const existing = this.get(name, schema);
-    if (existing === null) {
-      throw new VariableNotFoundError(name, schema);
-    }
-
-    const stmt = this.db.prepare(`
-      DELETE FROM variables WHERE name = ? AND schema = ?
-    `);
-
-    stmt.run(name, schema);
-
-    return existing;
-  }
-
   /**
    * List variables with optional filters
    */
   list(options?: {
     namePrefix?: string;
+    exactName?: string;
     schema?: Hash;
     tags?: Record<string, string>;
     labels?: string[];
   }): Variable[] {
+    // Validate mutually exclusive options
+    if (options?.namePrefix !== undefined && options?.exactName !== undefined) {
+      throw new Error(
+        "namePrefix and exactName are mutually exclusive - cannot specify both",
+      );
+    }
+
     const namePrefix = options?.namePrefix ?? "";
+    const exactName = options?.exactName;
     const schema = options?.schema;
     const filterTags = options?.tags ?? {};
     const filterLabels = options?.labels ?? [];
@@ -680,10 +642,13 @@ export class VariableStore {
       params.push(label);
     }
 
-    // WHERE clause for namePrefix and schema
+    // WHERE clause for name filters and schema
     const whereClauses: string[] = [];
 
-    if (namePrefix !== "") {
+    if (exactName !== undefined) {
+      whereClauses.push("v.name = ?");
+      params.push(exactName);
+    } else if (namePrefix !== "") {
       whereClauses.push("v.name LIKE ? || '%'");
       params.push(namePrefix);
     }
@@ -735,7 +700,7 @@ export class VariableStore {
     this.validateName(name);
 
     const existing = this.get(name, schema);
-    if (existing === null || Array.isArray(existing)) {
+    if (existing === null) {
       throw new VariableNotFoundError(name, schema);
     }
 

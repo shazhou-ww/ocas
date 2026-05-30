@@ -91,7 +91,7 @@ describe("GC - Variable Model Refactoring", () => {
     const varStore = new VariableStore(dbPath, store);
 
     varStore.create("config", hashRef);
-    varStore.delete("config", schemaHash);
+    varStore.remove("config", schemaHash);
 
     const stats = gc(store, varStore);
 
@@ -165,7 +165,7 @@ describe("GC - Variable Model Refactoring", () => {
     expect(stats.scanned).toBe(3);
 
     // Delete one variable
-    varStore.delete("var2", schemaAHash);
+    varStore.remove("var2", schemaAHash);
 
     // Second GC: hashA2 removed
     stats = gc(store, varStore);

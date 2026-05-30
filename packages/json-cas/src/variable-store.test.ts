@@ -313,6 +313,58 @@ describe("VariableStore - set() Upsert Method", () => {
     varStore.close();
   });
 
+  test("set() extracts schema from value hash internally", async () => {
+    // Given: Two different schemas
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, { type: "number" });
+    const schemaB = await putSchema(store, { type: "string" });
+    const valueA = await store.put(schemaA, 42);
+    const valueB = await store.put(schemaB, "hello");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // When: set() with same name but different value schemas
+    const varA = varStore.set("config", valueA);
+    const varB = varStore.set("config", valueB);
+
+    // Then: Both variables created with correct extracted schemas
+    expect(varA.schema).toBe(schemaA);
+    expect(varB.schema).toBe(schemaB);
+
+    // Verify they coexist independently
+    const retrievedA = varStore.get("config", schemaA);
+    const retrievedB = varStore.get("config", schemaB);
+    expect((retrievedA as Variable).value).toBe(valueA);
+    expect((retrievedB as Variable).value).toBe(valueB);
+
+    varStore.close();
+  });
+
+  test("set() upserts based on extracted schema", async () => {
+    // Given: Existing variable with schemaA
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, { type: "number" });
+    const value1 = await store.put(schemaA, 42);
+    const value2 = await store.put(schemaA, 99);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.set("config", value1);
+
+    // When: set() with same name and same schema (extracted)
+    const updated = varStore.set("config", value2);
+
+    // Then: Updates existing variable, not creates new
+    expect(updated.value).toBe(value2);
+    expect(varStore.list().length).toBe(1); // Still only 1 variable
+
+    varStore.close();
+  });
+
   test("set() throws CasNodeNotFoundError for invalid hash", async () => {
     store = createMemoryStore();
     dbPath = tmpDbPath();
@@ -343,74 +395,119 @@ describe("VariableStore - get() with Optional Schema", () => {
     }
   });
 
-  test("get(name) returns null when variable doesn't exist", async () => {
+  test("get(name, schema) returns Variable when exists", async () => {
+    // Given: Variable with (name, schema)
     store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const value = await store.put(schema, 42);
+
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    const result = varStore.get("nonexistent");
+    varStore.set("config", value);
 
+    // When: get() with exact (name, schema)
+    const result = varStore.get("config", schema);
+
+    // Then: Returns Variable object
+    expect(result).not.toBeNull();
+    expect((result as Variable).name).toBe("config");
+    expect((result as Variable).schema).toBe(schema);
+    expect((result as Variable).value).toBe(value);
+
+    varStore.close();
+  });
+
+  test("get(name, schema) returns null when name doesn't exist", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // When: Query non-existent name
+    const result = varStore.get("nonexistent", schema);
+
+    // Then: Returns null
     expect(result).toBeNull();
 
     varStore.close();
   });
 
-  test("get(name) returns single Variable when only one schema variant exists", async () => {
+  test("get(name, schema) returns null when schema doesn't match", async () => {
+    // Given: Variable with schemaA
     store = createMemoryStore();
     await bootstrap(store);
-    const schemaHash = await putSchema(store, {
-      type: "object",
-      properties: { x: { type: "number" } },
-    });
-    const dataHash = await store.put(schemaHash, { x: 42 });
+    const schemaA = await putSchema(store, { type: "number" });
+    const schemaB = await putSchema(store, { type: "string" });
+    const value = await store.put(schemaA, 42);
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", dataHash);
+    varStore.set("config", value);
 
-    const result = varStore.get("config");
+    // When: Query with wrong schema
+    const result = varStore.get("config", schemaB);
 
-    // Should return single Variable, not array
-    expect(result).not.toBeNull();
-    expect(Array.isArray(result)).toBe(false);
-    expect((result as Variable).name).toBe("config");
-    expect((result as Variable).schema).toBe(schemaHash);
-    expect((result as Variable).value).toBe(dataHash);
+    // Then: Returns null (schema mismatch)
+    expect(result).toBeNull();
 
     varStore.close();
   });
 
-  test("get(name) returns Variable[] when multiple schema variants exist", async () => {
+  test("get(name, schema) returns correct variant when multiple schemas exist", async () => {
+    // Given: Same name with two different schemas
     store = createMemoryStore();
     await bootstrap(store);
-    const schemaA = await putSchema(store, {
-      type: "object",
-      properties: { x: { type: "number" } },
-    });
-    const schemaB = await putSchema(store, {
-      type: "object",
-      properties: { y: { type: "string" } },
-    });
-    const hashA = await store.put(schemaA, { x: 42 });
-    const hashB = await store.put(schemaB, { y: "hello" });
+    const schemaA = await putSchema(store, { type: "number" });
+    const schemaB = await putSchema(store, { type: "string" });
+    const valueA = await store.put(schemaA, 42);
+    const valueB = await store.put(schemaB, "hello");
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashA);
-    varStore.set("config", hashB);
+    varStore.set("config", valueA);
+    varStore.set("config", valueB);
 
-    const result = varStore.get("config");
+    // When: Query each schema explicitly
+    const resultA = varStore.get("config", schemaA);
+    const resultB = varStore.get("config", schemaB);
 
-    // Should return array of Variables
+    // Then: Returns correct variant for each schema
+    expect(resultA).not.toBeNull();
+    expect((resultA as Variable).schema).toBe(schemaA);
+    expect((resultA as Variable).value).toBe(valueA);
+
+    expect(resultB).not.toBeNull();
+    expect((resultB as Variable).schema).toBe(schemaB);
+    expect((resultB as Variable).value).toBe(valueB);
+
+    varStore.close();
+  });
+
+  test("get(name, schema) includes tags and labels", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "object" });
+    const value = await store.put(schema, {});
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.set("config", value, {
+      tags: { env: "prod" },
+      labels: ["critical"],
+    });
+
+    const result = varStore.get("config", schema);
+
     expect(result).not.toBeNull();
-    expect(Array.isArray(result)).toBe(true);
-    expect((result as Variable[]).length).toBe(2);
-
-    const schemas = (result as Variable[]).map((v) => v.schema).sort();
-    expect(schemas).toContain(schemaA);
-    expect(schemas).toContain(schemaB);
+    expect((result as Variable).tags).toEqual({ env: "prod" });
+    expect((result as Variable).labels).toEqual(["critical"]);
 
     varStore.close();
   });
@@ -474,29 +571,6 @@ describe("VariableStore - get() with Optional Schema", () => {
     const result = varStore.get("config", schemaB);
 
     expect(result).toBeNull();
-
-    varStore.close();
-  });
-
-  test("get(name) returns variables with complete tags and labels", async () => {
-    store = createMemoryStore();
-    await bootstrap(store);
-    const schemaHash = await putSchema(store, { type: "object" });
-    const dataHash = await store.put(schemaHash, {});
-
-    dbPath = tmpDbPath();
-    const varStore = new VariableStore(dbPath, store);
-
-    varStore.set("config", dataHash, {
-      tags: { env: "prod" },
-      labels: ["critical"],
-    });
-
-    const result = varStore.get("config");
-
-    expect(result).not.toBeNull();
-    expect((result as Variable).tags).toEqual({ env: "prod" });
-    expect((result as Variable).labels).toEqual(["critical"]);
 
     varStore.close();
   });
@@ -846,6 +920,134 @@ describe("VariableStore - Name Validation", () => {
   });
 });
 
+describe("VariableStore - validateName() Error Messages", () => {
+  let store: Store;
+  let dbPath: string;
+  let varStore: VariableStore;
+  let schemaHash: string;
+  let dataHash: string;
+
+  afterEach(() => {
+    try {
+      varStore.close();
+    } catch {
+      // ignore
+    }
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // ignore
+    }
+  });
+
+  test("validateName error message mentions 'empty' for empty string", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    schemaHash = await putSchema(store, { type: "object" });
+    dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    varStore = new VariableStore(dbPath, store);
+
+    try {
+      varStore.set("", dataHash);
+      throw new Error("Expected InvalidVariableNameError");
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvalidVariableNameError);
+      expect((e as InvalidVariableNameError).reason).toMatch(/empty/i);
+      expect((e as InvalidVariableNameError).message).toContain('""'); // Shows the invalid name
+    }
+  });
+
+  test("validateName error message identifies specific invalid segment", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    schemaHash = await putSchema(store, { type: "object" });
+    dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    varStore = new VariableStore(dbPath, store);
+
+    try {
+      varStore.set("valid/segment/bad@segment/more", dataHash);
+      throw new Error("Expected InvalidVariableNameError");
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvalidVariableNameError);
+      const error = e as InvalidVariableNameError;
+      expect(error.reason).toContain("bad@segment"); // Specific segment mentioned
+      expect(error.reason).toMatch(/invalid|characters/i);
+    }
+  });
+
+  test("validateName error message explains consecutive slashes", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    schemaHash = await putSchema(store, { type: "object" });
+    dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    varStore = new VariableStore(dbPath, store);
+
+    try {
+      varStore.set("a//b", dataHash);
+      throw new Error("Expected InvalidVariableNameError");
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvalidVariableNameError);
+      const error = e as InvalidVariableNameError;
+      expect(error.reason).toMatch(/empty segment|consecutive.*slash|\/\//i);
+    }
+  });
+
+  test("validateName error message distinguishes leading vs trailing slash", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    schemaHash = await putSchema(store, { type: "object" });
+    dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    varStore = new VariableStore(dbPath, store);
+
+    // Leading slash
+    try {
+      varStore.set("/abc", dataHash);
+      throw new Error("Expected InvalidVariableNameError");
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvalidVariableNameError);
+      const error = e as InvalidVariableNameError;
+      expect(error.reason).toMatch(/leading|start|begins/i);
+      expect(error.reason).not.toMatch(/trailing|end/i);
+    }
+
+    // Trailing slash
+    try {
+      varStore.set("abc/", dataHash);
+      throw new Error("Expected InvalidVariableNameError");
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvalidVariableNameError);
+      const error = e as InvalidVariableNameError;
+      expect(error.reason).toMatch(/trailing|end/i);
+      expect(error.reason).not.toMatch(/leading|start|begins/i);
+    }
+  });
+
+  test("validateName accepts valid names with dots, underscores, hyphens", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    schemaHash = await putSchema(store, { type: "object" });
+    dataHash = await store.put(schemaHash, {});
+
+    dbPath = tmpDbPath();
+    varStore = new VariableStore(dbPath, store);
+
+    // All these should succeed
+    expect(() => varStore.set("app.config", dataHash)).not.toThrow();
+    expect(() => varStore.set("my_variable", dataHash)).not.toThrow();
+    expect(() => varStore.set("test-name", dataHash)).not.toThrow();
+    expect(() => varStore.set("path/to/config.json", dataHash)).not.toThrow();
+    expect(() => varStore.set("v1.2.3-alpha_001", dataHash)).not.toThrow();
+  });
+});
+
 describe("VariableStore - Integration Tests", () => {
   let store: Store;
   let dbPath: string;
@@ -893,10 +1095,9 @@ describe("VariableStore - Integration Tests", () => {
     const var2 = varStore.set("app/server", stateHash1);
     expect(var2.schema).toBe(schemaState);
 
-    // 3. Get without schema returns array
-    const result = varStore.get("app/server");
-    expect(Array.isArray(result)).toBe(true);
-    expect((result as Variable[]).length).toBe(2);
+    // 3. List all variants with exactName
+    const result = varStore.list({ exactName: "app/server" });
+    expect(result.length).toBe(2);
 
     // 4. Get with schema returns single variable
     const config = varStore.get("app/server", schemaConfig);
@@ -915,9 +1116,9 @@ describe("VariableStore - Integration Tests", () => {
     expect((deletedState as Variable).schema).toBe(schemaState);
 
     // 8. Verify only config remains
-    const remaining = varStore.get("app/server");
-    expect(Array.isArray(remaining)).toBe(false);
-    expect((remaining as Variable).schema).toBe(schemaConfig);
+    const remaining = varStore.list({ exactName: "app/server" });
+    expect(remaining.length).toBe(1);
+    expect(remaining[0]?.schema).toBe(schemaConfig);
 
     // 9. Remove all remaining
     const deletedAll = varStore.remove("app/server");
@@ -925,7 +1126,7 @@ describe("VariableStore - Integration Tests", () => {
     expect(deletedAll.length).toBe(1);
 
     // 10. Verify all gone
-    expect(varStore.get("app/server")).toBeNull();
+    expect(varStore.get("app/server", schemaConfig)).toBeNull();
 
     varStore.close();
   });
@@ -1075,6 +1276,186 @@ describe("VariableStore - List Operation", () => {
 
     expect(vars.length).toBe(2);
     expect(vars.every((v) => v.name.startsWith("app/"))).toBe(true);
+
+    varStore.close();
+  });
+});
+
+describe("VariableStore - list() with exactName", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // Ignore
+    }
+  });
+
+  test("list({ exactName }) returns all schema variants for name", async () => {
+    // Given: Same name with multiple schemas
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, { type: "number" });
+    const schemaB = await putSchema(store, { type: "string" });
+    const schemaC = await putSchema(store, { type: "boolean" });
+    const valueA = await store.put(schemaA, 42);
+    const valueB = await store.put(schemaB, "hello");
+    const valueC = await store.put(schemaC, true);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.set("config", valueA);
+    varStore.set("config", valueB);
+    varStore.set("config", valueC);
+    varStore.set("other", valueA); // Different name, same schema
+
+    // When: list with exactName
+    const results = varStore.list({ exactName: "config" });
+
+    // Then: Returns all 3 schema variants, not "other"
+    expect(results.length).toBe(3);
+    const schemas = results.map((v) => v.schema).sort();
+    expect(schemas).toContain(schemaA);
+    expect(schemas).toContain(schemaB);
+    expect(schemas).toContain(schemaC);
+    expect(results.every((v) => v.name === "config")).toBe(true);
+
+    varStore.close();
+  });
+
+  test("list({ exactName }) returns empty array when name doesn't exist", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const results = varStore.list({ exactName: "nonexistent" });
+    expect(results).toEqual([]);
+
+    varStore.close();
+  });
+
+  test("list({ exactName, schema }) filters to specific variant", async () => {
+    // Given: Same name with two schemas
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, { type: "number" });
+    const schemaB = await putSchema(store, { type: "string" });
+    const valueA = await store.put(schemaA, 42);
+    const valueB = await store.put(schemaB, "hello");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.set("config", valueA);
+    varStore.set("config", valueB);
+
+    // When: Filter by both exactName and schema
+    const results = varStore.list({ exactName: "config", schema: schemaA });
+
+    // Then: Returns only schemaA variant
+    expect(results.length).toBe(1);
+    expect(results[0]?.schema).toBe(schemaA);
+
+    varStore.close();
+  });
+
+  test("list({ exactName }) with tags filters variants", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, { type: "number" });
+    const schemaB = await putSchema(store, { type: "string" });
+    const valueA = await store.put(schemaA, 42);
+    const valueB = await store.put(schemaB, "hello");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.set("config", valueA, { tags: { env: "dev" } });
+    varStore.set("config", valueB, { tags: { env: "prod" } });
+
+    // When: Filter by exactName + tags
+    const results = varStore.list({
+      exactName: "config",
+      tags: { env: "prod" },
+    });
+
+    // Then: Returns only prod variant
+    expect(results.length).toBe(1);
+    expect(results[0]?.schema).toBe(schemaB);
+
+    varStore.close();
+  });
+
+  test("exactName and namePrefix are mutually exclusive", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // When: Both provided
+    expect(() => {
+      varStore.list({ exactName: "config", namePrefix: "app/" });
+    }).toThrow(/mutually exclusive|cannot specify both/i);
+
+    varStore.close();
+  });
+
+  test("list({ namePrefix }) does match partial exact names", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const value = await store.put(schema, 42);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.set("app", value);
+    varStore.set("app/config", value);
+    varStore.set("application", value);
+
+    // When: namePrefix without trailing slash
+    const results = varStore.list({ namePrefix: "app" });
+
+    // Then: Matches all three (prefix match)
+    expect(results.length).toBe(3);
+    expect(results.map((v) => v.name).sort()).toEqual([
+      "app",
+      "app/config",
+      "application",
+    ]);
+
+    varStore.close();
+  });
+
+  test("exactName replaces get(name) multi-schema query use case", async () => {
+    // This test demonstrates that list({ exactName }) provides
+    // the functionality previously available via get(name) → Variable[]
+
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaA = await putSchema(store, { type: "number" });
+    const schemaB = await putSchema(store, { type: "string" });
+    const valueA = await store.put(schemaA, 42);
+    const valueB = await store.put(schemaB, "hello");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    varStore.set("config", valueA);
+    varStore.set("config", valueB);
+
+    // Old way: get("config") → Variable | Variable[]
+    // New way: list({ exactName: "config" }) → Variable[]
+    const results = varStore.list({ exactName: "config" });
+
+    expect(results.length).toBe(2);
+    expect(results.every((v) => v.name === "config")).toBe(true);
 
     varStore.close();
   });
