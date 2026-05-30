@@ -1,0 +1,220 @@
+name: "retrospect-workflow"
+description: "Post-execution retrospective: analyze a completed thread, find inefficiencies, and improve the workflow definition."
+roles:
+  analyst:
+    description: "Scans thread execution for anomalies and produces a findings report"
+    goal: "You are a workflow execution analyst. You review completed thread data to find inefficiencies, wasted effort, and procedure gaps."
+    capabilities:
+      - data-analysis
+    procedure: |
+      You receive a completed thread ID in your task prompt.
+
+      Phase 0 — Validation (must pass before any analysis):
+      1. Run `uwf step list <thread-id>` to get thread metadata including the workflow hash
+      2. Run `uwf workflow show <workflow-hash>` to get the workflow name
+      3. Verify the workflow exists locally: check `.workflows/<name>.yaml` in the current repo
+         - If NOT found: output $status=wrong_project with the workflow name. Do NOT proceed.
+      4. Compare the thread's workflow hash against the current registered version:
+         - Run `uwf workflow show <name>` to get the current hash
+         - If hashes differ: the thread ran on an older version. Note this — you will need to diff versions after analysis.
+
+      Phase 1 — Overview scan:
+      5. From the step list, compute a health signal for each step:
+         - Duration: flag if >2x the median of other steps
+         - Output tokens: flag if >2x the median
+         - Status flow: flag non-happy-path transitions (rejected, fix_code, fix_spec, hook_failed)
+         - Step count: flag if the same role appears more than expected (indicates loops)
+      6. If no anomalies found AND versions match: output $status=clean
+      7. If no anomalies found BUT versions differ:
+         - Diff the two workflow versions to check if any procedure changes are relevant
+         - If the current version already addresses potential concerns: output $status=clean with a note
+         - Otherwise: proceed to Phase 2
+
+      Phase 2 — Targeted deep-dive (only for flagged steps):
+      8. For each flagged step, run `uwf step show <hash>` to get the detail with turns
+      9. Analyze the turn sequence for:
+         - Repeated tool calls with the same or similar input (blind retries)
+         - Tool errors followed by no strategy change (same approach retried)
+         - Unnecessary exploration (reading files or running commands unrelated to the task)
+         - Hallucinated commands or flags (commands that don't exist or wrong syntax)
+         - Excessive turns before reaching the goal
+      10. For each finding, record:
+          - Which role and step hash
+          - What happened (specific turn indices and commands)
+          - Root cause hypothesis (procedure gap, missing pitfall, unclear instruction)
+          - Suggested fix (what to add/change in the procedure)
+      11. If versions differ: compare findings against the version diff.
+          Mark any finding that is already fixed in the current version as "resolved_in_current".
+          Only report findings that are NOT yet addressed.
+
+      Output a structured findings report. Set $status=clean if nothing actionable, $status=findings if unresolved issues exist, or $status=wrong_project if the workflow doesn't belong here.
+    output: "A findings report with per-issue root cause and suggested procedure fixes. Set $status to clean or findings (with report hash)."
+    frontmatter:
+      oneOf:
+        - properties:
+            $status: { const: "clean" }
+            summary: { type: string }
+          required: [$status, summary]
+        - properties:
+            $status: { const: "findings" }
+            report: { type: string }
+            targetWorkflow: { type: string }
+          required: [$status, report, targetWorkflow]
+        - properties:
+            $status: { const: "wrong_project" }
+            workflowName: { type: string }
+          required: [$status, workflowName]
+  proposer:
+    description: "Translates findings into concrete workflow edits"
+    goal: "You are a workflow improvement proposer. You read the analyst's findings and produce specific, minimal edits to the workflow YAML."
+    capabilities:
+      - planning
+    procedure: |
+      1. Read the analyst's findings report from your task prompt
+      2. Locate the target workflow YAML:
+         - Workflow definitions live in the WORKFLOW ENGINE repo (where `uwf` is developed), NOT in the repo that was analyzed.
+         - Find it via: `uwf workflow show <targetWorkflow> --format yaml` to read the current definition
+         - The physical file is `.workflows/<targetWorkflow>.yaml` in the workflow engine repo
+         - Use `git rev-parse --show-toplevel` in the current directory to find the workflow engine repo root
+      3. Read the current workflow YAML to understand existing procedures
+      4. For each finding, draft a minimal edit:
+         - Prefer adding a pitfall note or clarifying instruction over restructuring
+         - If a procedure step is ambiguous, make it explicit
+         - If a tool usage pattern is wrong, add a "Do NOT" or "IMPORTANT" note
+         - Keep edits surgical — don't rewrite procedures that work fine
+      5. Check if existing tests need updating (search for test files referencing the workflow)
+      6. Produce a change plan as CAS text node via `uwf cas put-text "<plan>"`
+
+      The plan should list each edit with:
+      - File path
+      - What to change (old text → new text, or addition)
+      - Why (linked to which finding)
+      - Any test updates needed
+    output: "A change plan stored in CAS. Set $status to ready (with plan hash and repoPath) or no_action (if findings don't warrant changes)."
+    frontmatter:
+      oneOf:
+        - properties:
+            $status: { const: "ready" }
+            plan: { type: string }
+            repoPath: { type: string }
+          required: [$status, plan, repoPath]
+        - properties:
+            $status: { const: "no_action" }
+            reason: { type: string }
+          required: [$status, reason]
+  developer:
+    description: "Applies the proposed workflow edits"
+    goal: "You are a developer agent. You apply workflow YAML edits and update related tests."
+    capabilities:
+      - coding
+    procedure: |
+      IMPORTANT: Always work in a git worktree, NEVER modify the main working directory directly.
+      The workflow definitions live in THIS repo (the workflow engine), not the repo that was analyzed.
+
+      Before starting any work, set up an isolated worktree:
+      1. Use `git rev-parse --show-toplevel` to find the repo root (do NOT use repoPath from proposer — that's the analyzed repo)
+      2. `git fetch origin` to get latest refs
+      3. `git worktree add .worktrees/retrospect/<short-slug> -b retrospect/<short-slug> origin/main`
+      4. `cd .worktrees/retrospect/<short-slug> && bun install`
+      5. ALL subsequent work must happen inside the worktree directory.
+
+      Then apply changes:
+      6. Read the change plan from CAS: `uwf cas get <plan hash>`
+      7. Apply each edit from the plan to the workflow YAML
+      8. Update or add tests as specified in the plan
+      9. Run `bun run build` and `bun test` to verify
+      10. Run `bun run check` for lint
+      11. Commit with message: `improve: <workflow-name> — <brief summary>`
+    output: "List all files changed and provide a summary. Set $status to done (with branch/worktree), or failed (with reason)."
+    frontmatter:
+      oneOf:
+        - properties:
+            $status: { const: "done" }
+            branch: { type: string }
+            worktree: { type: string }
+          required: [$status, branch, worktree]
+        - properties:
+            $status: { const: "failed" }
+            reason: { type: string }
+          required: [$status, reason]
+  reviewer:
+    description: "Reviews the workflow edits for correctness"
+    goal: "You are a reviewer. You verify that workflow edits are minimal, correct, and actually address the findings."
+    capabilities:
+      - code-review
+    procedure: |
+      The worktree path is provided in your task prompt. cd into it first.
+
+      Review criteria:
+      1. Each edit must trace back to a specific finding — no drive-by changes
+      2. Edits should be minimal — don't rewrite working procedures
+      3. New pitfall notes or instructions must be clear and actionable
+      4. Tests must be updated if assertions changed
+      5. `bun run build` and `bun test` must pass
+      6. `bunx biome check` must pass
+
+      IMPORTANT: `tea pr create` must run from the MAIN repo directory (not a worktree), because tea cannot detect the repo from worktree `.git` files.
+    output: "Explain your decision. Set $status to approved (with branch/worktree) or rejected (with comments)."
+    frontmatter:
+      oneOf:
+        - properties:
+            $status: { const: "approved" }
+            branch: { type: string }
+            worktree: { type: string }
+          required: [$status, branch, worktree]
+        - properties:
+            $status: { const: "rejected" }
+            comments: { type: string }
+            worktree: { type: string }
+          required: [$status, comments, worktree]
+  committer:
+    description: "Commits and creates PR"
+    goal: "You are a committer agent. You create a clean commit and push a PR."
+    capabilities: []
+    procedure: |
+      The worktree path, branch name, and repo info are provided in your task prompt.
+      cd into the worktree first.
+
+      Note: You inherit the developer's worktree and branch. Do NOT create a new branch.
+      1. Stage all changes: `git add -A`
+      2. Commit with a descriptive message: `git commit -m "improve: <workflow> — <summary>"`
+      3. Push the branch: `git push -u origin <branch-name>`
+         - If push hook fails: capture the error log in your output, mark hook_failed
+      4. On push success: create a PR via `tea pr create --title "..." --description "..."`
+         - IMPORTANT: `tea pr create` must run from the MAIN repo directory (not a worktree), because tea cannot detect the repo from worktree `.git` files. cd to the repo root first.
+         - Do NOT pass `--repo` — let tea auto-detect from the main repo's git remote.
+         - PR description must include: What / Why / Findings / Changes sections
+         - On tea failure: capture stderr/stdout, include PR details for manual creation, mark hook_failed
+      5. After PR creation, clean up the worktree:
+         - cd to the repo root (parent of .worktrees)
+         - `git worktree remove <worktree-path>`
+    output: "Include PR URL on success or error log on failure. Set $status to committed (with prUrl) or hook_failed (with error)."
+    frontmatter:
+      oneOf:
+        - properties:
+            $status: { const: "committed" }
+            prUrl: { type: string }
+          required: [$status, prUrl]
+        - properties:
+            $status: { const: "hook_failed" }
+            error: { type: string }
+          required: [$status, error]
+graph:
+  $START:
+    _: { role: "analyst", prompt: "Analyze completed thread {{{threadId}}} for execution anomalies." }
+  analyst:
+    clean: { role: "$END", prompt: "No issues found. Thread executed cleanly." }
+    findings: { role: "proposer", prompt: "Findings report: {{{report}}}. Target workflow: {{{targetWorkflow}}}. Propose minimal edits." }
+    wrong_project: { role: "$END", prompt: "Thread uses workflow '{{{workflowName}}}' which does not exist in this project. Run retrospect from the correct repo." }
+  proposer:
+    no_action: { role: "$END", prompt: "No actionable changes needed: {{{reason}}}." }
+    ready: { role: "developer", prompt: "Apply the change plan (CAS hash: {{{plan}}}) to the workflow definitions in this repo." }
+  developer:
+    done: { role: "reviewer", prompt: "Review workflow edits on branch {{{branch}}} at {{{worktree}}}." }
+    failed: { role: "$END", prompt: "Developer failed: {{{reason}}}. Ending workflow." }
+  reviewer:
+    rejected: { role: "developer", prompt: "Reviewer rejected: {{{comments}}}. Fix the issues in {{{worktree}}}." }
+    approved: { role: "committer", prompt: "Approved. Commit and push branch {{{branch}}} from {{{worktree}}}." }
+  committer:
+    hook_failed: { role: "developer", prompt: "Push hook failed: {{{error}}}. Fix and re-submit." }
+    committed: { role: "$END", prompt: "PR created: {{{prUrl}}}. Workflow improved." }
