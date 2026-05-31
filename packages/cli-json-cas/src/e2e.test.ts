@@ -34,6 +34,26 @@ async function runCli(
   return { stdout, stderr, exitCode };
 }
 
+/**
+ * Parse JSON and strip volatile fields (timestamp, created, updated)
+ * so snapshots are stable across runs.
+ */
+function stripVolatile(json: string): unknown {
+  const strip = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(strip);
+    if (v !== null && typeof v === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+        if (k === "timestamp" || k === "created" || k === "updated") continue;
+        out[k] = strip(val);
+      }
+      return out;
+    }
+    return v;
+  };
+  return strip(JSON.parse(json));
+}
+
 // ---- Phase 1: CAS Core ----
 
 describe("Phase 1: CAS Core", () => {
@@ -88,7 +108,7 @@ describe("Phase 1: CAS Core", () => {
   test("1.6 get returns node JSON (snapshot)", async () => {
     const { stdout, exitCode } = await runCli(["get", nodeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("1.7 has returns true for existing node", async () => {
@@ -131,7 +151,7 @@ describe("Phase 1: CAS Core", () => {
   test("1.13 cat returns full node (snapshot)", async () => {
     const { stdout, exitCode } = await runCli(["cat", nodeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("1.14 cat --payload returns only payload (snapshot)", async () => {
@@ -158,7 +178,8 @@ describe("Phase 2: Schema Validation", () => {
     expect(exitCode).not.toBe(0);
     expect(stdout).toBe("");
     expect(stderr).toContain("Validation failed");
-    expect(stderr).toMatchSnapshot();
+    expect(stderr).toContain(typeHash);
+    // Do NOT snapshot stderr — it embeds a machine-specific tmp path
   });
 
   test("2.2 schema validate on valid node returns valid", async () => {
@@ -190,7 +211,7 @@ describe("Phase 3: Variable System", () => {
       nodeHash,
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("3.2 var get returns variable", async () => {
@@ -202,21 +223,21 @@ describe("Phase 3: Variable System", () => {
       typeHash,
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
     expect(stdout).toContain(nodeHash);
   });
 
   test("3.3 var list shows all variables", async () => {
     const { stdout, exitCode } = await runCli(["var", "list"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
     expect(stdout).toContain("myapp/config");
   });
 
   test("3.4 var list prefix filters by prefix", async () => {
     const { stdout, exitCode } = await runCli(["var", "list", "myapp/"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
     expect(stdout).toContain("myapp/config");
   });
 
@@ -231,7 +252,7 @@ describe("Phase 3: Variable System", () => {
       node2Hash.trim(),
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
     // Restore original value
     await runCli(["var", "set", "myapp/config", nodeHash]);
   });
@@ -247,7 +268,7 @@ describe("Phase 3: Variable System", () => {
       "important",
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("3.7 var list --tag env:prod filters by kv tag", async () => {
@@ -259,7 +280,7 @@ describe("Phase 3: Variable System", () => {
     ]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("myapp/config");
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("3.8 var list --tag important filters by label", async () => {
@@ -271,7 +292,7 @@ describe("Phase 3: Variable System", () => {
     ]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("myapp/config");
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("3.9 var tag remove deletes label", async () => {
@@ -284,7 +305,7 @@ describe("Phase 3: Variable System", () => {
       ":important",
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
     // Verify label is gone
     const { stdout: listOut } = await runCli([
       "var",
@@ -302,7 +323,7 @@ describe("Phase 3: Variable System", () => {
       "myapp/config",
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("3.11 var get deleted variable returns not found", async () => {
@@ -414,7 +435,15 @@ describe("Phase 6: GC", () => {
   test("6.1 gc runs without error", async () => {
     const { exitCode, stdout } = await runCli(["gc"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    // Assert structural shape only — exact counts depend on phase history
+    const result = JSON.parse(stdout) as Record<string, unknown>;
+    expect(typeof result["total"]).toBe("number");
+    expect(typeof result["reachable"]).toBe("number");
+    expect(typeof result["collected"]).toBe("number");
+    expect(typeof result["scanned"]).toBe("number");
+    expect(result["total"] as number).toBeGreaterThanOrEqual(
+      result["reachable"] as number,
+    );
   });
 
   test("6.2 gc preserves node referenced by a var", async () => {

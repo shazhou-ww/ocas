@@ -28,14 +28,13 @@ AGSJVKM01WNKZ  (unnamed)
 `;
 
 exports[`Phase 1: CAS Core 1.6 get returns node JSON (snapshot) 1`] = `
-"{
-  "type": "7XX5H51CVD9H0",
+{
   "payload": {
     "age": 30,
-    "name": "Alice"
+    "name": "Alice",
   },
-  "timestamp": 1780226624080
-}"
+  "type": "7XX5H51CVD9H0",
+}
 `;
 
 exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `"ok"`;
@@ -45,14 +44,13 @@ exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `"
 exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `"ERARPP19YJT05"`;
 
 exports[`Phase 1: CAS Core 1.13 cat returns full node (snapshot) 1`] = `
-"{
-  "type": "7XX5H51CVD9H0",
+{
   "payload": {
     "age": 30,
-    "name": "Alice"
+    "name": "Alice",
   },
-  "timestamp": 1780226624080
-}"
+  "type": "7XX5H51CVD9H0",
+}
 `;
 
 exports[`Phase 1: CAS Core 1.14 cat --payload returns only payload (snapshot) 1`] = `
@@ -62,186 +60,164 @@ exports[`Phase 1: CAS Core 1.14 cat --payload returns only payload (snapshot) 1`
 }"
 `;
 
-exports[`Phase 2: Schema Validation 2.1 put {name:123} against string-schema fails with non-zero exit 1`] = `"Validation failed: payload in /var/folders/_x/kgw53jp56ngdfz2x1ly96wyc0000gn/T/json-cas-e2e-WXS50Y/bad-node.json does not match schema 7XX5H51CVD9H0"`;
-
 exports[`Phase 2: Schema Validation 2.2 schema validate on valid node returns valid 1`] = `"valid"`;
 
 exports[`Phase 2: Schema Validation 2.3 put against non-existent schema hash fails 1`] = `"Schema not found: AAAAAAAAAAAAA"`;
 
 exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": {
+    "labels": [],
     "name": "myapp/config",
     "schema": "7XX5H51CVD9H0",
-    "value": "ERARPP19YJT05",
-    "created": 1780226624515,
-    "updated": 1780226624515,
     "tags": {},
-    "labels": []
-  }
-}"
+    "value": "ERARPP19YJT05",
+  },
+}
 `;
 
 exports[`Phase 3: Variable System 3.2 var get returns variable 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": {
+    "labels": [],
     "name": "myapp/config",
     "schema": "7XX5H51CVD9H0",
-    "value": "ERARPP19YJT05",
-    "created": 1780226624515,
-    "updated": 1780226624515,
     "tags": {},
-    "labels": []
-  }
-}"
+    "value": "ERARPP19YJT05",
+  },
+}
 `;
 
 exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": [
     {
+      "labels": [],
       "name": "myapp/config",
       "schema": "7XX5H51CVD9H0",
-      "value": "ERARPP19YJT05",
-      "created": 1780226624515,
-      "updated": 1780226624515,
       "tags": {},
-      "labels": []
-    }
-  ]
-}"
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
 `;
 
 exports[`Phase 3: Variable System 3.4 var list prefix filters by prefix 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": [
     {
+      "labels": [],
       "name": "myapp/config",
       "schema": "7XX5H51CVD9H0",
-      "value": "ERARPP19YJT05",
-      "created": 1780226624515,
-      "updated": 1780226624515,
       "tags": {},
-      "labels": []
-    }
-  ]
-}"
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
 `;
 
 exports[`Phase 3: Variable System 3.5 var set upsert updates existing variable 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": {
+    "labels": [],
     "name": "myapp/config",
     "schema": "7XX5H51CVD9H0",
-    "value": "F68P1BZ46YDXM",
-    "created": 1780226624515,
-    "updated": 1780226624700,
     "tags": {},
-    "labels": []
-  }
-}"
+    "value": "F68P1BZ46YDXM",
+  },
+}
 `;
 
 exports[`Phase 3: Variable System 3.6 var tag adds kv tag and label 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": {
+    "labels": [
+      "important",
+    ],
     "name": "myapp/config",
     "schema": "7XX5H51CVD9H0",
-    "value": "ERARPP19YJT05",
-    "created": 1780226624515,
-    "updated": 1780226624771,
     "tags": {
-      "env": "prod"
+      "env": "prod",
     },
-    "labels": [
-      "important"
-    ]
-  }
-}"
+    "value": "ERARPP19YJT05",
+  },
+}
 `;
 
 exports[`Phase 3: Variable System 3.7 var list --tag env:prod filters by kv tag 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": [
     {
+      "labels": [
+        "important",
+      ],
       "name": "myapp/config",
       "schema": "7XX5H51CVD9H0",
-      "value": "ERARPP19YJT05",
-      "created": 1780226624515,
-      "updated": 1780226624771,
       "tags": {
-        "env": "prod"
+        "env": "prod",
       },
-      "labels": [
-        "important"
-      ]
-    }
-  ]
-}"
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
 `;
 
 exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": [
     {
+      "labels": [
+        "important",
+      ],
       "name": "myapp/config",
       "schema": "7XX5H51CVD9H0",
-      "value": "ERARPP19YJT05",
-      "created": 1780226624515,
-      "updated": 1780226624771,
       "tags": {
-        "env": "prod"
+        "env": "prod",
       },
-      "labels": [
-        "important"
-      ]
-    }
-  ]
-}"
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
 `;
 
 exports[`Phase 3: Variable System 3.9 var tag remove deletes label 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": {
+    "labels": [],
     "name": "myapp/config",
     "schema": "7XX5H51CVD9H0",
-    "value": "ERARPP19YJT05",
-    "created": 1780226624515,
-    "updated": 1780226624878,
     "tags": {
-      "env": "prod"
+      "env": "prod",
     },
-    "labels": []
-  }
-}"
+    "value": "ERARPP19YJT05",
+  },
+}
 `;
 
 exports[`Phase 3: Variable System 3.10 var delete removes variable 1`] = `
-"{
+{
   "type": "E1D32N3GT69Q8",
   "value": [
     {
+      "labels": [],
       "name": "myapp/config",
       "schema": "7XX5H51CVD9H0",
-      "value": "ERARPP19YJT05",
-      "created": 1780226624515,
-      "updated": 1780226624878,
       "tags": {
-        "env": "prod"
+        "env": "prod",
       },
-      "labels": []
-    }
-  ]
-}"
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
 `;
 
 exports[`Phase 3: Variable System 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=myapp/config, schema=7XX5H51CVD9H0"`;
@@ -275,15 +251,6 @@ exports[`Phase 4: Template System 4.5 template get deleted template returns not 
 exports[`Phase 5: Render 5.1 render fills payload variables 1`] = `"Hello Alice!"`;
 
 exports[`Phase 5: Render 5.2 render --resolution with different value 1`] = `"Hello Alice!"`;
-
-exports[`Phase 6: GC 6.1 gc runs without error 1`] = `
-"{
-  "total": 13,
-  "reachable": 5,
-  "collected": 8,
-  "scanned": 2
-}"
-`;
 
 exports[`Phase 7: Edge Cases 7.1 get non-existent hash errors gracefully 1`] = `"Node not found: AAAAAAAAAAAAA"`;
 
