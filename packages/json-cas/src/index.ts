@@ -4,6 +4,7 @@ export { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 export { cborEncode } from "./cbor.js";
 export { type GcStats, gc } from "./gc.js";
 export { computeHash, computeSelfHash } from "./hash.js";
+export { type RenderOptions, render } from "./render.js";
 export type { JSONSchema } from "./schema.js";
 export {
   getSchema,
