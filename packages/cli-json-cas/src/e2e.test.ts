@@ -437,12 +437,12 @@ describe("Phase 6: GC", () => {
     expect(exitCode).toBe(0);
     // Assert structural shape only — exact counts depend on phase history
     const result = JSON.parse(stdout) as Record<string, unknown>;
-    expect(typeof result["total"]).toBe("number");
-    expect(typeof result["reachable"]).toBe("number");
-    expect(typeof result["collected"]).toBe("number");
-    expect(typeof result["scanned"]).toBe("number");
-    expect(result["total"] as number).toBeGreaterThanOrEqual(
-      result["reachable"] as number,
+    expect(typeof result.total).toBe("number");
+    expect(typeof result.reachable).toBe("number");
+    expect(typeof result.collected).toBe("number");
+    expect(typeof result.scanned).toBe("number");
+    expect(result.total as number).toBeGreaterThanOrEqual(
+      result.reachable as number,
     );
   });
 
