@@ -1,1 +1,1 @@
-export { createFsStore } from "./store.js";
+export { createFsStore, openStore } from "./store.js";

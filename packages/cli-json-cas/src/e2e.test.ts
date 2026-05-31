@@ -57,13 +57,7 @@ function stripVolatile(json: string): unknown {
 // ---- Phase 1: CAS Core ----
 
 describe("Phase 1: CAS Core", () => {
-  test("1.1 bootstrap returns 13-char Base32 hash", async () => {
-    const { stdout, exitCode } = await runCli(["init"]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
-  });
-
-  test("1.2 schema put returns type hash", async () => {
+  test("1.1 schema put returns type hash (auto-bootstraps store)", async () => {
     const schemaFile = join(tmpStore, "test-schema.json");
     writeFileSync(
       schemaFile,
@@ -531,14 +525,15 @@ describe("Phase 7: Edge Cases", () => {
     expect(combined.toLowerCase()).toContain("usage");
   });
 
-  test("7.7 --store non-existent path errors with Store not found", async () => {
-    const fakeStore = "/nonexistent/store/path";
+  test("7.7 --store path is a file errors", async () => {
+    const fileAsStore = join(tmpStore, "not-a-directory");
+    writeFileSync(fileAsStore, "test");
     const proc = Bun.spawn(
       [
         "bun",
         entrypoint,
         "--store",
-        fakeStore,
+        fileAsStore,
         "--var-db",
         varDbPath,
         "get",
@@ -549,7 +544,6 @@ describe("Phase 7: Edge Cases", () => {
     const exitCode = await proc.exited;
     const stderr = (await new Response(proc.stderr).text()).trim();
     expect(exitCode).not.toBe(0);
-    expect(stderr).toContain("Store not found");
-    expect(stderr).not.toContain("Node not found");
+    expect(stderr).toContain("not a directory");
   });
 });

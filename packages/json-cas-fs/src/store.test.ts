@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CasNode } from "@uncaged/json-cas";
@@ -10,7 +16,7 @@ import {
   verify,
 } from "@uncaged/json-cas";
 
-import { createFsStore } from "./store.js";
+import { createFsStore, openStore } from "./store.js";
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), "json-cas-fs-test-"));
@@ -310,5 +316,116 @@ describe("createFsStore – verify on disk-loaded nodes", () => {
       const node = store2.get(hash) as CasNode;
       expect(await verify(hash, node)).toBe(true);
     }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// openStore – async with auto-bootstrap
+// ──────────────────────────────────────────────────────────────────────────────
+describe("openStore – async with auto-bootstrap", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = makeTmpDir();
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("openStore returns Promise<Store>", async () => {
+    const store = await openStore(dir);
+    expect(store).toBeDefined();
+    expect(typeof store.put).toBe("function");
+    expect(typeof store.get).toBe("function");
+  });
+
+  test("openStore auto-creates directory when it doesn't exist", async () => {
+    const nested = join(dir, "sub", "nested", "store");
+    expect(existsSync(nested)).toBe(false);
+
+    const store = await openStore(nested);
+    expect(existsSync(nested)).toBe(true);
+
+    // Verify store works
+    const typeHash = await computeSelfHash({ name: "t" });
+    const hash = await store.put(typeHash, { x: 1 });
+    expect(store.has(hash)).toBe(true);
+  });
+
+  test("openStore works when directory already exists", async () => {
+    // Pre-create the directory
+    const store1 = await openStore(dir);
+    const typeHash = await computeSelfHash({ name: "t" });
+    await store1.put(typeHash, { x: 1 });
+
+    // Open again
+    const store2 = await openStore(dir);
+    expect(store2.listByType(typeHash)).toHaveLength(1);
+  });
+
+  test("openStore throws error when path exists but is not a directory", async () => {
+    const filePath = join(dir, "not-a-dir");
+    writeFileSync(filePath, "test");
+
+    await expect(openStore(filePath)).rejects.toThrow();
+  });
+
+  test("openStore auto-bootstraps on first open (empty directory)", async () => {
+    const store = await openStore(dir);
+
+    // Check that bootstrap schemas exist
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"];
+
+    expect(metaHash).toBeDefined();
+    expect(store.has(metaHash as string)).toBe(true);
+
+    // Verify all core schemas exist
+    expect(store.has(builtinSchemas["@string"] as string)).toBe(true);
+    expect(store.has(builtinSchemas["@number"] as string)).toBe(true);
+    expect(store.has(builtinSchemas["@object"] as string)).toBe(true);
+    expect(store.has(builtinSchemas["@array"] as string)).toBe(true);
+    expect(store.has(builtinSchemas["@bool"] as string)).toBe(true);
+    expect(store.has(builtinSchemas["@schema"] as string)).toBe(true);
+  });
+
+  test("openStore bootstrap is idempotent on subsequent opens", async () => {
+    const store1 = await openStore(dir);
+    const schemas1 = await bootstrap(store1);
+    const count1 = store1.listAll().length;
+
+    const store2 = await openStore(dir);
+    const schemas2 = await bootstrap(store2);
+    const count2 = store2.listAll().length;
+
+    // Same schemas, same count
+    expect(schemas1).toEqual(schemas2);
+    expect(count1).toBe(count2);
+  });
+
+  test("openStore works on already-bootstrapped store", async () => {
+    // Bootstrap manually first
+    const store1 = createFsStore(dir);
+    const schemas1 = await bootstrap(store1);
+
+    // Open with openStore
+    const store2 = await openStore(dir);
+    const schemas2 = await bootstrap(store2);
+
+    expect(schemas1).toEqual(schemas2);
+  });
+
+  test("openStore auto-bootstraps old store without bootstrap", async () => {
+    // Create a store with some data but no bootstrap
+    const store1 = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "custom" });
+    await store1.put(typeHash, { data: "old" });
+
+    // Open with openStore - should auto-bootstrap
+    const store2 = await openStore(dir);
+    const schemas = await bootstrap(store2);
+
+    expect(store2.has(schemas["@schema"] as string)).toBe(true);
+    // Old data still exists
+    expect(store2.listByType(typeHash)).toHaveLength(1);
   });
 });

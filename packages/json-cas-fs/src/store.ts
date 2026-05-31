@@ -5,6 +5,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -13,6 +14,7 @@ import type { BootstrapCapableStore, CasNode, Hash } from "@uncaged/json-cas";
 
 import {
   BOOTSTRAP_STORE,
+  bootstrap,
   cborEncode,
   computeHash,
   computeSelfHash,
@@ -216,6 +218,60 @@ export function createFsStore(dir: string): BootstrapCapableStore {
 
     [BOOTSTRAP_STORE]: putSelfReferencing,
   };
+
+  return store;
+}
+
+/**
+ * Open a filesystem-backed CAS store with automatic directory creation and bootstrap.
+ * This is an async function that:
+ * 1. Creates the directory (with recursive: true) if it doesn't exist
+ * 2. Validates that the path is actually a directory (not a file)
+ * 3. Creates the store
+ * 4. Runs bootstrap (which is idempotent)
+ *
+ * @param dir - The directory path for the store
+ * @returns A Promise resolving to the BootstrapCapableStore
+ * @throws Error if the path exists but is not a directory
+ */
+export async function openStore(dir: string): Promise<BootstrapCapableStore> {
+  // Create directory if it doesn't exist
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (error) {
+    if (error instanceof Error && "code" in error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === "EACCES") {
+        throw new Error(`Permission denied: cannot access store at ${dir}`);
+      }
+      if (nodeError.code === "ENOTDIR") {
+        throw new Error(`Path exists but is not a directory: ${dir}`);
+      }
+    }
+    throw error;
+  }
+
+  // Validate that the path is a directory
+  try {
+    const stats = statSync(dir);
+    if (!stats.isDirectory()) {
+      throw new Error(`Path exists but is not a directory: ${dir}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && "code" in error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === "ENOENT") {
+        throw new Error(`Store not found at ${dir}`);
+      }
+    }
+    throw error;
+  }
+
+  // Create the store
+  const store = createFsStore(dir);
+
+  // Bootstrap (idempotent)
+  await bootstrap(store);
 
   return store;
 }
