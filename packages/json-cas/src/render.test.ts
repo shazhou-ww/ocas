@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { bootstrap } from "./bootstrap.js";
-import { render, renderDirect } from "./render.js";
+import { render, renderAsync, renderDirect } from "./render.js";
 import { putSchema } from "./schema.js";
 import { createMemoryStore } from "./store.js";
 import type { Hash } from "./types.js";
+import { CasNodeNotFoundError } from "./variable-store.js";
 
 describe("Suite 1: Basic Rendering (No Nesting)", () => {
   test("1.1 Render Simple Primitives", async () => {
@@ -65,13 +66,14 @@ describe("Suite 1: Basic Rendering (No Nesting)", () => {
     expect(output.trim()).toBe(`cas:${hash}`);
   });
 
-  test("1.5 Render Non-existent Hash", () => {
+  test("1.5 Render Non-existent Hash Throws Error", () => {
     const store = createMemoryStore();
     const fakeHash = "ZZZZZZZZZZZZZ" as Hash;
 
-    // Non-existent node renders as cas: reference
-    const output = render(store, fakeHash);
-    expect(output.trim()).toBe(`cas:${fakeHash}`);
+    // Non-existent root node should throw
+    expect(() => render(store, fakeHash)).toThrow(CasNodeNotFoundError);
+    expect(() => render(store, fakeHash)).toThrow("Node not found");
+    expect(() => render(store, fakeHash)).toThrow(fakeHash);
   });
 });
 
@@ -1053,5 +1055,95 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
     const unknownType = "ZZZZZZZZZZZZ0" as Hash;
     const output = renderDirect(unknownType, { key: "val" }, store, null);
     expect(output).toContain("key: val");
+  });
+});
+
+describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
+  test("10.1 renderAsync() throws CasNodeNotFoundError for missing root hash", async () => {
+    const store = createMemoryStore();
+    await bootstrap(store);
+    const fakeHash = "AAAAAAAAAAAAA" as Hash;
+
+    await expect(renderAsync(store, fakeHash)).rejects.toThrow(
+      CasNodeNotFoundError,
+    );
+    await expect(renderAsync(store, fakeHash)).rejects.toThrow("Node not found");
+    await expect(renderAsync(store, fakeHash)).rejects.toThrow(fakeHash);
+  });
+
+  test("10.2 render() throws CasNodeNotFoundError for missing root hash", () => {
+    const store = createMemoryStore();
+    const fakeHash = "ZZZZZZZZZZZZZ" as Hash;
+
+    expect(() => render(store, fakeHash)).toThrow(CasNodeNotFoundError);
+    expect(() => render(store, fakeHash)).toThrow("Node not found");
+    expect(() => render(store, fakeHash)).toThrow(fakeHash);
+  });
+
+  test("10.3 renderDirect() does NOT throw for non-existent type hash", () => {
+    const store = createMemoryStore();
+    const fakeTypeHash = "0000000000000" as Hash;
+    const output = renderDirect(fakeTypeHash, { key: "value" }, store, null);
+
+    expect(output).toContain("key: value");
+  });
+
+  test("10.4 Missing nested node renders as cas: reference (no error)", async () => {
+    const store = createMemoryStore();
+    await bootstrap(store);
+
+    const parentSchema = await putSchema(store, {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        child: { type: "string", format: "cas_ref" },
+      },
+    });
+
+    const fakeChildHash = "ZZZZZZZZZZZZZ" as Hash;
+    const parentHash = await store.put(parentSchema, {
+      title: "root",
+      child: fakeChildHash,
+    });
+
+    const output = render(store, parentHash);
+
+    expect(output).toContain("title: root");
+    expect(output).toContain(`cas:${fakeChildHash}`);
+  });
+
+  test("10.5 Resolution below epsilon renders as cas: reference (no error)", async () => {
+    const store = createMemoryStore();
+    await bootstrap(store);
+
+    const nodeSchema = await putSchema(store, {
+      type: "object",
+      properties: {
+        level: { type: "number" },
+        next: {
+          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+        },
+      },
+    });
+
+    // Create 3-level chain
+    let currentHash: Hash | null = null;
+    for (let i = 2; i >= 0; i--) {
+      currentHash = await store.put(nodeSchema, {
+        level: i,
+        next: currentHash,
+      });
+    }
+
+    const output = render(store, currentHash as Hash, {
+      resolution: 1.0,
+      decay: 0.1,
+      epsilon: 0.5,
+    });
+
+    // Level 0 should be expanded (resolution = 1.0 > 0.5)
+    expect(output).toContain("level: 0");
+    // Level 1+ should be cas: references (0.1, 0.01 < 0.5)
+    expect(output).toContain("cas:");
   });
 });

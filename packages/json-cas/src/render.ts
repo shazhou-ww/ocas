@@ -1,6 +1,7 @@
 import { renderWithTemplate } from "./liquid-render.js";
 import { collectRefs, getSchema, putSchema, refs } from "./schema.js";
 import type { Hash, Store } from "./types.js";
+import { CasNodeNotFoundError } from "./variable-store.js";
 import type { VariableStore } from "./variable-store.js";
 
 export type RenderOptions = {
@@ -55,6 +56,11 @@ export function render(
 ): string {
   const { resolution, decay, epsilon } = validateAndExtractOptions(options);
 
+  // Check if root node exists
+  if (store.get(hash) === null) {
+    throw new CasNodeNotFoundError(hash);
+  }
+
   const visited = new Set<Hash>();
   return renderNode(store, hash, resolution, decay, epsilon, visited);
 }
@@ -70,6 +76,12 @@ export async function renderAsync(
   options?: RenderOptions,
 ): Promise<string> {
   const { resolution, decay, epsilon } = validateAndExtractOptions(options);
+
+  // Check if root node exists
+  if (store.get(hash) === null) {
+    throw new CasNodeNotFoundError(hash);
+  }
+
   const varStore = options?.varStore;
 
   // If varStore provided, try template rendering first

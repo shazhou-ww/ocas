@@ -23,6 +23,25 @@ async function runCli(
   return { stdout, stderr, exitCode };
 }
 
+async function runCliWithStdin(
+  args: string[],
+  storePath: string,
+  stdin: string,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const finalArgs = ["bun", entrypoint, "--store", storePath, ...args];
+  const proc = Bun.spawn(finalArgs, {
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: "pipe",
+  });
+  proc.stdin.write(stdin);
+  proc.stdin.end();
+  const exitCode = await proc.exited;
+  const stdout = await new Response(proc.stdout).text();
+  const stderr = await new Response(proc.stderr).text();
+  return { stdout, stderr, exitCode };
+}
+
 describe("ucas command alias", () => {
   test("T1: ucas bin entry exists in package.json", async () => {
     const pkg = await Bun.file(pkgPath).json();
@@ -287,13 +306,14 @@ describe("ucas render command", () => {
     const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
     try {
       await runCli(["init"], tmpStore);
-      const { exitCode, stdout } = await runCli(
+      const { exitCode, stderr } = await runCli(
         ["render", "ZZZZZZZZZZZZZ"],
         tmpStore,
       );
-      // Missing hash renders as cas: reference
-      expect(exitCode).toBe(0);
-      expect(stdout).toContain("cas:ZZZZZZZZZZZZZ");
+      // Missing hash should exit with error
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("Node not found");
+      expect(stderr).toContain("ZZZZZZZZZZZZZ");
     } finally {
       rmSync(tmpStore, { recursive: true, force: true });
     }
@@ -592,6 +612,107 @@ describe("Suite 6: CLI Integration with Templates", () => {
 
       expect(exitCode).not.toBe(0);
       expect(stderr).toContain("decay");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("R8: render with non-existent hash exits with error", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+      const { exitCode, stderr, stdout } = await runCli(
+        ["render", "AAAAAAAAAAAAA"],
+        tmpStore,
+      );
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("Node not found");
+      expect(stderr).toContain("AAAAAAAAAAAAA");
+      expect(stdout).toBe("");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("R9: render with valid hash exits successfully", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      // Get @string type hash
+      const { stdout: typesJson } = await runCli(["types"], tmpStore);
+      const types = JSON.parse(typesJson);
+      const stringType = types["@string"];
+
+      // Create and store a simple string node
+      const nodeFile = join(tmpStore, "test.json");
+      writeFileSync(nodeFile, JSON.stringify("hello world"));
+      const { stdout: nodeHash } = await runCli(
+        ["put", stringType, nodeFile],
+        tmpStore,
+      );
+
+      // Render the valid hash
+      const { exitCode, stdout, stderr } = await runCli(
+        ["render", nodeHash.trim()],
+        tmpStore,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("hello world");
+      expect(stderr).toBe("");
+      expect(stdout).not.toContain("Error");
+      expect(stdout).not.toContain("Node not found");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("R10: render --pipe with valid envelope succeeds", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      // Get @string type hash
+      const { stdout: typesJson } = await runCli(["types"], tmpStore);
+      const types = JSON.parse(typesJson);
+      const stringType = types["@string"];
+
+      // Create envelope and pipe to render
+      const envelope = JSON.stringify({ type: stringType, value: "test" });
+      const { exitCode, stdout, stderr } = await runCliWithStdin(
+        ["render", "--pipe"],
+        tmpStore,
+        envelope,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("test");
+      expect(stderr).toBe("");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("R11: render --pipe with invalid type hash still renders", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      // Use invalid type hash in envelope
+      const envelope = JSON.stringify({
+        type: "ZZZZZZZZZZZZZ",
+        value: "test",
+      });
+      const { exitCode, stdout, stderr } = await runCliWithStdin(
+        ["render", "--pipe"],
+        tmpStore,
+        envelope,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("test");
+      expect(stderr).toBe("");
     } finally {
       rmSync(tmpStore, { recursive: true, force: true });
     }
