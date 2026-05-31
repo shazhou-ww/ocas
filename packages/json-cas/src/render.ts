@@ -1,5 +1,6 @@
 import { renderWithTemplate } from "./liquid-render.js";
-import { putSchema, refs } from "./schema.js";
+import type { JSONSchema } from "./schema.js";
+import { getSchema, putSchema, refs } from "./schema.js";
 import type { Hash, Store } from "./types.js";
 import type { VariableStore } from "./variable-store.js";
 
@@ -98,6 +99,98 @@ export async function renderAsync(
 }
 
 /**
+ * Render a value directly (in-memory) without requiring it to be stored.
+ * Accepts a raw { type, value } pair. Store is optional and read-only —
+ * used only for schema lookup and expanding nested cas_ref references.
+ * No data is written to the store.
+ */
+export function renderDirect(
+  typeHash: Hash,
+  value: unknown,
+  store?: Store,
+  options?: Omit<RenderOptions, "varStore">,
+): string {
+  const resolution = options?.resolution ?? DEFAULT_RESOLUTION;
+  const decay = options?.decay ?? DEFAULT_DECAY;
+  const epsilon = options?.epsilon ?? DEFAULT_EPSILON;
+
+  // Validate parameters
+  if (resolution < 0 || resolution > 1) {
+    throw new Error("resolution must be in [0, 1]");
+  }
+  if (decay <= 0 || decay > 1) {
+    throw new Error("decay must be in (0, 1]");
+  }
+  if (epsilon < 0) {
+    throw new Error("epsilon must be >= 0");
+  }
+
+  // Try to get schema from store to identify cas_ref fields
+  let refSet = new Set<Hash>();
+  if (store !== undefined) {
+    const schema = getSchema(store, typeHash);
+    if (schema !== null) {
+      refSet = new Set(collectRefsFromSchema(schema, value));
+    }
+  }
+
+  const childResolution = resolution * decay;
+  const visited = new Set<Hash>();
+
+  return renderValue(
+    store ?? null,
+    value,
+    refSet,
+    childResolution,
+    decay,
+    epsilon,
+    visited,
+  );
+}
+
+/**
+ * Collect cas_ref hashes from a value using its schema definition.
+ * Mirrors the logic in schema.ts collectRefs but is local to render.
+ */
+function collectRefsFromSchema(schema: JSONSchema, value: unknown): Hash[] {
+  const result: Hash[] = [];
+
+  if (schema.format === "cas_ref") {
+    if (typeof value === "string") {
+      result.push(value as Hash);
+    }
+    return result;
+  }
+
+  if (Array.isArray(schema.anyOf)) {
+    for (const sub of schema.anyOf as JSONSchema[]) {
+      result.push(...collectRefsFromSchema(sub, value));
+    }
+    return result;
+  }
+
+  if (schema.type === "array" && schema.items && Array.isArray(value)) {
+    const itemSchema = schema.items as JSONSchema;
+    for (const item of value as unknown[]) {
+      result.push(...collectRefsFromSchema(itemSchema, item));
+    }
+    return result;
+  }
+
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    if (schema.properties && typeof schema.properties === "object") {
+      const props = schema.properties as Record<string, JSONSchema>;
+      const obj = value as Record<string, unknown>;
+      for (const [key, subSchema] of Object.entries(props)) {
+        result.push(...collectRefsFromSchema(subSchema, obj[key]));
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Check if a template exists for a given type
  */
 async function hasTemplate(
@@ -116,7 +209,7 @@ async function hasTemplate(
 }
 
 function renderNode(
-  store: Store,
+  store: Store | null,
   hash: Hash,
   currentResolution: number,
   decay: number,
@@ -129,7 +222,7 @@ function renderNode(
   }
 
   // Fetch the node
-  const node = store.get(hash);
+  const node = store !== null ? store.get(hash) : null;
   if (node === null) {
     // Missing node - render as cas: reference
     return `cas:${hash}`;
@@ -142,7 +235,7 @@ function renderNode(
   visited.add(hash);
 
   // Get references from this node's schema
-  const nodeRefs = refs(store, node);
+  const nodeRefs = store !== null ? refs(store, node) : [];
   const refSet = new Set(nodeRefs);
 
   // Calculate child resolution for next level
@@ -165,7 +258,7 @@ function renderNode(
 }
 
 function renderValue(
-  store: Store,
+  store: Store | null,
   value: unknown,
   refHashes: Set<Hash>,
   childResolution: number,
