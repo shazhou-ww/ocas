@@ -5,6 +5,7 @@ export { cborEncode } from "./cbor.js";
 export { type GcStats, gc } from "./gc.js";
 export { computeHash, computeSelfHash } from "./hash.js";
 export { renderWithTemplate } from "./liquid-render.js";
+export { registerOutputTemplates } from "./output-templates.js";
 export {
   type RenderOptions,
   render,
@@ -34,3 +35,4 @@ export {
   VariableStore,
 } from "./variable-store.js";
 export { verify } from "./verify.js";
+export { wrapEnvelope } from "./wrap-envelope.js";
