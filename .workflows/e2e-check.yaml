@@ -1,0 +1,360 @@
+name: "e2e-check"
+description: "Docker-isolated E2E testing of json-cas CLI. Builds from scratch in a clean container, runs exploratory scenarios, reports bugs as Gitea issues."
+
+roles:
+  tester:
+    description: "Spins up a Docker container, builds from source, runs CLI scenarios end-to-end"
+    goal: "You are an exploratory QA agent for the json-cas CLI. You test in a Docker-isolated environment from scratch — clone, install, build, then run real CLI scenarios. Report every issue you find."
+    capabilities:
+      - testing
+      - cli
+      - docker
+    procedure: |
+      ## Phase 0: Docker Environment Setup
+
+      Create a fresh Docker container with bun, then build the project from source.
+
+      1. Start an interactive container (mount the repo read-only, work in a copy):
+         ```bash
+         docker run -it --rm \
+           -v "$(pwd):/src:ro" \
+           -w /workspace \
+           oven/bun:latest \
+           bash
+         ```
+         Or in non-interactive mode for automation, run each command via `docker exec`.
+
+         **Preferred approach for automation:** Start a detached container, then exec commands:
+         ```bash
+         docker run -d --name json-cas-e2e \
+           -v "<repoPath>:/src:ro" \
+           -w /workspace \
+           oven/bun:latest \
+           sleep 3600
+         ```
+         Then run all subsequent commands via:
+         ```bash
+         docker exec json-cas-e2e bash -c '<command>'
+         ```
+
+      2. Copy repo into the container and install:
+         ```bash
+         docker exec json-cas-e2e bash -c 'cp -r /src/. /workspace/ && cd /workspace && bun install'
+         ```
+         ✅ Verify: exit code 0, no missing peer deps warnings
+         ❌ Record: any install failures, missing deps, version conflicts
+
+      3. Build:
+         ```bash
+         docker exec json-cas-e2e bash -c 'cd /workspace && bun run build'
+         ```
+         ✅ Verify: exit code 0, no type errors
+         ❌ Record: any build failures, type errors, missing modules
+
+      4. Lint check:
+         ```bash
+         docker exec json-cas-e2e bash -c 'cd /workspace && bun run check'
+         ```
+         ✅ Verify: exit code 0
+         ❌ Record: lint errors (these block CI)
+
+      5. Unit tests:
+         ```bash
+         docker exec json-cas-e2e bash -c 'cd /workspace && bun test'
+         ```
+         ✅ Verify: all tests pass
+         ❌ Record: failing tests with error messages
+
+      6. Set up CLI alias inside the container:
+         ```bash
+         docker exec json-cas-e2e bash -c 'cd /workspace && export STORE=$(mktemp -d)/cas-test && bun packages/cli-json-cas/src/index.ts --store $STORE init && bun packages/cli-json-cas/src/index.ts --store $STORE bootstrap'
+         ```
+         Capture the STORE path for subsequent commands.
+
+      **Important:** If any step in Phase 0 fails, record it as a bug! Setup failures from a clean environment are high-severity issues.
+
+      ## Phase 1: CAS Core Operations
+
+      All commands run inside Docker via `docker exec json-cas-e2e bash -c '...'`.
+      Use `--store $STORE` for every command, or set it in the shell.
+
+      Define a helper: `CMD="cd /workspace && bun packages/cli-json-cas/src/index.ts --store /tmp/cas-test"`
+
+      1. **bootstrap** — `$CMD bootstrap`
+         Expected: prints meta-schema hash (13-char Base32)
+
+      2. **schema put** — Create `/tmp/test-schema.json` in container, then `$CMD schema put /tmp/test-schema.json`
+         Schema: `{"type":"object","properties":{"name":{"type":"string"},"age":{"type":"number"}},"required":["name"],"additionalProperties":false}`
+         Expected: prints type hash
+
+      3. **schema get** — `$CMD schema get <type-hash>`
+         Expected: returns the schema JSON
+
+      4. **schema list** — `$CMD schema list`
+         Expected: lists registered schemas
+
+      5. **put** — Create data file, `$CMD put <type-hash> /tmp/test-node.json`
+         Data: `{"name":"Alice","age":30}`
+         Expected: prints node hash
+
+      6. **get** — `$CMD get <node-hash>`
+         Expected: returns node JSON
+
+      7. **has (exists)** — `$CMD has <node-hash>`
+         Expected: true
+
+      8. **has (not exists)** — `$CMD has AAAAAAAAAAAAA`
+         Expected: false
+
+      9. **verify** — `$CMD verify <node-hash>`
+         Expected: ok
+
+      10. **refs** — `$CMD refs <node-hash>`
+          Expected: lists refs (may be empty)
+
+      11. **walk** — `$CMD walk <node-hash>`
+          Expected: shows traversal tree
+
+      12. **hash (dry run)** — `$CMD hash <type-hash> /tmp/test-node.json`
+          Expected: same hash as put
+
+      13. **cat** — `$CMD cat <node-hash>`
+          Expected: full node output
+
+      14. **cat --payload** — `$CMD cat <node-hash> --payload`
+          Expected: payload only (no type wrapper)
+
+      ## Phase 2: Schema Validation
+
+      1. **Invalid node** — `$CMD put <type-hash> /tmp/bad-node.json` where bad-node = `{"name":123}`
+         Expected: validation error, non-zero exit
+
+      2. **schema validate** — `$CMD schema validate <node-hash>`
+         Expected: valid for good node
+
+      3. **Non-existent schema** — `$CMD put AAAAAAAAAAAAA /tmp/test-node.json`
+         Expected: error about missing schema
+
+      ## Phase 3: Variable System
+
+      1. **var set** — `$CMD var set myapp/config <node-hash>`
+         Expected: creates variable
+
+      2. **var get** — `$CMD var get myapp/config --schema <type-hash>`
+         Expected: returns variable
+
+      3. **var list** — `$CMD var list`
+         Expected: shows all variables
+
+      4. **var list prefix** — `$CMD var list myapp/`
+         Expected: filtered results
+
+      5. **var set (update)** — Put a second node, `$CMD var set myapp/config <new-hash>`
+         Expected: upsert succeeds
+
+      6. **var tag** — `$CMD var tag myapp/config --schema <type-hash> env:prod important`
+         Expected: adds tag and label
+
+      7. **var list --tag** — `$CMD var list --tag env:prod`
+         Expected: finds tagged variable
+
+      8. **var list --tag (label)** — `$CMD var list --tag important`
+         Expected: finds labeled variable
+
+      9. **var tag remove** — `$CMD var tag myapp/config --schema <type-hash> :important`
+         Expected: removes label
+
+      10. **var delete** — `$CMD var delete myapp/config`
+          Expected: deletes variable
+
+      11. **var get (deleted)** — `$CMD var get myapp/config --schema <type-hash>`
+          Expected: not found error
+
+      ## Phase 4: Template System
+
+      1. **template set** — Create template file, `$CMD template set <type-hash> /tmp/test.liquid`
+         Template: `Name: {{ name }}, Age: {{ age }}`
+         Expected: success
+
+      2. **template get** — `$CMD template get <type-hash>`
+         Expected: returns template text
+
+      3. **template list** — `$CMD template list`
+         Expected: lists templates
+
+      4. **template delete** — `$CMD template delete <type-hash>`
+         Expected: success
+
+      5. **template get (deleted)** — `$CMD template get <type-hash>`
+         Expected: not found error
+
+      ## Phase 5: Render
+
+      1. Re-register template, then `$CMD render <node-hash>`
+         Expected: rendered output
+
+      2. **render --resolution** — `$CMD render <node-hash> --resolution 0.5`
+         Expected: different resolution output
+
+      3. **render (bad hash)** — `$CMD render AAAAAAAAAAAAA`
+         Expected: graceful error
+
+      ## Phase 6: GC
+
+      1. **gc basic** — `$CMD gc`
+         Expected: runs without error
+
+      2. **gc preserves referenced** — Verify `$CMD has <node-hash>` still true
+
+      3. **gc collects orphans** — Put an orphan node (not in any variable), run gc, check it's gone
+
+      ## Phase 7: Edge Cases & Error Handling
+
+      1. `$CMD get AAAAAAAAAAAAA` — non-existent
+      2. `$CMD put <type-hash> /nonexistent/file.json` — missing file
+      3. `$CMD var set "" <hash>` — empty name
+      4. `$CMD var set "bad name!" <hash>` — invalid name chars
+      5. `$CMD schema put /tmp/bad-schema.json` — `{"type":"invalid"}`
+      6. `$CMD` with no subcommand — should show help
+      7. `$CMD --store /nonexistent/path get <hash>` — bad store path
+
+      ## Cleanup
+
+      After all tests:
+      ```bash
+      docker stop json-cas-e2e && docker rm json-cas-e2e
+      ```
+
+      ## Recording Results
+
+      For each scenario:
+      - ✅ Pass: works as expected
+      - ❌ Fail: unexpected behavior, crash, wrong output
+      - ⚠️ Questionable: works but confusing UX
+
+      Collect all ❌ and ⚠️. For each, record:
+      - Title (concise description)
+      - Command (exact command run)
+      - Expected behavior
+      - Actual behavior (include actual output)
+      - Severity: critical (crash/data loss/build failure), high (wrong behavior), medium (bad UX/error message), low (cosmetic)
+
+      ## CRITICAL: Frontmatter Output Format
+
+      Your response MUST start with YAML frontmatter. The `bugs` field MUST be an array of objects, NOT strings.
+
+      Example of CORRECT frontmatter:
+      ```yaml
+      ---
+      $status: bugs_found
+      repoPath: /path/to/repo
+      bugs:
+        - title: "put does not validate data against schema"
+          command: "json-cas put <hash> bad-data.json"
+          expected: "Validation error, non-zero exit"
+          actual: "Accepted invalid data, exit 0"
+          severity: "high"
+          phase: "Schema Validation"
+        - title: "render shows empty values"
+          command: "json-cas render <hash>"
+          expected: "Name: Alice"
+          actual: "Name: "
+          severity: "high"
+          phase: "Render"
+      ---
+      ```
+
+      Do NOT write bugs as plain strings like `- some bug description`. Each bug MUST be an object with all 6 fields.
+
+    output: "Summary of all phases with pass/fail counts. Set $status."
+    frontmatter:
+      oneOf:
+        - type: object
+          properties:
+            $status: { const: "bugs_found" }
+            bugs:
+              type: array
+              items:
+                type: object
+                properties:
+                  title: { type: string }
+                  command: { type: string }
+                  expected: { type: string }
+                  actual: { type: string }
+                  severity: { type: string }
+                  phase: { type: string }
+                required: [title, command, expected, actual, severity, phase]
+            repoPath: { type: string }
+          required: [$status, bugs, repoPath]
+        - type: object
+          properties:
+            $status: { const: "all_passed" }
+          required: [$status]
+
+  reporter:
+    description: "Opens Gitea issues for each bug found by the tester"
+    goal: "You are a bug reporter. You create well-formatted Gitea issues for each bug found during E2E testing."
+    capabilities:
+      - issue-management
+    procedure: |
+      1. Parse the bugs array from the tester's output
+      2. Group bugs by severity (critical first)
+      3. For each bug, create a Gitea issue:
+         ```bash
+         tea issues create -r uncaged/json-cas \
+           -t "[E2E] <title>" \
+           -d "## Bug Report (E2E Check)
+
+         **Phase:** <phase>
+         **Severity:** <severity>
+
+         **Command:**
+         \`\`\`
+         <exact command>
+         \`\`\`
+
+         **Expected:** <expected>
+
+         **Actual:** <actual>
+
+         ---
+         _Reported by e2e-check workflow (Docker isolated)_"
+         ```
+
+         ⚠️ If `tea issues create` fails with long body, use Gitea REST API:
+         ```bash
+         eval "$(cfg env)" && GITEA_TOKEN=$(cfg get GITEA_TOKEN)
+         curl -s -X POST "https://git.shazhou.work/api/v1/repos/uncaged/json-cas/issues" \
+           -H "Authorization: token $GITEA_TOKEN" \
+           -H "Content-Type: application/json" \
+           -d '{"title":"[E2E] ...","body":"..."}'
+         ```
+
+      4. Collect created issue numbers
+
+    output: "List created issues. Set $status."
+    frontmatter:
+      oneOf:
+        - type: object
+          properties:
+            $status: { const: "reported" }
+            issues:
+              type: array
+              items: { type: string }
+          required: [$status, issues]
+        - type: object
+          properties:
+            $status: { const: "partial" }
+            created: { type: number }
+            failed: { type: number }
+          required: [$status, created, failed]
+
+graph:
+  $START:
+    _: { role: "tester", prompt: "Run Docker-isolated E2E tests on json-cas CLI at {{{repoPath}}}." }
+  tester:
+    all_passed: { role: "$END", prompt: "All E2E tests passed in clean Docker environment. No issues." }
+    bugs_found: { role: "reporter", prompt: "File these bugs as Gitea issues: {{{bugs}}}" }
+  reporter:
+    reported: { role: "$END", prompt: "All bugs filed: {{{issues}}}. E2E check complete." }
+    partial: { role: "$END", prompt: "Filed {{{created}}} issues, {{{failed}}} failed. E2E check complete." }

@@ -26,12 +26,14 @@ roles:
     output: "Output a brief summary of the test spec. Set $status to ready (with plan hash and repoPath) or insufficient_info."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "ready" }
             plan: { type: string }
             repoPath: { type: string }
           required: [$status, plan, repoPath]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "insufficient_info" }
           required: [$status]
   developer:
@@ -67,12 +69,14 @@ roles:
     output: "List all files changed and provide a summary. Set $status to done (with branch/worktree), or failed (with reason)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "done" }
             branch: { type: string }
             worktree: { type: string }
           required: [$status, branch, worktree]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "failed" }
             reason: { type: string }
           required: [$status, reason]
@@ -105,12 +109,14 @@ roles:
     output: "Explain your decision with specific file/line references. Set $status to approved (with branch/worktree) or rejected (with comments)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "approved" }
             branch: { type: string }
             worktree: { type: string }
           required: [$status, branch, worktree]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "rejected" }
             comments: { type: string }
             worktree: { type: string }
@@ -133,16 +139,19 @@ roles:
     output: "Report test results per scenario. Set $status to passed (with branch/worktree), fix_code (with report), or fix_spec (with report)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "passed" }
             branch: { type: string }
             worktree: { type: string }
           required: [$status, branch, worktree]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "fix_code" }
             report: { type: string }
           required: [$status, report]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "fix_spec" }
             report: { type: string }
           required: [$status, report]
@@ -169,11 +178,13 @@ roles:
     output: "Include PR URL on success or error log on failure. Set $status to committed (with prUrl) or hook_failed (with error)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "committed" }
             prUrl: { type: string }
           required: [$status, prUrl]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "hook_failed" }
             error: { type: string }
           required: [$status, error]
