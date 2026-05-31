@@ -1,32 +1,5 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`Phase 1: CAS Core 1.3 schema get returns schema JSON (snapshot) 1`] = `
-"{
-  "type": "object",
-  "required": [
-    "name"
-  ],
-  "properties": {
-    "age": {
-      "type": "number"
-    },
-    "name": {
-      "type": "string"
-    }
-  },
-  "additionalProperties": false
-}"
-`;
-
-exports[`Phase 1: CAS Core 1.4 schema list shows registered schemas 1`] = `
-"8J5E9WCD54ZJZ  (unnamed)
-89ZQWMV9PTC7B  (unnamed)
-86QB0Q5VA7797  (unnamed)
-AKEX4KYV98MGT  (unnamed)
-AGSJVKM01WNKZ  (unnamed)
-7XX5H51CVD9H0  (unnamed)"
-`;
-
 exports[`Phase 1: CAS Core 1.6 get returns node JSON (snapshot) 1`] = `
 {
   "payload": {
@@ -42,25 +15,6 @@ exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `"ok"`;
 exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `""`;
 
 exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `"ERARPP19YJT05"`;
-
-exports[`Phase 1: CAS Core 1.13 cat returns full node (snapshot) 1`] = `
-{
-  "payload": {
-    "age": 30,
-    "name": "Alice",
-  },
-  "type": "7XX5H51CVD9H0",
-}
-`;
-
-exports[`Phase 1: CAS Core 1.14 cat --payload returns only payload (snapshot) 1`] = `
-"{
-  "age": 30,
-  "name": "Alice"
-}"
-`;
-
-exports[`Phase 2: Schema Validation 2.2 schema validate on valid node returns valid 1`] = `"valid"`;
 
 exports[`Phase 2: Schema Validation 2.3 put against non-existent schema hash fails 1`] = `"Schema not found: AAAAAAAAAAAAA"`;
 
@@ -258,26 +212,20 @@ exports[`Phase 7: Edge Cases 7.3 var set empty name errors 1`] = `"Usage: json-c
 
 exports[`Phase 7: Edge Cases 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Segment "invalid name!" contains invalid characters (only @, a-z, A-Z, 0-9, ., _, - allowed)"`;
 
-exports[`Phase 7: Edge Cases 7.5 schema put invalid schema errors 1`] = `"Invalid schema: input does not conform to the json-cas JSON Schema meta-schema"`;
-
-exports[`Phase 7: Edge Cases 7.6 no subcommand shows help text 1`] = `
+exports[`Phase 7: Edge Cases 7.5 no subcommand shows help text 1`] = `
 "Usage: json-cas [--store <path>] [--json] <command> [args]
 
 Commands:
-  schema put <file.json>            Register schema, print type hash
-  schema get <type-hash>            Print schema JSON
-  schema list                       List all schemas (name + hash)
-  schema validate <hash>            Validate node against its schema
   put <type-hash> <file.json>       Store node, print hash
   get <hash>                        Print node as JSON
   has <hash>                        Print true/false
-  verify <hash>                     Verify integrity, print ok/corrupted
+  verify <hash>                     Verify integrity + schema, print ok/corrupted/invalid
   refs <hash>                       List direct cas_ref edges
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
   render <hash> [options]           Render node as YAML with resolution decay
   render --pipe/-p [options]        Render { type, value } from stdin
-  cat <hash> [--payload]            Output node (--payload for payload only)
+  list --type <hash-or-alias>       List all hashes for a given type
   var set <name> <hash> [--tag <tag>...] Create/update a variable
   var get <name> --schema <hash>    Get a variable by name + schema
   var delete <name> [--schema <hash>] Delete variable(s)
