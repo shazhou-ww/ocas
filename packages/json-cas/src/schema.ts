@@ -142,7 +142,11 @@ export async function putSchema(
   store: Store,
   jsonSchema: JSONSchema,
 ): Promise<Hash> {
-  const metaHash = await bootstrap(store);
+  const builtinSchemas = await bootstrap(store);
+  const metaHash = builtinSchemas["@schema"];
+  if (!metaHash) {
+    throw new Error("Meta-schema not found in bootstrap result");
+  }
   if (!isValidSchema(jsonSchema)) {
     throw new SchemaValidationError(
       "Invalid schema: input does not conform to the json-cas JSON Schema meta-schema",

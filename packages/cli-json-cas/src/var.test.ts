@@ -90,7 +90,8 @@ async function createTestNode(
  * Get bootstrap type hash
  */
 async function getBootstrapHash(store: Store): Promise<Hash> {
-  return await bootstrap(store);
+  const builtinSchemas = await bootstrap(store);
+  return builtinSchemas["@schema"] ?? "";
 }
 
 // ---- Tests ----

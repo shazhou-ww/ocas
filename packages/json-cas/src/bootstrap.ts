@@ -64,13 +64,32 @@ const BOOTSTRAP_PAYLOAD = {
 } as const;
 
 /**
- * Write the meta-schema seed node into the store.
- * The returned hash equals the node's own type field (self-referencing).
- * Idempotent: calling bootstrap multiple times returns the same hash.
+ * Write the meta-schema seed node into the store and register built-in schemas.
+ * The returned object contains aliases for the meta-schema and 5 primitive schemas.
+ * Idempotent: calling bootstrap multiple times returns the same hashes.
  */
-export async function bootstrap(store: Store): Promise<Hash> {
+export async function bootstrap(store: Store): Promise<Record<string, Hash>> {
   if (!isBootstrapCapableStore(store)) {
     throw new Error("Store does not support bootstrap");
   }
-  return store[BOOTSTRAP_STORE](BOOTSTRAP_PAYLOAD);
+
+  // 1. Bootstrap the meta-schema (self-referential)
+  const metaHash = await store[BOOTSTRAP_STORE](BOOTSTRAP_PAYLOAD);
+
+  // 2. Register built-in primitive schemas directly (without putSchema to avoid recursion)
+  const stringHash = await store.put(metaHash, { type: "string" });
+  const numberHash = await store.put(metaHash, { type: "number" });
+  const objectHash = await store.put(metaHash, { type: "object" });
+  const arrayHash = await store.put(metaHash, { type: "array" });
+  const boolHash = await store.put(metaHash, { type: "boolean" });
+
+  // 3. Return map of aliases to hashes
+  return {
+    "@schema": metaHash,
+    "@string": stringHash,
+    "@number": numberHash,
+    "@object": objectHash,
+    "@array": arrayHash,
+    "@bool": boolHash,
+  };
 }

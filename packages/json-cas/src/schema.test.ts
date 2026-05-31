@@ -29,7 +29,8 @@ describe("putSchema", () => {
 
   test("schema node type equals the meta-schema hash", async () => {
     const store = createMemoryStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const schemaHash = await putSchema(store, { type: "string" });
     const node = store.get(schemaHash) as CasNode;
 
@@ -355,7 +356,8 @@ describe("walk", () => {
 describe("bootstrap meta-schema self-reference", () => {
   test("metaNode.type === metaHash (self-referencing)", async () => {
     const store = createMemoryStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const metaNode = store.get(metaHash) as CasNode;
 
     expect(metaNode.type).toBe(metaHash);
@@ -363,7 +365,8 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("schema nodes have type === metaHash", async () => {
     const store = createMemoryStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const schemaHash = await putSchema(store, { type: "string" });
     const schemaNode = store.get(schemaHash) as CasNode;
 
@@ -372,7 +375,8 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("data nodes have type === schemaHash (not metaHash)", async () => {
     const store = createMemoryStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const schemaHash = await putSchema(store, {
       type: "object",
       properties: { val: { type: "number" } },
@@ -386,7 +390,8 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("bootstrap is idempotent across putSchema calls", async () => {
     const store = createMemoryStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
 
     await putSchema(store, { type: "string" });
     await putSchema(store, { type: "number" });

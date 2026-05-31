@@ -197,9 +197,17 @@ describe("createMemoryStore – listByType", () => {
 
   test("bootstrap node is listed under its self type", async () => {
     const store = createMemoryStore();
-    const hash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const hash = builtinSchemas["@schema"] ?? "";
 
-    expect(store.listByType(hash)).toEqual([hash]);
+    // All built-in schemas should be typed by the meta-schema
+    const allTypedByMeta = store.listByType(hash);
+    expect(allTypedByMeta).toContain(hash); // meta-schema itself
+    expect(allTypedByMeta).toContain(builtinSchemas["@string"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@number"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@object"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@array"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@bool"] ?? "");
   });
 });
 
@@ -256,44 +264,59 @@ describe("bootstrap", () => {
     );
   });
 
-  test("returns a valid 13-char hash", async () => {
+  test("returns a map with 6 built-in schema aliases", async () => {
     const store = createMemoryStore();
-    const hash = await bootstrap(store);
-    expect(hash).toHaveLength(13);
-    expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    const builtinSchemas = await bootstrap(store);
+
+    expect(builtinSchemas).toHaveProperty("@schema");
+    expect(builtinSchemas).toHaveProperty("@string");
+    expect(builtinSchemas).toHaveProperty("@number");
+    expect(builtinSchemas).toHaveProperty("@object");
+    expect(builtinSchemas).toHaveProperty("@array");
+    expect(builtinSchemas).toHaveProperty("@bool");
+
+    // All values should be valid hashes
+    for (const hash of Object.values(builtinSchemas)) {
+      expect(hash).toHaveLength(13);
+      expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    }
   });
 
-  test("node is stored and retrievable", async () => {
+  test("meta-schema node is stored and retrievable", async () => {
     const store = createMemoryStore();
-    const hash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
 
-    expect(store.has(hash)).toBe(true);
-    const node = store.get(hash);
+    expect(store.has(metaHash)).toBe(true);
+    const node = store.get(metaHash);
     expect(node).not.toBeNull();
   });
 
-  test("node is self-referencing: type === hash", async () => {
+  test("meta-schema node is self-referencing: type === hash", async () => {
     const store = createMemoryStore();
-    const hash = await bootstrap(store);
-    const node = store.get(hash) as CasNode;
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
+    const node = store.get(metaHash) as CasNode;
 
-    expect(node.type).toBe(hash);
+    expect(node.type).toBe(metaHash);
   });
 
   test("bootstrap node passes verify()", async () => {
     const store = createMemoryStore();
-    const hash = await bootstrap(store);
-    const node = store.get(hash) as CasNode;
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
+    const node = store.get(metaHash) as CasNode;
 
-    expect(await verify(hash, node)).toBe(true);
+    expect(await verify(metaHash, node)).toBe(true);
   });
 
-  test("bootstrap is idempotent: same hash on repeated calls", async () => {
+  test("bootstrap is idempotent: same hashes on repeated calls", async () => {
     const store = createMemoryStore();
     const h1 = await bootstrap(store);
     const h2 = await bootstrap(store);
 
-    expect(h1).toBe(h2);
-    expect(store.listByType(h1)).toHaveLength(1);
+    expect(h1).toEqual(h2);
+    // All 6 built-in schemas should be typed by the meta-schema
+    expect(store.listByType(h1["@schema"] ?? "")).toHaveLength(6);
   });
 });

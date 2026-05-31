@@ -1593,3 +1593,186 @@ describe("VariableStore - Tag/Label Management", () => {
     varStore.close();
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// @ Prefix Support for Variable Names
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("VariableStore - @ Prefix Variable Names", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    if (dbPath) {
+      try {
+        unlinkSync(dbPath);
+      } catch {
+        // ignore
+      }
+    }
+  });
+
+  test("should accept variable name with @ prefix in first segment", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "string" });
+    const hash = await store.put(schemaHash, "test value");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Should succeed
+    const variable = varStore.set("@ucas/test/foo", hash);
+    expect(variable.name).toBe("@ucas/test/foo");
+
+    const retrieved = varStore.get("@ucas/test/foo", schemaHash);
+    expect(retrieved).not.toBeNull();
+    expect(retrieved?.name).toBe("@ucas/test/foo");
+    expect(retrieved?.value).toBe(hash);
+
+    varStore.close();
+  });
+
+  test("should accept variable name starting with @", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "string" });
+    const hash = await store.put(schemaHash, "config value");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Single segment with @
+    varStore.set("@config", hash);
+    const result = varStore.get("@config", schemaHash);
+    expect(result).not.toBeNull();
+    expect(result?.name).toBe("@config");
+
+    varStore.close();
+  });
+
+  test("should accept complex @ prefix paths", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "string" });
+    const hash = await store.put(schemaHash, "test");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // Multiple valid patterns
+    const validNames = [
+      "@ucas/render/template",
+      "@system/config",
+      "@foo.bar/baz",
+      "@app-1/test_2",
+    ];
+
+    for (const name of validNames) {
+      expect(() => varStore.set(name, hash)).not.toThrow();
+      const retrieved = varStore.get(name, schemaHash);
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.name).toBe(name);
+    }
+
+    varStore.close();
+  });
+
+  test("should reject @ in non-first segment", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "string" });
+    const hash = await store.put(schemaHash, "test");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // @ only allowed at start of entire name
+    const invalidNames = [
+      "foo/@bar", // @ in second segment
+      "foo/bar/@baz", // @ in third segment
+      "foo@bar", // @ within segment (not at start)
+    ];
+
+    for (const name of invalidNames) {
+      expect(() => varStore.set(name, hash)).toThrow(InvalidVariableNameError);
+    }
+
+    varStore.close();
+  });
+
+  test("should reject @ followed by invalid characters", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "string" });
+    const hash = await store.put(schemaHash, "test");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // @ prefix must still follow segment rules after @
+    const invalidNames = [
+      "@", // @ alone is empty segment
+      "@/foo", // empty after @
+      "@foo bar", // space not allowed
+      "@foo$bar", // $ not allowed
+    ];
+
+    for (const name of invalidNames) {
+      expect(() => varStore.set(name, hash)).toThrow(InvalidVariableNameError);
+    }
+
+    varStore.close();
+  });
+
+  test("should still accept all previously valid names", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "string" });
+    const hash = await store.put(schemaHash, "test");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    // All non-@ names should continue to work
+    const validNames = [
+      "simple",
+      "with.dots",
+      "with-dashes",
+      "with_underscores",
+      "path/to/var",
+      "foo.bar/baz-qux/test_123",
+    ];
+
+    for (const name of validNames) {
+      expect(() => varStore.set(name, hash)).not.toThrow();
+    }
+
+    varStore.close();
+  });
+
+  test("should still reject previously invalid names", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schemaHash = await putSchema(store, { type: "string" });
+    const hash = await store.put(schemaHash, "test");
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+
+    const invalidNames = [
+      "", // empty
+      "/leading", // leading slash
+      "trailing/", // trailing slash
+      "double//slash", // empty segment
+      "has space", // space
+      "has$dollar", // special char
+    ];
+
+    for (const name of invalidNames) {
+      expect(() => varStore.set(name, hash)).toThrow(InvalidVariableNameError);
+    }
+
+    varStore.close();
+  });
+});

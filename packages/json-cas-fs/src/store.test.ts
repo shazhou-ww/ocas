@@ -43,7 +43,8 @@ describe("createFsStore – init and bootstrap", () => {
 
   test("bootstrap returns a valid 13-char self-referencing hash", async () => {
     const store = createFsStore(dir);
-    const hash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const hash = builtinSchemas["@schema"] ?? "";
 
     expect(hash).toHaveLength(13);
     expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
@@ -57,8 +58,8 @@ describe("createFsStore – init and bootstrap", () => {
     const h1 = await bootstrap(store);
     const h2 = await bootstrap(store);
 
-    expect(h1).toBe(h2);
-    expect(store.listByType(h1)).toHaveLength(1);
+    expect(h1).toEqual(h2);
+    expect(store.listByType(h1["@schema"] ?? "")).toHaveLength(6);
   });
 });
 
@@ -104,7 +105,8 @@ describe("createFsStore – persistence round-trip", () => {
 
   test("bootstrap survives round-trip: self-referencing node reloads correctly", async () => {
     const store1 = createFsStore(dir);
-    const hash = await bootstrap(store1);
+    const builtinSchemas = await bootstrap(store1);
+    const hash = builtinSchemas["@schema"] ?? "";
 
     const store2 = createFsStore(dir);
     const node = store2.get(hash) as CasNode;
@@ -251,10 +253,11 @@ describe("createFsStore – listByType", () => {
 
   test("bootstrap node is listed under its self type after reload", async () => {
     const store1 = createFsStore(dir);
-    const hash = await bootstrap(store1);
+    const builtinSchemas = await bootstrap(store1);
+    const hash = builtinSchemas["@schema"] ?? "";
 
     const store2 = createFsStore(dir);
-    expect(store2.listByType(hash)).toEqual([hash]);
+    expect(store2.listByType(hash)).toContain(hash);
   });
 });
 
@@ -284,7 +287,8 @@ describe("createFsStore – verify on disk-loaded nodes", () => {
 
   test("verify passes on a disk-loaded bootstrap node", async () => {
     const store1 = createFsStore(dir);
-    const hash = await bootstrap(store1);
+    const builtinSchemas = await bootstrap(store1);
+    const hash = builtinSchemas["@schema"] ?? "";
 
     const store2 = createFsStore(dir);
     const node = store2.get(hash) as CasNode;
