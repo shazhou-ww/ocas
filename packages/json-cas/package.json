@@ -15,7 +15,8 @@
     "src"
   ],
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
     "ajv": "^8.20.0",

@@ -7,7 +7,8 @@
     "ucas": "./src/index.ts"
   },
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
     "@uncaged/json-cas": "^0.6.0",
