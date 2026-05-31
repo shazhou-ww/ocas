@@ -20,15 +20,27 @@ exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `
 }
 `;
 
-exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `""`;
+exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `
+"{
+  "type": "4N5REDA48XYJP",
+  "value": []
+}"
+`;
 
-exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `"ERARPP19YJT05"`;
+exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `
+"{
+  "type": "7124NEATTWYYY",
+  "value": [
+    "ERARPP19YJT05"
+  ]
+}"
+`;
 
 exports[`Phase 2: Schema Validation 2.3 put against non-existent schema hash fails 1`] = `"Schema not found: AAAAAAAAAAAAA"`;
 
 exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "AYHQD2YA9G667",
   "value": {
     "labels": [],
     "name": "myapp/config",
@@ -41,7 +53,7 @@ exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
 
 exports[`Phase 3: Variable System 3.2 var get returns variable 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "BVW2SAJ8606EZ",
   "value": {
     "labels": [],
     "name": "myapp/config",
@@ -54,7 +66,7 @@ exports[`Phase 3: Variable System 3.2 var get returns variable 1`] = `
 
 exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "3BY1S4RKNMR0P",
   "value": [
     {
       "labels": [],
@@ -69,7 +81,7 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
 
 exports[`Phase 3: Variable System 3.4 var list prefix filters by prefix 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "3BY1S4RKNMR0P",
   "value": [
     {
       "labels": [],
@@ -84,7 +96,7 @@ exports[`Phase 3: Variable System 3.4 var list prefix filters by prefix 1`] = `
 
 exports[`Phase 3: Variable System 3.5 var set upsert updates existing variable 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "AYHQD2YA9G667",
   "value": {
     "labels": [],
     "name": "myapp/config",
@@ -97,7 +109,7 @@ exports[`Phase 3: Variable System 3.5 var set upsert updates existing variable 1
 
 exports[`Phase 3: Variable System 3.6 var tag adds kv tag and label 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "BKMJ3DJHTS6VB",
   "value": {
     "labels": [
       "important",
@@ -114,7 +126,7 @@ exports[`Phase 3: Variable System 3.6 var tag adds kv tag and label 1`] = `
 
 exports[`Phase 3: Variable System 3.7 var list --tag env:prod filters by kv tag 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "3BY1S4RKNMR0P",
   "value": [
     {
       "labels": [
@@ -133,7 +145,7 @@ exports[`Phase 3: Variable System 3.7 var list --tag env:prod filters by kv tag 
 
 exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "3BY1S4RKNMR0P",
   "value": [
     {
       "labels": [
@@ -152,7 +164,7 @@ exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 
 
 exports[`Phase 3: Variable System 3.9 var tag remove deletes label 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "BKMJ3DJHTS6VB",
   "value": {
     "labels": [],
     "name": "myapp/config",
@@ -167,7 +179,7 @@ exports[`Phase 3: Variable System 3.9 var tag remove deletes label 1`] = `
 
 exports[`Phase 3: Variable System 3.10 var delete removes variable 1`] = `
 {
-  "type": "E1D32N3GT69Q8",
+  "type": "ASWN8JEGAG7AP",
   "value": [
     {
       "labels": [],

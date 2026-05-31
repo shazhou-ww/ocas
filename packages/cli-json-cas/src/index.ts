@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Hash, JSONSchema, Store, VariableStore } from "@uncaged/json-cas";
+import type { Hash, Store, VariableStore } from "@uncaged/json-cas";
 import {
   bootstrap,
   CasNodeNotFoundError,
@@ -13,7 +13,6 @@ import {
   getSchema,
   InvalidTagFormatError,
   InvalidVariableNameError,
-  putSchema,
   refs,
   renderAsync,
   renderDirect,
@@ -146,55 +145,6 @@ async function resolveTypeHash(typeHashOrAlias: string): Promise<Hash> {
 }
 
 /**
- * Get the Variable schema's CAS hash
- * This is the type hash used in JSON envelopes
- */
-async function getVariableSchemaHash(): Promise<Hash> {
-  const store = await openStore();
-
-  // Define the Variable JSON Schema (updated for new model with composite key)
-  const variableSchema: JSONSchema = {
-    title: "Variable",
-    type: "object",
-    properties: {
-      name: { type: "string" },
-      schema: { type: "string" },
-      value: { type: "string" },
-      created: { type: "number" },
-      updated: { type: "number" },
-      tags: { type: "object" },
-      labels: { type: "array", items: { type: "string" } },
-    },
-    required: [
-      "name",
-      "schema",
-      "value",
-      "created",
-      "updated",
-      "tags",
-      "labels",
-    ],
-  };
-
-  // Compute hash or retrieve from store
-  const hash = await putSchema(store, variableSchema);
-  return hash;
-}
-
-/**
- * Wrap Variable output in JSON envelope
- */
-async function wrapVariableEnvelope(
-  variable: unknown,
-): Promise<{ type: Hash; value: unknown }> {
-  const typeHash = await getVariableSchemaHash();
-  return {
-    type: typeHash,
-    value: variable,
-  };
-}
-
-/**
  * Parse tag/label arguments
  * Returns: { tags: Record<string, string>, labels: string[], deleteNames: string[] }
  */
@@ -296,9 +246,7 @@ async function cmdRefs(args: string[]): Promise<void> {
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   const refHashes = refs(store, node);
-  for (const r of refHashes) {
-    console.log(r);
-  }
+  out(await wrapEnvelope(store, "@output/refs", refHashes));
 }
 
 async function cmdWalk(args: string[]): Promise<void> {
@@ -314,15 +262,16 @@ async function cmdWalk(args: string[]): Promise<void> {
     });
 
     const printed = new Set<Hash>();
+    const lines: string[] = [];
 
     function printNode(h: Hash, prefix: string, isLast: boolean): void {
       const connector = prefix === "" ? "" : isLast ? "└── " : "├── ";
       if (printed.has(h)) {
-        console.log(`${prefix}${connector}${h} (seen)`);
+        lines.push(`${prefix}${connector}${h} (seen)`);
         return;
       }
       printed.add(h);
-      console.log(`${prefix}${connector}${h}`);
+      lines.push(`${prefix}${connector}${h}`);
 
       const kids = childMap.get(h) ?? [];
       const childPrefix =
@@ -333,10 +282,13 @@ async function cmdWalk(args: string[]): Promise<void> {
     }
 
     printNode(hash, "", true);
+    out(await wrapEnvelope(store, "@output/walk", lines.join("\n")));
   } else {
+    const hashes: Hash[] = [];
     walk(store, hash, (h) => {
-      console.log(h);
+      hashes.push(h);
     });
+    out(await wrapEnvelope(store, "@output/walk", hashes));
   }
 }
 
@@ -471,7 +423,8 @@ async function cmdVarSet(args: string[]): Promise<void> {
     die("Usage: json-cas var set <name> <hash> [--tag <tag>...]");
   }
 
-  const varStore = await openVarStore();
+  const store = await openStore();
+  const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
     // Parse tags/labels from --tag flags
@@ -498,8 +451,7 @@ async function cmdVarSet(args: string[]): Promise<void> {
         : undefined;
 
     const variable = varStore.set(name, value, options);
-    const envelope = await wrapVariableEnvelope(variable);
-    out(envelope);
+    out(await wrapEnvelope(store, "@output/var-set", variable));
   } catch (e) {
     if (
       e instanceof InvalidVariableNameError ||
@@ -522,15 +474,15 @@ async function cmdVarGet(args: string[]): Promise<void> {
     die("Usage: json-cas var get <name> --schema <hash>");
   }
 
-  const varStore = await openVarStore();
+  const store = await openStore();
+  const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
     const variable = varStore.get(name, schema);
     if (variable === null) {
       die(`Error: Variable not found: name=${name}, schema=${schema}`);
     }
-    const envelope = await wrapVariableEnvelope(variable);
-    out(envelope);
+    out(await wrapEnvelope(store, "@output/var-get", variable));
   } finally {
     varStore.close();
   }
@@ -544,19 +496,18 @@ async function cmdVarDelete(args: string[]): Promise<void> {
     die("Usage: json-cas var delete <name> [--schema <hash>]");
   }
 
-  const varStore = await openVarStore();
+  const store = await openStore();
+  const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
     if (schema !== undefined) {
       // Precise deletion: remove specific (name, schema) variant
       const variable = varStore.remove(name, schema);
-      const envelope = await wrapVariableEnvelope(variable);
-      out(envelope);
+      out(await wrapEnvelope(store, "@output/var-delete", variable));
     } else {
       // Batch deletion: remove all variants for this name
       const variables = varStore.remove(name);
-      const envelope = await wrapVariableEnvelope(variables);
-      out(envelope);
+      out(await wrapEnvelope(store, "@output/var-delete", variables));
     }
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
@@ -581,7 +532,8 @@ async function cmdVarTag(args: string[]): Promise<void> {
     die("Usage: json-cas var tag <name> --schema <hash> <operations...>");
   }
 
-  const varStore = await openVarStore();
+  const store = await openStore();
+  const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
     const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
@@ -592,8 +544,7 @@ async function cmdVarTag(args: string[]): Promise<void> {
       delete: deleteNames.length > 0 ? deleteNames : undefined,
     });
 
-    const envelope = await wrapVariableEnvelope(variable);
-    out(envelope);
+    out(await wrapEnvelope(store, "@output/var-tag", variable));
   } catch (e) {
     if (
       e instanceof VariableNotFoundError ||
@@ -613,7 +564,8 @@ async function cmdVarList(args: string[]): Promise<void> {
   const schema = flags.schema as string | undefined;
   const tagFlags = flags.tag;
 
-  const varStore = await openVarStore();
+  const store = await openStore();
+  const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
     // Parse tags/labels from --tag flags
@@ -635,8 +587,7 @@ async function cmdVarList(args: string[]): Promise<void> {
       tags: Object.keys(tags).length > 0 ? tags : undefined,
       labels: labels.length > 0 ? labels : undefined,
     });
-    const envelope = await wrapVariableEnvelope(variables);
-    out(envelope);
+    out(await wrapEnvelope(store, "@output/var-list", variables));
   } catch (e) {
     if (e instanceof InvalidVariableNameError) {
       die(`Error: ${e.message}`);
@@ -817,7 +768,7 @@ async function cmdGc(_args: string[]): Promise<void> {
 
   try {
     const stats = gc(store, varStore);
-    out(stats);
+    out(await wrapEnvelope(store, "@output/gc", stats));
   } finally {
     varStore.close();
   }
