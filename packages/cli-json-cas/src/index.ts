@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Hash, JSONSchema, Store, VariableStore } from "@uncaged/json-cas";
@@ -38,6 +38,7 @@ const VALUE_FLAGS = new Set([
   "resolution",
   "decay",
   "epsilon",
+  "inline",
 ]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
@@ -629,6 +630,174 @@ async function cmdVarList(args: string[]): Promise<void> {
   }
 }
 
+async function cmdTemplateSet(args: string[]): Promise<void> {
+  const schemaHash = args[0];
+  const inlineFlag = flags.inline;
+
+  if (!schemaHash) {
+    die("Usage: json-cas template set <schema-hash> <file> | --inline <text>");
+  }
+
+  const store = openStore();
+  mkdirSync(resolve(storePath), { recursive: true });
+  const varStore = createVariableStore(resolve(varDbPath), store);
+
+  try {
+    // Validate schema hash exists in CAS
+    if (!store.has(schemaHash)) {
+      die(`Error: Schema hash not found in CAS: ${schemaHash}`);
+    }
+
+    // Determine content source
+    let content: string;
+
+    if (typeof inlineFlag === "string") {
+      // --inline mode
+      const fileArg = args[1];
+      if (fileArg !== undefined && !fileArg.startsWith("--")) {
+        die("Error: Cannot specify both file and --inline");
+      }
+      content = inlineFlag;
+    } else if (inlineFlag === true) {
+      // --inline flag present but no value
+      const contentArg = args[1];
+      if (!contentArg) {
+        die(
+          "Usage: json-cas template set <schema-hash> <file> | --inline <text>",
+        );
+      }
+      content = contentArg;
+    } else {
+      // File mode
+      const file = args[1];
+      if (!file) {
+        die(
+          "Usage: json-cas template set <schema-hash> <file> | --inline <text>",
+        );
+      }
+      if (!existsSync(file)) {
+        die(`Error: File not found: ${file}`);
+      }
+      content = readFileSync(file, "utf-8");
+    }
+
+    // Store content in CAS under @string schema
+    const stringHash = await resolveTypeHash("@string");
+    const contentHash = await store.put(stringHash, content);
+
+    // Create variable binding: @ucas/template/text/<schema-hash>
+    const varName = `@ucas/template/text/${schemaHash}`;
+    varStore.set(varName, contentHash);
+
+    out({
+      schemaHash,
+      contentHash,
+    });
+  } catch (e) {
+    if (e instanceof CasNodeNotFoundError) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdTemplateGet(args: string[]): Promise<void> {
+  const schemaHash = args[0];
+
+  if (!schemaHash) {
+    die("Usage: json-cas template get <schema-hash>");
+  }
+
+  const store = openStore();
+  mkdirSync(resolve(storePath), { recursive: true });
+  const varStore = createVariableStore(resolve(varDbPath), store);
+
+  try {
+    const varName = `@ucas/template/text/${schemaHash}`;
+    const stringHash = await resolveTypeHash("@string");
+    const variable = varStore.get(varName, stringHash);
+
+    if (variable === null) {
+      die(`Error: Template not found for schema: ${schemaHash}`);
+    }
+
+    // Get the content from CAS
+    const node = store.get(variable.value);
+    if (node === null) {
+      die(`Error: Content not found in CAS: ${variable.value}`);
+    }
+
+    // Output raw text (not JSON)
+    process.stdout.write(node.payload as string);
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdTemplateList(_args: string[]): Promise<void> {
+  const store = openStore();
+  mkdirSync(resolve(storePath), { recursive: true });
+  const varStore = createVariableStore(resolve(varDbPath), store);
+
+  try {
+    const stringHash = await resolveTypeHash("@string");
+    const variables = varStore.list({
+      namePrefix: "@ucas/template/text/",
+      schema: stringHash,
+    });
+
+    const templates = variables.map((v) => {
+      const schemaHash = v.name.replace("@ucas/template/text/", "");
+
+      // Get content for preview
+      const node = store.get(v.value);
+      const content = (node?.payload as string | undefined) ?? "";
+
+      // Truncate preview to 80 chars
+      const preview =
+        content.length > 80 ? `${content.slice(0, 77)}...` : content;
+
+      return {
+        schemaHash,
+        preview,
+      };
+    });
+
+    out(templates);
+  } finally {
+    varStore.close();
+  }
+}
+
+async function cmdTemplateDelete(args: string[]): Promise<void> {
+  const schemaHash = args[0];
+
+  if (!schemaHash) {
+    die("Usage: json-cas template delete <schema-hash>");
+  }
+
+  const store = openStore();
+  mkdirSync(resolve(storePath), { recursive: true });
+  const varStore = createVariableStore(resolve(varDbPath), store);
+
+  try {
+    const varName = `@ucas/template/text/${schemaHash}`;
+    const stringHash = await resolveTypeHash("@string");
+    varStore.remove(varName, stringHash);
+
+    out({ deleted: true });
+  } catch (e) {
+    if (e instanceof VariableNotFoundError) {
+      die(`Error: Template not found for schema: ${schemaHash}`);
+    }
+    throw e;
+  } finally {
+    varStore.close();
+  }
+}
+
 async function cmdGc(_args: string[]): Promise<void> {
   const store = createFsStore(storePath);
   const varStore = createVariableStore(varDbPath, store);
@@ -666,6 +835,10 @@ Commands:
   var delete <name> [--schema <hash>] Delete variable(s)
   var list [prefix] [--schema <hash>] [--tag <tag>...] List variables
   var tag <name> --schema <hash> <operations...> Modify tags/labels
+  template set <schema-hash> <file> | --inline <text> Set template for schema
+  template get <schema-hash>        Get template content as raw text
+  template list                     List all templates
+  template delete <schema-hash>     Delete template for schema
   gc                                Run garbage collection
 
 Flags:
@@ -674,6 +847,7 @@ Flags:
   --json              Compact JSON output
   --schema <hash>     Schema hash filter for var get/delete/tag/list
   --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
+  --inline <text>     Inline text content for template set
   --resolution <n>    Initial resolution for render (default: 1.0)
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)`);
@@ -774,6 +948,27 @@ switch (cmd) {
         break;
       default:
         die(`Unknown var subcommand: ${sub ?? "(none)"}`);
+    }
+    break;
+  }
+
+  case "template": {
+    const [sub, ...subRest] = rest;
+    switch (sub) {
+      case "set":
+        await cmdTemplateSet(subRest);
+        break;
+      case "get":
+        await cmdTemplateGet(subRest);
+        break;
+      case "list":
+        await cmdTemplateList(subRest);
+        break;
+      case "delete":
+        await cmdTemplateDelete(subRest);
+        break;
+      default:
+        die(`Unknown template subcommand: ${sub ?? "(none)"}`);
     }
     break;
   }
