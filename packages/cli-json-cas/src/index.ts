@@ -15,7 +15,7 @@ import {
   InvalidVariableNameError,
   putSchema,
   refs,
-  render,
+  renderAsync,
   TagLabelConflictError,
   VariableNotFoundError,
   validate,
@@ -421,8 +421,14 @@ async function cmdRender(args: string[]): Promise<void> {
   }
 
   try {
-    const output = render(store, hash, { resolution, decay, epsilon });
-    // Output to stdout without JSON wrapping (raw YAML)
+    const varStore = openVarStore();
+    const output = await renderAsync(store, hash, {
+      resolution,
+      decay,
+      epsilon,
+      varStore,
+    });
+    // Output to stdout without JSON wrapping (raw output)
     process.stdout.write(output);
   } catch (error) {
     if (error instanceof Error) {

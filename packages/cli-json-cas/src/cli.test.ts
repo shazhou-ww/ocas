@@ -314,3 +314,286 @@ describe("ucas render command", () => {
     }
   });
 });
+
+describe("Suite 6: CLI Integration with Templates", () => {
+  test("6.1 CLI with Template (Default Parameters)", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      // Initialize store
+      await runCli(["init"], tmpStore);
+
+      // Create schema
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: { name: { type: "string" } },
+        }),
+      );
+      const { stdout: schemaHash } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      // Create node
+      const nodeFile = join(tmpStore, "node.json");
+      writeFileSync(nodeFile, JSON.stringify({ name: "Alice" }));
+      const { stdout: nodeHash } = await runCli(
+        ["put", schemaHash.trim(), nodeFile],
+        tmpStore,
+      );
+
+      // Create template file (JSON-encoded string)
+      const templateFile = join(tmpStore, "template.json");
+      writeFileSync(templateFile, JSON.stringify("Hello {{ payload.name }}!"));
+      const { stdout: tmplHash } = await runCli(
+        ["put", "@string", templateFile],
+        tmpStore,
+      );
+
+      // Register template
+      await runCli(
+        [
+          "var",
+          "set",
+          `@ucas/template/text/${schemaHash.trim()}`,
+          tmplHash.trim(),
+        ],
+        tmpStore,
+      );
+
+      // Render with template
+      const { stdout: output, exitCode } = await runCli(
+        ["render", nodeHash.trim()],
+        tmpStore,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(output).toBe("Hello Alice!");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("6.2 CLI with Template + Custom Decay", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      // Create schema with child ref
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: {
+            value: { type: "string" },
+            child: {
+              anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+            },
+          },
+        }),
+      );
+      const { stdout: schemaHash } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      // Create child node
+      const childFile = join(tmpStore, "child.json");
+      writeFileSync(childFile, JSON.stringify({ value: "child", child: null }));
+      const { stdout: childHash } = await runCli(
+        ["put", schemaHash.trim(), childFile],
+        tmpStore,
+      );
+
+      // Create parent node
+      const parentFile = join(tmpStore, "parent.json");
+      writeFileSync(
+        parentFile,
+        JSON.stringify({ value: "parent", child: childHash.trim() }),
+      );
+      const { stdout: parentHash } = await runCli(
+        ["put", schemaHash.trim(), parentFile],
+        tmpStore,
+      );
+
+      // Create template showing resolution (JSON-encoded string)
+      const templateFile = join(tmpStore, "template.json");
+      writeFileSync(
+        templateFile,
+        JSON.stringify("{{ payload.value }}(res={{ resolution }})"),
+      );
+      const { stdout: tmplHash } = await runCli(
+        ["put", "@string", templateFile],
+        tmpStore,
+      );
+
+      // Register template
+      await runCli(
+        [
+          "var",
+          "set",
+          `@ucas/template/text/${schemaHash.trim()}`,
+          tmplHash.trim(),
+        ],
+        tmpStore,
+      );
+
+      // Render with custom decay
+      const { stdout: output, exitCode } = await runCli(
+        ["render", parentHash.trim(), "--decay", "0.7"],
+        tmpStore,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(output).toContain("parent(res=1)");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("6.3 CLI with Template + All Parameters", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: { name: { type: "string" } },
+        }),
+      );
+      const { stdout: schemaHash } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      const nodeFile = join(tmpStore, "node.json");
+      writeFileSync(nodeFile, JSON.stringify({ name: "Bob" }));
+      const { stdout: nodeHash } = await runCli(
+        ["put", schemaHash.trim(), nodeFile],
+        tmpStore,
+      );
+
+      // Create template (JSON-encoded string)
+      const templateFile = join(tmpStore, "template.json");
+      writeFileSync(
+        templateFile,
+        JSON.stringify("Greetings {{ payload.name }}!"),
+      );
+      const { stdout: tmplHash } = await runCli(
+        ["put", "@string", templateFile],
+        tmpStore,
+      );
+
+      await runCli(
+        [
+          "var",
+          "set",
+          `@ucas/template/text/${schemaHash.trim()}`,
+          tmplHash.trim(),
+        ],
+        tmpStore,
+      );
+
+      const { stdout: output, exitCode } = await runCli(
+        [
+          "render",
+          nodeHash.trim(),
+          "--resolution",
+          "0.8",
+          "--decay",
+          "0.6",
+          "--epsilon",
+          "0.005",
+        ],
+        tmpStore,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(output).toBe("Greetings Bob!");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("6.4 CLI with Non-templated Node (YAML Fallback)", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: { name: { type: "string" } },
+        }),
+      );
+      const { stdout: schemaHash } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      const nodeFile = join(tmpStore, "node.json");
+      writeFileSync(nodeFile, JSON.stringify({ name: "Charlie" }));
+      const { stdout: nodeHash } = await runCli(
+        ["put", schemaHash.trim(), nodeFile],
+        tmpStore,
+      );
+
+      // No template registered - should fall back to YAML
+      const { stdout: output, exitCode } = await runCli(
+        ["render", nodeHash.trim()],
+        tmpStore,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(output).toContain("name:");
+      expect(output).toContain("Charlie");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("6.5 CLI Error: Invalid Decay Value", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: { name: { type: "string" } },
+        }),
+      );
+      const { stdout: schemaHash } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      const nodeFile = join(tmpStore, "node.json");
+      writeFileSync(nodeFile, JSON.stringify({ name: "Test" }));
+      const { stdout: nodeHash } = await runCli(
+        ["put", schemaHash.trim(), nodeFile],
+        tmpStore,
+      );
+
+      const { exitCode, stderr } = await runCli(
+        ["render", nodeHash.trim(), "--decay", "1.5"],
+        tmpStore,
+      );
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("decay");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+});

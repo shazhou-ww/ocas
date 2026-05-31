@@ -167,7 +167,7 @@ async function renderNode(
   varStore: VariableStore,
   hash: Hash,
   currentResolution: number,
-  globalDecay: number,
+  _globalDecay: number,
   epsilon: number,
   visited: Set<Hash>,
 ): Promise<string> {
