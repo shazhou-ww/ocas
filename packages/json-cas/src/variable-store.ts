@@ -40,7 +40,7 @@ export class CasNodeNotFoundError extends Error {
     public readonly hash: string,
     message?: string,
   ) {
-    super(message ?? `Node not found: ${hash}`);
+    super(message ?? `CAS node not found: ${hash}`);
     this.name = "CasNodeNotFoundError";
   }
 }

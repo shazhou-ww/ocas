@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { bootstrap } from "@uncaged/json-cas";
+import { createFsStore } from "@uncaged/json-cas-fs";
 
 const pkgPath = resolve(import.meta.dir, "../package.json");
 const entrypoint = resolve(import.meta.dir, "index.ts");
@@ -639,9 +641,9 @@ describe("Suite 6: CLI Integration with Templates", () => {
     try {
       await runCli(["init"], tmpStore);
 
-      // Get @string type hash
-      const { stdout: typesJson } = await runCli(["types"], tmpStore);
-      const types = JSON.parse(typesJson);
+      // Get @string type hash via bootstrap
+      const store = createFsStore(tmpStore);
+      const types = await bootstrap(store);
       const stringType = types["@string"];
 
       // Create and store a simple string node
@@ -673,9 +675,9 @@ describe("Suite 6: CLI Integration with Templates", () => {
     try {
       await runCli(["init"], tmpStore);
 
-      // Get @string type hash
-      const { stdout: typesJson } = await runCli(["types"], tmpStore);
-      const types = JSON.parse(typesJson);
+      // Get @string type hash via bootstrap
+      const store = createFsStore(tmpStore);
+      const types = await bootstrap(store);
       const stringType = types["@string"];
 
       // Create envelope and pipe to render

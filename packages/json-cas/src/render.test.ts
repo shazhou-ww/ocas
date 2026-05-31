@@ -72,7 +72,7 @@ describe("Suite 1: Basic Rendering (No Nesting)", () => {
 
     // Non-existent root node should throw
     expect(() => render(store, fakeHash)).toThrow(CasNodeNotFoundError);
-    expect(() => render(store, fakeHash)).toThrow("Node not found");
+    expect(() => render(store, fakeHash)).toThrow("CAS node not found");
     expect(() => render(store, fakeHash)).toThrow(fakeHash);
   });
 });
@@ -795,9 +795,10 @@ describe("Suite 6: Schema Integration", () => {
 
   test("6.5 Schema-less Node (Bootstrap Node)", async () => {
     const store = createMemoryStore();
-    const metaHash = await bootstrap(store);
+    const types = await bootstrap(store);
+    const schemaHash = types["@schema"];
 
-    const output = render(store, metaHash);
+    const output = render(store, schemaHash);
 
     // Should render without recursive expansion
     expect(output).toBeTruthy();
@@ -1068,7 +1069,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
       CasNodeNotFoundError,
     );
     await expect(renderAsync(store, fakeHash)).rejects.toThrow(
-      "Node not found",
+      "CAS node not found",
     );
     await expect(renderAsync(store, fakeHash)).rejects.toThrow(fakeHash);
   });
@@ -1078,7 +1079,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
     const fakeHash = "ZZZZZZZZZZZZZ" as Hash;
 
     expect(() => render(store, fakeHash)).toThrow(CasNodeNotFoundError);
-    expect(() => render(store, fakeHash)).toThrow("Node not found");
+    expect(() => render(store, fakeHash)).toThrow("CAS node not found");
     expect(() => render(store, fakeHash)).toThrow(fakeHash);
   });
 
