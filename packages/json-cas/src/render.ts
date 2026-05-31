@@ -1,6 +1,5 @@
 import { renderWithTemplate } from "./liquid-render.js";
-import type { JSONSchema } from "./schema.js";
-import { getSchema, putSchema, refs } from "./schema.js";
+import { collectRefs, getSchema, putSchema, refs } from "./schema.js";
 import type { Hash, Store } from "./types.js";
 import type { VariableStore } from "./variable-store.js";
 
@@ -18,6 +17,32 @@ const DEFAULT_EPSILON = 0.01;
 const FLOAT_TOLERANCE = 1e-10;
 
 /**
+ * Extract and validate resolution/decay/epsilon from options.
+ */
+function validateAndExtractOptions(
+  options:
+    | Pick<RenderOptions, "resolution" | "decay" | "epsilon">
+    | null
+    | undefined,
+): { resolution: number; decay: number; epsilon: number } {
+  const resolution = options?.resolution ?? DEFAULT_RESOLUTION;
+  const decay = options?.decay ?? DEFAULT_DECAY;
+  const epsilon = options?.epsilon ?? DEFAULT_EPSILON;
+
+  if (resolution < 0 || resolution > 1) {
+    throw new Error("resolution must be in [0, 1]");
+  }
+  if (decay <= 0 || decay > 1) {
+    throw new Error("decay must be in (0, 1]");
+  }
+  if (epsilon < 0) {
+    throw new Error("epsilon must be >= 0");
+  }
+
+  return { resolution, decay, epsilon };
+}
+
+/**
  * Render a CAS node as YAML with resolution-based decay.
  * When resolution ≤ epsilon, nodes are rendered as opaque `cas:<hash>` references.
  * This is the synchronous version without template support.
@@ -28,20 +53,7 @@ export function render(
   hash: Hash,
   options?: RenderOptions,
 ): string {
-  const resolution = options?.resolution ?? DEFAULT_RESOLUTION;
-  const decay = options?.decay ?? DEFAULT_DECAY;
-  const epsilon = options?.epsilon ?? DEFAULT_EPSILON;
-
-  // Validate parameters
-  if (resolution < 0 || resolution > 1) {
-    throw new Error("resolution must be in [0, 1]");
-  }
-  if (decay <= 0 || decay > 1) {
-    throw new Error("decay must be in (0, 1]");
-  }
-  if (epsilon < 0) {
-    throw new Error("epsilon must be >= 0");
-  }
+  const { resolution, decay, epsilon } = validateAndExtractOptions(options);
 
   const visited = new Set<Hash>();
   return renderNode(store, hash, resolution, decay, epsilon, visited);
@@ -57,21 +69,8 @@ export async function renderAsync(
   hash: Hash,
   options?: RenderOptions,
 ): Promise<string> {
-  const resolution = options?.resolution ?? DEFAULT_RESOLUTION;
-  const decay = options?.decay ?? DEFAULT_DECAY;
-  const epsilon = options?.epsilon ?? DEFAULT_EPSILON;
+  const { resolution, decay, epsilon } = validateAndExtractOptions(options);
   const varStore = options?.varStore;
-
-  // Validate parameters
-  if (resolution < 0 || resolution > 1) {
-    throw new Error("resolution must be in [0, 1]");
-  }
-  if (decay <= 0 || decay > 1) {
-    throw new Error("decay must be in (0, 1]");
-  }
-  if (epsilon < 0) {
-    throw new Error("epsilon must be >= 0");
-  }
 
   // If varStore provided, try template rendering first
   if (varStore !== undefined) {
@@ -107,30 +106,17 @@ export async function renderAsync(
 export function renderDirect(
   typeHash: Hash,
   value: unknown,
-  store?: Store,
-  options?: Omit<RenderOptions, "varStore">,
+  store: Store | null,
+  options: Omit<RenderOptions, "varStore"> | null,
 ): string {
-  const resolution = options?.resolution ?? DEFAULT_RESOLUTION;
-  const decay = options?.decay ?? DEFAULT_DECAY;
-  const epsilon = options?.epsilon ?? DEFAULT_EPSILON;
-
-  // Validate parameters
-  if (resolution < 0 || resolution > 1) {
-    throw new Error("resolution must be in [0, 1]");
-  }
-  if (decay <= 0 || decay > 1) {
-    throw new Error("decay must be in (0, 1]");
-  }
-  if (epsilon < 0) {
-    throw new Error("epsilon must be >= 0");
-  }
+  const { resolution, decay, epsilon } = validateAndExtractOptions(options);
 
   // Try to get schema from store to identify cas_ref fields
   let refSet = new Set<Hash>();
-  if (store !== undefined) {
+  if (store !== null) {
     const schema = getSchema(store, typeHash);
     if (schema !== null) {
-      refSet = new Set(collectRefsFromSchema(schema, value));
+      refSet = new Set(collectRefs(schema, value));
     }
   }
 
@@ -146,48 +132,6 @@ export function renderDirect(
     epsilon,
     visited,
   );
-}
-
-/**
- * Collect cas_ref hashes from a value using its schema definition.
- * Mirrors the logic in schema.ts collectRefs but is local to render.
- */
-function collectRefsFromSchema(schema: JSONSchema, value: unknown): Hash[] {
-  const result: Hash[] = [];
-
-  if (schema.format === "cas_ref") {
-    if (typeof value === "string") {
-      result.push(value as Hash);
-    }
-    return result;
-  }
-
-  if (Array.isArray(schema.anyOf)) {
-    for (const sub of schema.anyOf as JSONSchema[]) {
-      result.push(...collectRefsFromSchema(sub, value));
-    }
-    return result;
-  }
-
-  if (schema.type === "array" && schema.items && Array.isArray(value)) {
-    const itemSchema = schema.items as JSONSchema;
-    for (const item of value as unknown[]) {
-      result.push(...collectRefsFromSchema(itemSchema, item));
-    }
-    return result;
-  }
-
-  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    if (schema.properties && typeof schema.properties === "object") {
-      const props = schema.properties as Record<string, JSONSchema>;
-      const obj = value as Record<string, unknown>;
-      for (const [key, subSchema] of Object.entries(props)) {
-        result.push(...collectRefsFromSchema(subSchema, obj[key]));
-      }
-    }
-  }
-
-  return result;
 }
 
 /**

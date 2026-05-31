@@ -937,23 +937,28 @@ describe("Suite 8: Performance & Edge Cases", () => {
 describe("Suite 9: renderDirect (in-memory rendering)", () => {
   test("9.1 Render primitive value without store", () => {
     const fakeTypeHash = "0000000000000" as Hash;
-    const output = renderDirect(fakeTypeHash, "hello world");
+    const output = renderDirect(fakeTypeHash, "hello world", null, null);
     expect(output.trim()).toBe("hello world");
   });
 
   test("9.2 Render object value without store", () => {
     const fakeTypeHash = "0000000000000" as Hash;
-    const output = renderDirect(fakeTypeHash, {
-      name: "Alice",
-      age: 30,
-    });
+    const output = renderDirect(
+      fakeTypeHash,
+      {
+        name: "Alice",
+        age: 30,
+      },
+      null,
+      null,
+    );
     expect(output).toContain("name: Alice");
     expect(output).toContain("age: 30");
   });
 
   test("9.3 Render array value without store", () => {
     const fakeTypeHash = "0000000000000" as Hash;
-    const output = renderDirect(fakeTypeHash, ["a", "b", "c"]);
+    const output = renderDirect(fakeTypeHash, ["a", "b", "c"], null, null);
     expect(output).toContain("-");
     expect(output).toContain("a");
     expect(output).toContain("b");
@@ -962,10 +967,15 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
 
   test("9.4 Render nested object without store", () => {
     const fakeTypeHash = "0000000000000" as Hash;
-    const output = renderDirect(fakeTypeHash, {
-      user: { name: "Bob", role: "admin" },
-      active: true,
-    });
+    const output = renderDirect(
+      fakeTypeHash,
+      {
+        user: { name: "Bob", role: "admin" },
+        active: true,
+      },
+      null,
+      null,
+    );
     expect(output).toContain("name: Bob");
     expect(output).toContain("role: admin");
     expect(output).toContain("active: true");
@@ -991,13 +1001,18 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
     });
 
     // Render directly with store — cas_ref should expand
-    const output = renderDirect(parentSchema, { child: childHash }, store);
+    const output = renderDirect(
+      parentSchema,
+      { child: childHash },
+      store,
+      null,
+    );
     expect(output).toContain("msg: inner");
   });
 
   test("9.6 Render with resolution/decay options", () => {
     const fakeTypeHash = "0000000000000" as Hash;
-    const output = renderDirect(fakeTypeHash, { key: "value" }, undefined, {
+    const output = renderDirect(fakeTypeHash, { key: "value" }, null, {
       resolution: 0.5,
       decay: 0.8,
     });
@@ -1007,19 +1022,19 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
   test("9.7 Validate parameters", () => {
     const fakeTypeHash = "0000000000000" as Hash;
     expect(() =>
-      renderDirect(fakeTypeHash, "x", undefined, { resolution: 2 }),
+      renderDirect(fakeTypeHash, "x", null, { resolution: 2 }),
     ).toThrow("resolution must be in [0, 1]");
+    expect(() => renderDirect(fakeTypeHash, "x", null, { decay: 0 })).toThrow(
+      "decay must be in (0, 1]",
+    );
     expect(() =>
-      renderDirect(fakeTypeHash, "x", undefined, { decay: 0 }),
-    ).toThrow("decay must be in (0, 1]");
-    expect(() =>
-      renderDirect(fakeTypeHash, "x", undefined, { epsilon: -1 }),
+      renderDirect(fakeTypeHash, "x", null, { epsilon: -1 }),
     ).toThrow("epsilon must be >= 0");
   });
 
   test("9.8 Render null value", () => {
     const fakeTypeHash = "0000000000000" as Hash;
-    const output = renderDirect(fakeTypeHash, null);
+    const output = renderDirect(fakeTypeHash, null, null, null);
     expect(output.trim()).toBe("null");
   });
 
@@ -1027,8 +1042,16 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
     // Without store, can't identify cas_ref fields — hash strings stay as strings
     const fakeTypeHash = "0000000000000" as Hash;
     const someHash = "ABCDEFGH12345" as Hash;
-    const output = renderDirect(fakeTypeHash, { ref: someHash });
+    const output = renderDirect(fakeTypeHash, { ref: someHash }, null, null);
     // Without store, it's just a string value
     expect(output).toContain(`ref: ${someHash}`);
+  });
+
+  test("9.10 store present but schema missing — renders without ref expansion", async () => {
+    const store = createMemoryStore();
+    await bootstrap(store);
+    const unknownType = "ZZZZZZZZZZZZ0" as Hash;
+    const output = renderDirect(unknownType, { key: "val" }, store, null);
+    expect(output).toContain("key: val");
   });
 });

@@ -390,6 +390,10 @@ async function cmdRender(args: string[]): Promise<void> {
   const isPipe = flags.pipe === true || flags.p === true;
   const hash = args[0];
 
+  if (isPipe && hash) {
+    die("Cannot use --pipe/-p with a hash argument. Use one or the other.");
+  }
+
   if (!isPipe && !hash) {
     die(
       "Usage: ucas render <hash> [--resolution <n>] [--decay <n>] [--epsilon <n>]\n       ucas render --pipe/-p [--resolution <n>] [--decay <n>] [--epsilon <n>]",
@@ -426,7 +430,11 @@ async function cmdRender(args: string[]): Promise<void> {
   try {
     if (isPipe) {
       // Read { type, value } JSON from stdin
-      const input = readFileSync("/dev/stdin", "utf-8").trim();
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(chunk as Buffer);
+      }
+      const input = Buffer.concat(chunks).toString("utf-8").trim();
       if (!input) {
         die("No input on stdin. Pipe a { type, value } JSON envelope.");
       }
@@ -448,11 +456,22 @@ async function cmdRender(args: string[]): Promise<void> {
         die("Invalid envelope. Expected { type: string, value: unknown }.");
       }
 
+      // Validate type hash format: 13-char uppercase Crockford Base32
+      if (!/^[0-9A-Z]{13}$/.test(envelope.type)) {
+        die(
+          `Invalid type hash: "${envelope.type}". Expected 13-character uppercase Crockford Base32 string.`,
+        );
+      }
+
       const output = renderDirect(
         envelope.type as Hash,
         envelope.value,
         store,
-        { resolution, decay, epsilon },
+        {
+          resolution,
+          decay,
+          epsilon,
+        },
       );
       process.stdout.write(output);
     } else {
