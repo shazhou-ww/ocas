@@ -112,12 +112,26 @@ function readJsonFile(file: string): unknown {
   }
 }
 
-function openStore(): Store {
-  return createFsStore(resolve(storePath));
+/**
+ * Validate that the store directory exists.
+ * Dies with a clear error message if not found.
+ */
+function validateStoreExists(path: string): void {
+  if (!existsSync(path)) {
+    die(`Store not found at ${path}`);
+  }
+}
+
+function openStore(shouldCreate = false): Store {
+  const fullPath = resolve(storePath);
+  if (!shouldCreate) {
+    validateStoreExists(fullPath);
+  }
+  return createFsStore(fullPath);
 }
 
 function openVarStore(): VariableStore {
-  const store = openStore();
+  const store = openStore(true);
   mkdirSync(resolve(storePath), { recursive: true });
   return createVariableStore(resolve(varDbPath), store);
 }
@@ -127,9 +141,12 @@ function openVarStore(): VariableStore {
  * If the input starts with @, resolve it via bootstrap
  * Otherwise, return the hash as-is
  */
-async function resolveTypeHash(typeHashOrAlias: string): Promise<Hash> {
+async function resolveTypeHash(
+  typeHashOrAlias: string,
+  shouldCreate = false,
+): Promise<Hash> {
   if (typeHashOrAlias.startsWith("@")) {
-    const store = openStore();
+    const store = openStore(shouldCreate);
     const builtinSchemas = await bootstrap(store);
     const resolvedHash = builtinSchemas[typeHashOrAlias];
     if (!resolvedHash) {
@@ -233,7 +250,7 @@ async function cmdInit(): Promise<void> {
 }
 
 async function cmdBootstrap(): Promise<void> {
-  const store = openStore();
+  const store = openStore(true);
   const builtinSchemas = await bootstrap(store);
   const metaHash = builtinSchemas["@schema"];
   console.log(metaHash);
@@ -243,7 +260,7 @@ async function cmdSchemaPut(args: string[]): Promise<void> {
   const file = args[0];
   if (!file) die("Usage: json-cas schema put <file.json>");
   const schema = readJsonFile(file) as JSONSchema;
-  const store = openStore();
+  const store = openStore(true);
   try {
     const hash = await putSchema(store, schema);
     console.log(hash);
@@ -299,9 +316,9 @@ async function cmdPut(args: string[]): Promise<void> {
   const file = args[1];
   if (!typeHashOrAlias || !file)
     die("Usage: json-cas put <type-hash> <file.json>");
-  const typeHash = await resolveTypeHash(typeHashOrAlias);
+  const typeHash = await resolveTypeHash(typeHashOrAlias, true);
   const payload = readJsonFile(file);
-  const store = openStore();
+  const store = openStore(true);
 
   // Check if schema exists
   const schema = getSchema(store, typeHash);
@@ -405,7 +422,7 @@ async function cmdHash(args: string[]): Promise<void> {
   const file = args[1];
   if (!typeHashOrAlias || !file)
     die("Usage: json-cas hash <type-hash> <file.json>");
-  const typeHash = await resolveTypeHash(typeHashOrAlias);
+  const typeHash = await resolveTypeHash(typeHashOrAlias, true);
   const payload = readJsonFile(file);
   const hash = await computeHash(typeHash, payload);
   console.log(hash);
