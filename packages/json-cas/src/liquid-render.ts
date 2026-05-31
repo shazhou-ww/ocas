@@ -1,4 +1,5 @@
 import { type Context, Liquid, type TagToken } from "liquidjs";
+import { putSchema } from "./schema.js";
 import type { Hash, Store } from "./types.js";
 import type { VariableStore } from "./variable-store.js";
 
@@ -12,15 +13,6 @@ const DEFAULT_RESOLUTION = 1.0;
 const DEFAULT_DECAY = 0.5;
 const DEFAULT_EPSILON = 0.01;
 const FLOAT_TOLERANCE = 1e-10;
-
-// Context for render operations
-type RenderContext = {
-  store: Store;
-  varStore: VariableStore;
-  globalDecay: number;
-  epsilon: number;
-  engine: Liquid | null;
-};
 
 /**
  * Render a CAS node using LiquidJS templates with resolution-based decay.
@@ -48,25 +40,30 @@ export async function renderWithTemplate(
   }
 
   const visited = new Set<Hash>();
-  const ctx: RenderContext = {
+
+  // Create Liquid engine
+  const engine = createLiquidEngine(store, varStore, decay);
+
+  return await renderNode(
+    engine,
     store,
     varStore,
-    globalDecay: decay,
+    hash,
+    resolution,
+    decay,
     epsilon,
-    engine: null,
-  };
-
-  const engine = createLiquidEngine(ctx);
-  ctx.engine = engine;
-
-  return await renderNode(ctx, hash, resolution, visited);
+    visited,
+  );
 }
 
 /**
  * Create a Liquid engine instance with custom render tag
- * Returns both the engine and a function to register the render tag
  */
-function createLiquidEngine(ctx: RenderContext): Liquid {
+function createLiquidEngine(
+  store: Store,
+  varStore: VariableStore,
+  globalDecay: number,
+): Liquid {
   const engine = new Liquid({
     strictFilters: false,
     strictVariables: false,
@@ -79,7 +76,7 @@ function createLiquidEngine(ctx: RenderContext): Liquid {
   };
 
   // Register custom {% render %} tag
-  // We need to capture ctx in closure
+  // Capture store, varStore, globalDecay in closure
   engine.registerTag("render", {
     parse(token: TagToken) {
       // Parse "variable" or "variable, decay: 0.7" syntax
@@ -129,6 +126,7 @@ function createLiquidEngine(ctx: RenderContext): Liquid {
 
       // Get current render context
       const currentResolution = ctxLiquid.get(["resolution"]) as number;
+      const currentEpsilon = ctxLiquid.get(["epsilon"]) as number;
 
       // Compute child resolution using decay priority:
       // 1. Template explicit decay (explicitDecay)
@@ -137,12 +135,21 @@ function createLiquidEngine(ctx: RenderContext): Liquid {
       const effectiveDecay =
         explicitDecay !== undefined
           ? explicitDecay
-          : (ctx.globalDecay ?? DEFAULT_DECAY);
+          : (globalDecay ?? DEFAULT_DECAY);
       const childResolution = currentResolution * effectiveDecay;
 
       // Recursively render the referenced node
       const visited = ctxLiquid.get(["__visited"]) as Set<Hash>;
-      const output = await renderNode(ctx, nodeHash, childResolution, visited);
+      const output = await renderNode(
+        engine,
+        store,
+        varStore,
+        nodeHash,
+        childResolution,
+        globalDecay,
+        currentEpsilon,
+        visited,
+      );
 
       return output;
     },
@@ -155,18 +162,22 @@ function createLiquidEngine(ctx: RenderContext): Liquid {
  * Render a single node with template or fallback to cas: reference
  */
 async function renderNode(
-  ctx: RenderContext,
+  engine: Liquid,
+  store: Store,
+  varStore: VariableStore,
   hash: Hash,
   currentResolution: number,
+  globalDecay: number,
+  epsilon: number,
   visited: Set<Hash>,
 ): Promise<string> {
   // Check if resolution is below threshold
-  if (currentResolution < ctx.epsilon + FLOAT_TOLERANCE) {
+  if (currentResolution < epsilon + FLOAT_TOLERANCE) {
     return `cas:${hash}`;
   }
 
   // Fetch the node
-  const node = ctx.store.get(hash);
+  const node = store.get(hash);
   if (node === null) {
     return `cas:${hash}`;
   }
@@ -179,19 +190,19 @@ async function renderNode(
 
   try {
     // Try to find a template for this node's type
-    const template = await findTemplate(ctx.store, ctx.varStore, node.type);
+    const template = await findTemplate(store, varStore, node.type);
 
     if (template === null) {
       // No template found - this is handled by the caller (fallback to YAML)
       // For now, return a simple representation
       visited.delete(hash);
-      return renderFallback(ctx.store, node.payload);
+      return renderFallback(store, node.payload);
     }
 
     // Render using the template
     const context = {
       resolution: currentResolution,
-      epsilon: ctx.epsilon,
+      epsilon,
       hash,
       payload: node.payload,
       type: node.type,
@@ -199,7 +210,7 @@ async function renderNode(
       __visited: visited, // Pass visited set through context
     };
 
-    const output = await ctx.engine.parseAndRender(template, context);
+    const output = await engine.parseAndRender(template, context);
 
     visited.delete(hash);
     return output;
@@ -221,12 +232,9 @@ async function findTemplate(
 
   try {
     // Find the string schema hash (we need this to query variables)
-    const stringSchemaNode = await findStringSchema(store);
-    if (stringSchemaNode === null) {
-      return null;
-    }
+    const stringSchema = await putSchema(store, { type: "string" });
 
-    const variable = varStore.get(varName, stringSchemaNode);
+    const variable = varStore.get(varName, stringSchema);
     if (variable === null) {
       return null;
     }
@@ -245,20 +253,6 @@ async function findTemplate(
   } catch {
     return null;
   }
-}
-
-/**
- * Find the hash of the string schema
- */
-async function findStringSchema(store: Store): Promise<Hash | null> {
-  // The string schema is { type: "string" }
-  // We need to compute its hash or find it in the store
-  // For now, we'll use a heuristic: look for a schema with this exact structure
-
-  // Import putSchema to compute the hash
-  const { putSchema } = await import("./schema.js");
-  const stringSchema = await putSchema(store, { type: "string" });
-  return stringSchema;
 }
 
 /**

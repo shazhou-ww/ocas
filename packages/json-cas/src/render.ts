@@ -1,4 +1,5 @@
-import { refs } from "./schema.js";
+import { renderWithTemplate } from "./liquid-render.js";
+import { putSchema, refs } from "./schema.js";
 import type { Hash, Store } from "./types.js";
 import type { VariableStore } from "./variable-store.js";
 
@@ -74,7 +75,6 @@ export async function renderAsync(
   // If varStore provided, try template rendering first
   if (varStore !== undefined) {
     try {
-      const { renderWithTemplate } = await import("./liquid-render.js");
       const node = store.get(hash);
       if (node !== null) {
         // Check if a template exists for this type
@@ -107,7 +107,6 @@ async function hasTemplate(
 ): Promise<boolean> {
   const varName = `@ucas/template/text/${typeHash}`;
   try {
-    const { putSchema } = await import("./schema.js");
     const stringSchema = await putSchema(store, { type: "string" });
     const variable = varStore.get(varName, stringSchema);
     return variable !== null;
