@@ -116,6 +116,7 @@ export class VariableStore {
 
   /**
    * Validate variable name format
+   * @ is allowed at the start of the first segment (system-reserved)
    */
   private validateName(name: string): void {
     // Rule 1: Cannot be empty
@@ -139,9 +140,10 @@ export class VariableStore {
       );
     }
 
-    // Rule 4: Each segment must match [a-zA-Z0-9._-]+ and no empty segments
+    // Rule 4: Each segment must match [a-zA-Z0-9._-]+ (with @ allowed at start of first segment)
     const segments = name.split("/");
-    for (const segment of segments) {
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i] as string;
       if (segment === "") {
         throw new InvalidVariableNameError(
           name,
@@ -150,10 +152,12 @@ export class VariableStore {
       }
 
       // Check for invalid characters
-      if (!/^[a-zA-Z0-9._-]+$/.test(segment)) {
+      // First segment can start with @, all segments can contain [a-zA-Z0-9._-]
+      const regex = i === 0 ? /^@?[a-zA-Z0-9._-]+$/ : /^[a-zA-Z0-9._-]+$/;
+      if (!regex.test(segment)) {
         throw new InvalidVariableNameError(
           name,
-          `Segment "${segment}" contains invalid characters (only a-z, A-Z, 0-9, ., _, - allowed)`,
+          `Segment "${segment}" contains invalid characters (only ${i === 0 ? "@, " : ""}a-z, A-Z, 0-9, ., _, - allowed)`,
         );
       }
     }

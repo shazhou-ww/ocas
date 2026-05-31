@@ -15,7 +15,8 @@ import type { CasNode } from "../src/types.js";
 describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
   test("1.1: Meta-schema is a valid JSON Schema", async () => {
     const store = new MemStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const metaNode = store.get(metaHash);
 
     expect(metaNode).not.toBeNull();
@@ -25,7 +26,8 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.2: Meta-schema self-validates", async () => {
     const store = new MemStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const metaNode = store.get(metaHash);
 
     expect(metaNode).not.toBeNull();
@@ -34,7 +36,8 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.3: Meta-schema defines all supported keywords", async () => {
     const store = new MemStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();
@@ -57,7 +60,8 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.4: Meta-schema does not include unsupported keywords", async () => {
     const store = new MemStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();
@@ -74,7 +78,8 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.5: Meta-schema node type equals its own hash", async () => {
     const store = new MemStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const metaNode = store.get(metaHash);
 
     expect(metaNode).not.toBeNull();
@@ -443,7 +448,8 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
   test("5.1: Bootstrap hash changes (breaking change)", async () => {
     // This is a documentation test - the old hash was different
     const store = new MemStore();
-    const newMetaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const newMetaHash = builtinSchemas["@schema"] ?? "";
 
     // The new hash should be different from the old system metadata hash
     // We just verify it's a valid hash format
@@ -585,7 +591,8 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
 describe("Test Suite 7: Meta-Schema Content Validation", () => {
   test("7.1: Meta-schema allows recursive schema definitions", async () => {
     const store = new MemStore();
-    const metaHash = await bootstrap(store);
+    const builtinSchemas = await bootstrap(store);
+    const metaHash = builtinSchemas["@schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();

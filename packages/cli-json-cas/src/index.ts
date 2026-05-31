@@ -110,6 +110,24 @@ function openVarStore(): VariableStore {
 }
 
 /**
+ * Resolve a type-hash, handling @ aliases
+ * If the input starts with @, resolve it via bootstrap
+ * Otherwise, return the hash as-is
+ */
+async function resolveTypeHash(typeHashOrAlias: string): Promise<Hash> {
+  if (typeHashOrAlias.startsWith("@")) {
+    const store = openStore();
+    const builtinSchemas = await bootstrap(store);
+    const resolvedHash = builtinSchemas[typeHashOrAlias];
+    if (!resolvedHash) {
+      die(`Schema not found: ${typeHashOrAlias}`);
+    }
+    return resolvedHash;
+  }
+  return typeHashOrAlias;
+}
+
+/**
  * Get the Variable schema's CAS hash
  * This is the type hash used in JSON envelopes
  */
@@ -196,14 +214,16 @@ async function cmdInit(): Promise<void> {
   const dir = resolve(storePath);
   mkdirSync(dir, { recursive: true });
   const store = createFsStore(dir);
-  const hash = await bootstrap(store);
-  console.log(hash);
+  const builtinSchemas = await bootstrap(store);
+  const metaHash = builtinSchemas["@schema"];
+  console.log(metaHash);
 }
 
 async function cmdBootstrap(): Promise<void> {
   const store = openStore();
-  const hash = await bootstrap(store);
-  console.log(hash);
+  const builtinSchemas = await bootstrap(store);
+  const metaHash = builtinSchemas["@schema"];
+  console.log(metaHash);
 }
 
 async function cmdSchemaPut(args: string[]): Promise<void> {
@@ -216,17 +236,20 @@ async function cmdSchemaPut(args: string[]): Promise<void> {
 }
 
 async function cmdSchemaGet(args: string[]): Promise<void> {
-  const hash = args[0];
-  if (!hash) die("Usage: json-cas schema get <type-hash>");
+  const hashOrAlias = args[0];
+  if (!hashOrAlias) die("Usage: json-cas schema get <type-hash>");
+  const hash = await resolveTypeHash(hashOrAlias);
   const store = openStore();
   const schema = getSchema(store, hash);
-  if (schema === null) die(`Schema not found: ${hash}`);
+  if (schema === null) die(`Schema not found: ${hashOrAlias}`);
   out(schema);
 }
 
 async function cmdSchemaList(): Promise<void> {
   const store = openStore();
-  const metaHash = await bootstrap(store);
+  const builtinSchemas = await bootstrap(store);
+  const metaHash = builtinSchemas["@schema"];
+  if (!metaHash) throw new Error("Meta-schema not found");
   for (const hash of store.listByType(metaHash)) {
     if (hash === metaHash) continue;
     const node = store.get(hash);
@@ -252,9 +275,11 @@ async function cmdSchemaValidate(args: string[]): Promise<void> {
 }
 
 async function cmdPut(args: string[]): Promise<void> {
-  const typeHash = args[0];
+  const typeHashOrAlias = args[0];
   const file = args[1];
-  if (!typeHash || !file) die("Usage: json-cas put <type-hash> <file.json>");
+  if (!typeHashOrAlias || !file)
+    die("Usage: json-cas put <type-hash> <file.json>");
+  const typeHash = await resolveTypeHash(typeHashOrAlias);
   const payload = readJsonFile(file);
   const store = openStore();
   const hash = await store.put(typeHash, payload);
@@ -339,9 +364,11 @@ async function cmdWalk(args: string[]): Promise<void> {
 }
 
 async function cmdHash(args: string[]): Promise<void> {
-  const typeHash = args[0];
+  const typeHashOrAlias = args[0];
   const file = args[1];
-  if (!typeHash || !file) die("Usage: json-cas hash <type-hash> <file.json>");
+  if (!typeHashOrAlias || !file)
+    die("Usage: json-cas hash <type-hash> <file.json>");
+  const typeHash = await resolveTypeHash(typeHashOrAlias);
   const payload = readJsonFile(file);
   const hash = await computeHash(typeHash, payload);
   console.log(hash);
