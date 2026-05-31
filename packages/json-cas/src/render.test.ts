@@ -1067,7 +1067,9 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
     await expect(renderAsync(store, fakeHash)).rejects.toThrow(
       CasNodeNotFoundError,
     );
-    await expect(renderAsync(store, fakeHash)).rejects.toThrow("Node not found");
+    await expect(renderAsync(store, fakeHash)).rejects.toThrow(
+      "Node not found",
+    );
     await expect(renderAsync(store, fakeHash)).rejects.toThrow(fakeHash);
   });
 

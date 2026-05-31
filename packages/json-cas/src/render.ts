@@ -1,8 +1,8 @@
 import { renderWithTemplate } from "./liquid-render.js";
 import { collectRefs, getSchema, putSchema, refs } from "./schema.js";
 import type { Hash, Store } from "./types.js";
-import { CasNodeNotFoundError } from "./variable-store.js";
 import type { VariableStore } from "./variable-store.js";
+import { CasNodeNotFoundError } from "./variable-store.js";
 
 export type RenderOptions = {
   resolution?: number; // (0, 1], default 1.0
