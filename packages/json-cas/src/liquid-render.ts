@@ -1,13 +1,8 @@
 import { type Context, Liquid, type TagToken } from "liquidjs";
+import type { RenderOptions } from "./render.js";
 import { putSchema } from "./schema.js";
 import type { Hash, Store } from "./types.js";
 import type { VariableStore } from "./variable-store.js";
-
-export type RenderOptions = {
-  resolution?: number; // (0, 1], default 1.0
-  decay?: number; // (0, 1], default 0.5
-  epsilon?: number; // >= 0, default 0.01
-};
 
 const DEFAULT_RESOLUTION = 1.0;
 const DEFAULT_DECAY = 0.5;
@@ -50,7 +45,6 @@ export async function renderWithTemplate(
     varStore,
     hash,
     resolution,
-    decay,
     epsilon,
     visited,
   );
@@ -146,7 +140,6 @@ function createLiquidEngine(
         varStore,
         nodeHash,
         childResolution,
-        globalDecay,
         currentEpsilon,
         visited,
       );
@@ -167,7 +160,6 @@ async function renderNode(
   varStore: VariableStore,
   hash: Hash,
   currentResolution: number,
-  _globalDecay: number,
   epsilon: number,
   visited: Set<Hash>,
 ): Promise<string> {
