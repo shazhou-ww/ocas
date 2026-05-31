@@ -59,6 +59,23 @@ function envValue(json: string): unknown {
   return (JSON.parse(json) as { value: unknown }).value;
 }
 
+/** Run a CLI command feeding `stdin` to its standard input. */
+async function runCliWithStdin(
+  args: string[],
+  stdin: string,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const proc = Bun.spawn(
+    ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, ...args],
+    { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+  );
+  proc.stdin.write(stdin);
+  proc.stdin.end();
+  const exitCode = await proc.exited;
+  const stdout = (await new Response(proc.stdout).text()).trim();
+  const stderr = (await new Response(proc.stderr).text()).trim();
+  return { stdout, stderr, exitCode };
+}
+
 // ---- Phase 1: CAS Core ----
 
 describe("Phase 1: CAS Core", () => {
@@ -336,27 +353,29 @@ describe("Phase 4: Template System", () => {
       tmplFile,
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("4.2 template get returns template text", async () => {
     const { stdout, exitCode } = await runCli(["template", "get", typeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toBe("Name: {{ payload.name }}, Age: {{ payload.age }}");
-    expect(stdout).toMatchSnapshot();
+    expect(envValue(stdout)).toBe(
+      "Name: {{ payload.name }}, Age: {{ payload.age }}",
+    );
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("4.3 template list shows registered templates", async () => {
     const { stdout, exitCode } = await runCli(["template", "list"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain(typeHash);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("4.4 template delete removes template", async () => {
     const { exitCode, stdout } = await runCli(["template", "delete", typeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("4.5 template get deleted template returns not found", async () => {
@@ -518,5 +537,94 @@ describe("Phase 7: Edge Cases", () => {
     const stderr = (await new Response(proc.stderr).text()).trim();
     expect(exitCode).not.toBe(0);
     expect(stderr).toContain("not a directory");
+  });
+});
+
+// ---- Phase 8: Pipe Composition ----
+//
+// Every JSON command emits a { type, value } envelope, so its stdout can be
+// fed straight into `render --pipe` (which renders the envelope value) or into
+// any downstream JSON consumer. These tests verify the envelopes compose
+// end-to-end.
+
+describe("Phase 8: Pipe Composition", () => {
+  test("8.1 put | render -p expands the stored hash to its content", async () => {
+    const nodeFile = join(tmpStore, "pipe-node.json");
+    writeFileSync(nodeFile, JSON.stringify({ name: "Bob", age: 42 }));
+
+    const { stdout: putOut, exitCode: putExit } = await runCli([
+      "put",
+      typeHash,
+      nodeFile,
+    ]);
+    expect(putExit).toBe(0);
+
+    // The put envelope value is a cas_ref hash; render -p dereferences it and
+    // renders the stored node's payload.
+    const { stdout, exitCode } = await runCliWithStdin(
+      ["render", "--pipe"],
+      putOut,
+    );
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Bob");
+  });
+
+  test("8.2 gc | render -p renders the gc stats", async () => {
+    const { stdout: gcOut, exitCode: gcExit } = await runCli(["gc"]);
+    expect(gcExit).toBe(0);
+
+    const { stdout, exitCode } = await runCliWithStdin(
+      ["render", "--pipe"],
+      gcOut,
+    );
+    expect(exitCode).toBe(0);
+    // gc value is an object { total, reachable, collected, scanned }
+    expect(stdout).toContain("total:");
+  });
+
+  test("8.3 list --type @schema emits a parseable envelope of hashes", async () => {
+    const { stdout, exitCode } = await runCli(["list", "--type", "@schema"]);
+    expect(exitCode).toBe(0);
+
+    // Downstream consumers (jq, etc.) read the `value` array of hashes.
+    const value = envValue(stdout) as string[];
+    expect(Array.isArray(value)).toBe(true);
+    for (const hash of value) {
+      expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    }
+  });
+
+  test("8.4 list --type @schema | render -p expands the schema list", async () => {
+    const { stdout: listOut } = await runCli(["list", "--type", "@schema"]);
+    // list result items are cas_ref hashes; render -p dereferences each one
+    // and renders the schema contents.
+    const { stdout, exitCode } = await runCliWithStdin(
+      ["render", "--pipe"],
+      listOut,
+    );
+    expect(exitCode).toBe(0);
+    expect(stdout.length).toBeGreaterThan(0);
+  });
+
+  test("8.5 render <hash> uses a registered template", async () => {
+    // Register a template for the schema, then render a fresh node by hash.
+    const tmplFile = join(tmpStore, "pipe-render.liquid");
+    writeFileSync(tmplFile, "Person: {{ payload.name }} ({{ payload.age }})");
+    const { exitCode: setExit } = await runCli([
+      "template",
+      "set",
+      typeHash,
+      tmplFile,
+    ]);
+    expect(setExit).toBe(0);
+
+    const nodeFile = join(tmpStore, "pipe-render-node.json");
+    writeFileSync(nodeFile, JSON.stringify({ name: "Carol", age: 25 }));
+    const { stdout: putOut } = await runCli(["put", typeHash, nodeFile]);
+    const freshHash = envValue(putOut) as string;
+
+    const { stdout, exitCode } = await runCli(["render", freshHash]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("Person: Carol (25)");
   });
 });

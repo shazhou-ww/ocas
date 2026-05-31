@@ -656,10 +656,12 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     const varName = `@ucas/template/text/${schemaHash}`;
     varStore.set(varName, contentHash);
 
-    out({
-      schemaHash,
-      contentHash,
-    });
+    out(
+      await wrapEnvelope(store, "@output/template-set", {
+        schemaHash,
+        contentHash,
+      }),
+    );
   } catch (e) {
     if (e instanceof CasNodeNotFoundError) {
       die(`Error: ${e.message}`);
@@ -695,8 +697,9 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
       die(`Error: Content not found in CAS: ${variable.value}`);
     }
 
-    // Output raw text (not JSON)
-    process.stdout.write(node.payload as string);
+    out(
+      await wrapEnvelope(store, "@output/template-get", node.payload as string),
+    );
   } finally {
     varStore.close();
   }
@@ -713,24 +716,12 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
       schema: stringHash,
     });
 
-    const templates = variables.map((v) => {
-      const schemaHash = v.name.replace("@ucas/template/text/", "");
+    const templates = variables.map((v) => ({
+      schemaHash: v.name.replace("@ucas/template/text/", ""),
+      contentHash: v.value,
+    }));
 
-      // Get content for preview
-      const node = store.get(v.value);
-      const content = (node?.payload as string | undefined) ?? "";
-
-      // Truncate preview to 80 chars
-      const preview =
-        content.length > 80 ? `${content.slice(0, 77)}...` : content;
-
-      return {
-        schemaHash,
-        preview,
-      };
-    });
-
-    out(templates);
+    out(await wrapEnvelope(store, "@output/template-list", templates));
   } finally {
     varStore.close();
   }
@@ -751,7 +742,9 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
     const stringHash = await resolveTypeHash("@string");
     varStore.remove(varName, stringHash);
 
-    out({ deleted: true });
+    out(
+      await wrapEnvelope(store, "@output/template-delete", { deleted: true }),
+    );
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
       die(`Error: Template not found for schema: ${schemaHash}`);
@@ -788,27 +781,31 @@ function printUsage(): void {
   console.log(`\
 Usage: json-cas [--store <path>] [--json] <command> [args]
 
+All JSON commands emit a { type, value } envelope. The type is the hash of the
+command's @output/* schema (shown in parentheses); pipe any envelope into
+\`render -p\` to render its value (cas_ref hashes are expanded).
+
 Commands:
-  put <type-hash> <file.json>       Store node, print { type, value } envelope (value=hash)
-  get <hash>                        Print node as { type, value } envelope
-  has <hash>                        Print { type, value } envelope (value=boolean)
-  verify <hash>                     Verify integrity + schema → { type, value } (value=ok/corrupted/invalid)
-  refs <hash>                       List direct cas_ref edges
-  walk <hash> [--format tree]       Recursive traversal
-  hash <type-hash> <file.json>      Compute hash without storing → { type, value } envelope
-  render <hash> [options]           Render node as YAML with resolution decay
-  render --pipe/-p [options]        Render { type, value } from stdin
-  list --type <hash-or-alias>       List hashes for a type → { type, value } envelope (value=string[])
-  var set <name> <hash> [--tag <tag>...] Create/update a variable
-  var get <name> --schema <hash>    Get a variable by name + schema
-  var delete <name> [--schema <hash>] Delete variable(s)
-  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables
-  var tag <name> --schema <hash> <operations...> Modify tags/labels
-  template set <schema-hash> <file> | --inline <text> Set template for schema
-  template get <schema-hash>        Get template content as raw text
-  template list                     List all templates
-  template delete <schema-hash>     Delete template for schema
-  gc                                Run garbage collection
+  put <type-hash> <file.json>       Store node, print envelope (value=hash)            (@output/put)
+  get <hash>                        Print node as envelope                             (@output/get)
+  has <hash>                        Print envelope (value=boolean)                     (@output/has)
+  verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@output/verify)
+  refs <hash>                       List direct cas_ref edges                          (@output/refs)
+  walk <hash> [--format tree]       Recursive traversal                                (@output/walk)
+  hash <type-hash> <file.json>      Compute hash without storing                       (@output/hash)
+  render <hash> [options]           Render node as text with resolution decay (raw output)
+  render --pipe/-p [options]        Render { type, value } from stdin (raw output)
+  list --type <hash-or-alias>       List hashes for a type (value=string[])            (@output/list)
+  var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@output/var-set)
+  var get <name> --schema <hash>    Get a variable by name + schema                    (@output/var-get)
+  var delete <name> [--schema <hash>] Delete variable(s)                               (@output/var-delete)
+  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@output/var-list)
+  var tag <name> --schema <hash> <operations...> Modify tags/labels                    (@output/var-tag)
+  template set <schema-hash> <file> | --inline <text> Set template for schema          (@output/template-set)
+  template get <schema-hash>        Get template content (value=string)                (@output/template-get)
+  template list                     List all templates                                 (@output/template-list)
+  template delete <schema-hash>     Delete template for schema                         (@output/template-delete)
+  gc                                Run garbage collection                             (@output/gc)
 
 Flags:
   --store <path>      Store directory (default: ~/.uncaged/json-cas)
