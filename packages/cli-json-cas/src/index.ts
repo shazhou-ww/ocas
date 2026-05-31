@@ -17,6 +17,7 @@ import {
   refs,
   renderAsync,
   renderDirect,
+  SchemaValidationError,
   TagLabelConflictError,
   VariableNotFoundError,
   validate,
@@ -243,8 +244,15 @@ async function cmdSchemaPut(args: string[]): Promise<void> {
   if (!file) die("Usage: json-cas schema put <file.json>");
   const schema = readJsonFile(file) as JSONSchema;
   const store = openStore();
-  const hash = await putSchema(store, schema);
-  console.log(hash);
+  try {
+    const hash = await putSchema(store, schema);
+    console.log(hash);
+  } catch (e) {
+    if (e instanceof SchemaValidationError) {
+      die(e.message);
+    }
+    throw e;
+  }
 }
 
 async function cmdSchemaGet(args: string[]): Promise<void> {

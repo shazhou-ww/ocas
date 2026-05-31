@@ -1308,3 +1308,137 @@ describe("Suite 6: CLI Integration with Templates", () => {
     }
   });
 });
+
+// ---- schema put - invalid schema error handling ----
+
+describe("schema put - invalid schema error handling", () => {
+  test("invalid schema - unknown type value shows clean error", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "invalid-schema.json");
+      writeFileSync(schemaFile, JSON.stringify({ type: "invalid" }));
+
+      const { exitCode, stderr, stdout } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("Invalid schema");
+      expect(stderr).not.toContain("at ");
+      expect(stdout).toBe("");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("invalid schema - unknown key shows clean error", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "invalid-schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({ type: "string", unknownKey: true }),
+      );
+
+      const { exitCode, stderr, stdout } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("Invalid schema");
+      expect(stderr).not.toContain("at ");
+      expect(stdout).toBe("");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("invalid schema - invalid nested schema shows clean error", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "invalid-schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: {
+            name: { type: "invalid" },
+          },
+        }),
+      );
+
+      const { exitCode, stderr, stdout } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("Invalid schema");
+      expect(stderr).not.toContain("at ");
+      expect(stdout).toBe("");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("invalid schema - non-object root shows clean error", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "invalid-schema.json");
+      writeFileSync(schemaFile, JSON.stringify(["type", "string"]));
+
+      const { exitCode, stderr, stdout } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("Invalid schema");
+      expect(stderr).not.toContain("at ");
+      expect(stdout).toBe("");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("valid schema still works (regression)", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "valid-schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            age: { type: "number" },
+          },
+          required: ["name"],
+        }),
+      );
+
+      const { exitCode, stderr, stdout } = await runCli(
+        ["schema", "put", schemaFile],
+        tmpStore,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stderr).toBe("");
+      expect(stdout.trim()).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+});
