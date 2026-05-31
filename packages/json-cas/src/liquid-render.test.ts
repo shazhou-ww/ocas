@@ -1241,3 +1241,609 @@ describe("Suite 8: Performance & Scalability", () => {
     }
   });
 });
+
+describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
+  test("9.1 Direct Property Access - Should Render Empty", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema for person object
+      const personSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          age: { type: "number" },
+        },
+      });
+
+      // Create node with data
+      const personHash = await store.put(personSchema, {
+        name: "Alice",
+        age: 30,
+      });
+
+      // Register template using direct property access (incorrect syntax)
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Name: {{ name }}, Age: {{ age }}",
+      );
+      varStore.set(`@ucas/template/text/${personSchema}`, templateHash);
+
+      // Render - should produce empty values
+      const output = await renderWithTemplate(store, varStore, personHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Name: , Age: ");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.2 Correct Syntax with payload Prefix", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema for person object
+      const personSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          age: { type: "number" },
+        },
+      });
+
+      // Create node with data
+      const personHash = await store.put(personSchema, {
+        name: "Alice",
+        age: 30,
+      });
+
+      // Register template using correct payload. prefix
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Name: {{ payload.name }}, Age: {{ payload.age }}",
+      );
+      varStore.set(`@ucas/template/text/${personSchema}`, templateHash);
+
+      // Render - should produce correct values
+      const output = await renderWithTemplate(store, varStore, personHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Name: Alice, Age: 30");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.3 CLI Render Command - Template Variable Access", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema and node
+      const personSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          age: { type: "number" },
+        },
+      });
+
+      const personHash = await store.put(personSchema, {
+        name: "Bob",
+        age: 25,
+      });
+
+      // Register template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "User: {{ payload.name }}, Age: {{ payload.age }}",
+      );
+      varStore.set(`@ucas/template/text/${personSchema}`, templateHash);
+
+      // This simulates the CLI flow
+      const output = await renderWithTemplate(store, varStore, personHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toContain("User: Bob");
+      expect(output).toContain("Age: 25");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.4 Top-Level Primitive Payload - String", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema for simple string
+      const stringSchema = await putSchema(store, { type: "string" });
+
+      // Create node with string payload
+      const stringHash = await store.put(stringSchema, "Hello World");
+
+      // Register template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Value is: {{ payload }}",
+      );
+      varStore.set(`@ucas/template/text/${stringSchema}`, templateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, stringHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Value is: Hello World");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.5 Top-Level Primitive Payload - Number", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema for number
+      const numberSchema = await putSchema(store, { type: "number" });
+
+      // Create node with number payload
+      const numberHash = await store.put(numberSchema, 42);
+
+      // Register template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "The answer is {{ payload }}",
+      );
+      varStore.set(`@ucas/template/text/${numberSchema}`, templateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, numberHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("The answer is 42");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.6 Nested Object Property Access", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema for nested object
+      const userSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          user: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              address: {
+                type: "object",
+                properties: {
+                  city: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Create node with nested data
+      const userHash = await store.put(userSchema, {
+        user: {
+          name: "Bob",
+          address: {
+            city: "NYC",
+          },
+        },
+      });
+
+      // Register template with deep property access
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "User {{ payload.user.name }} lives in {{ payload.user.address.city }}",
+      );
+      varStore.set(`@ucas/template/text/${userSchema}`, templateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, userHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("User Bob lives in NYC");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.7 Array Property Access and Iteration", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema with array
+      const tagsSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          tags: {
+            type: "array",
+            items: { type: "string" },
+          },
+        },
+      });
+
+      // Create node with array data
+      const tagsHash = await store.put(tagsSchema, {
+        tags: ["javascript", "typescript", "bun"],
+      });
+
+      // Register template with array iteration
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Tags: {% for tag in payload.tags %}{{ tag }}{% unless forloop.last %}, {% endunless %}{% endfor %}",
+      );
+      varStore.set(`@ucas/template/text/${tagsSchema}`, templateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, tagsHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Tags: javascript, typescript, bun");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.8 Missing Property Access - Graceful Handling", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema
+      const personSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+        },
+      });
+
+      // Create node without age property
+      const personHash = await store.put(personSchema, {
+        name: "Alice",
+      });
+
+      // Register template that references missing property
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Name: {{ payload.name }}, Age: {{ payload.age }}",
+      );
+      varStore.set(`@ucas/template/text/${personSchema}`, templateHash);
+
+      // Render - age should be empty
+      const output = await renderWithTemplate(store, varStore, personHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Name: Alice, Age: ");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.9 Null Property Value Rendering", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema allowing null
+      const personSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          email: { type: ["string", "null"] },
+        },
+      });
+
+      // Create node with null email
+      const personHash = await store.put(personSchema, {
+        name: "Charlie",
+        email: null,
+      });
+
+      // Register template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Name: {{ payload.name }}, Email: {{ payload.email }}",
+      );
+      varStore.set(`@ucas/template/text/${personSchema}`, templateHash);
+
+      // Render - email should be empty
+      const output = await renderWithTemplate(store, varStore, personHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Name: Charlie, Email: ");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.10 Boolean Property Rendering", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema with boolean
+      const userSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          active: { type: "boolean" },
+        },
+      });
+
+      // Create node with boolean
+      const userHash = await store.put(userSchema, {
+        name: "Dave",
+        active: true,
+      });
+
+      // Register template with conditional
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "User {{ payload.name }} is {% if payload.active %}active{% else %}inactive{% endif %}",
+      );
+      varStore.set(`@ucas/template/text/${userSchema}`, templateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, userHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("User Dave is active");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.11 Zero and Empty String Values", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema
+      const dataSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          count: { type: "number" },
+        },
+      });
+
+      // Create node with empty string and zero
+      const dataHash = await store.put(dataSchema, {
+        name: "",
+        count: 0,
+      });
+
+      // Register template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Name: '{{ payload.name }}', Count: {{ payload.count }}",
+      );
+      varStore.set(`@ucas/template/text/${dataSchema}`, templateHash);
+
+      // Render - zero and empty string should appear
+      const output = await renderWithTemplate(store, varStore, dataHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Name: '', Count: 0");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("9.12 Special Characters in String Values", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create schema
+      const textSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+        },
+      });
+
+      // Create node with special characters
+      const textHash = await store.put(textSchema, {
+        text: 'Hello "World" & <tag>',
+      });
+
+      // Register template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const templateHash = await store.put(
+        templateSchema,
+        "Text: {{ payload.text }}",
+      );
+      varStore.set(`@ucas/template/text/${textSchema}`, templateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, textHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toContain('Hello "World" & <tag>');
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+});
+
+describe("Suite 10: Context Variable Completeness", () => {
+  test("10.1 Context Propagation in Recursive Renders", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create child schema and node
+      const childSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+        },
+      });
+      const childHash = await store.put(childSchema, { name: "child" });
+
+      // Create parent schema and node
+      const parentSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          child: { type: "string", format: "cas_ref" },
+        },
+      });
+      const parentHash = await store.put(parentSchema, {
+        name: "parent",
+        child: childHash,
+      });
+
+      // Register parent template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const parentTemplateHash = await store.put(
+        templateSchema,
+        "Parent: {{ payload.name }}\n{% render payload.child %}",
+      );
+      varStore.set(`@ucas/template/text/${parentSchema}`, parentTemplateHash);
+
+      // Register child template that accesses context variables
+      const childTemplateHash = await store.put(
+        templateSchema,
+        "Child: {{ payload.name }}, Hash: {{ hash }}, Resolution: {{ resolution }}",
+      );
+      varStore.set(`@ucas/template/text/${childSchema}`, childTemplateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, parentHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toContain("Parent: parent");
+      expect(output).toContain("Child: child");
+      expect(output).toContain(`Hash: ${childHash}`);
+      expect(output).toContain("Resolution: 0.5");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+
+  test("10.2 Context Isolation Between Parent and Child", async () => {
+    const { store, varStore, cleanup } = await createTempVarStore();
+
+    try {
+      // Create child schema and node
+      const childSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          custom: { type: "string" },
+        },
+      });
+      const childHash = await store.put(childSchema, {
+        custom: "child_value",
+      });
+
+      // Create parent schema and node
+      const parentSchema = await putSchema(store, {
+        type: "object",
+        properties: {
+          custom: { type: "string" },
+          child: { type: "string", format: "cas_ref" },
+        },
+      });
+      const parentHash = await store.put(parentSchema, {
+        custom: "parent_value",
+        child: childHash,
+      });
+
+      // Register parent template
+      const templateSchema = await putSchema(store, { type: "string" });
+      const parentTemplateHash = await store.put(
+        templateSchema,
+        "Parent custom: {{ payload.custom }}\n{% render payload.child %}",
+      );
+      varStore.set(`@ucas/template/text/${parentSchema}`, parentTemplateHash);
+
+      // Register child template
+      const childTemplateHash = await store.put(
+        templateSchema,
+        "Child custom: {{ payload.custom }}",
+      );
+      varStore.set(`@ucas/template/text/${childSchema}`, childTemplateHash);
+
+      // Render
+      const output = await renderWithTemplate(store, varStore, parentHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toContain("Parent custom: parent_value");
+      expect(output).toContain("Child custom: child_value");
+      expect(output).not.toContain("Child custom: parent_value");
+    } finally {
+      varStore.close();
+      await cleanup();
+    }
+  });
+});
