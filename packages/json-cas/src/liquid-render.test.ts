@@ -602,7 +602,7 @@ describe("Suite 4: Render Flow Integration", () => {
     }
   });
 
-  test("4.4 Empty Template", async () => {
+  test("4.2 Empty Template", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -631,7 +631,7 @@ describe("Suite 4: Render Flow Integration", () => {
     }
   });
 
-  test("4.5 Template with LiquidJS Syntax Error", async () => {
+  test("4.3 Template with LiquidJS Syntax Error", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -808,8 +808,8 @@ describe("Suite 5: Decay Priority Chain", () => {
   });
 });
 
-describe("Suite 7: Recursive Rendering Edge Cases", () => {
-  test("7.1 Deep Recursion (10 Levels)", async () => {
+describe("Suite 6: Recursive Rendering Edge Cases", () => {
+  test("6.1 Deep Recursion (10 Levels)", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -856,7 +856,7 @@ describe("Suite 7: Recursive Rendering Edge Cases", () => {
     }
   });
 
-  test("7.2 Cycle Detection with Templates", async () => {
+  test("6.2 Cycle Detection with Templates", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -893,7 +893,7 @@ describe("Suite 7: Recursive Rendering Edge Cases", () => {
     }
   });
 
-  test("7.4 Array of cas_ref with Template", async () => {
+  test("6.3 Array of cas_ref with Template", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -949,8 +949,8 @@ describe("Suite 7: Recursive Rendering Edge Cases", () => {
   });
 });
 
-describe("Suite 8: Error Handling & Edge Cases", () => {
-  test("8.1 Template Missing render Variable", async () => {
+describe("Suite 7: Error Handling & Edge Cases", () => {
+  test("7.1 Template Missing render Variable", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -983,7 +983,7 @@ describe("Suite 8: Error Handling & Edge Cases", () => {
     }
   });
 
-  test("8.2 Template Invalid Decay Value", async () => {
+  test("7.2 Template Invalid Decay Value", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -1023,7 +1023,7 @@ describe("Suite 8: Error Handling & Edge Cases", () => {
     }
   });
 
-  test("8.3 Template Negative Decay", async () => {
+  test("7.3 Template Negative Decay", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -1063,7 +1063,7 @@ describe("Suite 8: Error Handling & Edge Cases", () => {
     }
   });
 
-  test("8.4 Template Decay=0 (Invalid)", async () => {
+  test("7.4 Template Decay=0 (Invalid)", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -1103,7 +1103,7 @@ describe("Suite 8: Error Handling & Edge Cases", () => {
     }
   });
 
-  test("8.5 Template Decay=1 (Valid Edge)", async () => {
+  test("7.5 Template Decay=1 (Valid Edge)", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -1150,7 +1150,7 @@ describe("Suite 8: Error Handling & Edge Cases", () => {
     }
   });
 
-  test("8.6 Template with Unicode Content", async () => {
+  test("7.6 Template with Unicode Content", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -1183,8 +1183,8 @@ describe("Suite 8: Error Handling & Edge Cases", () => {
   });
 });
 
-describe("Suite 10: Performance & Scalability", () => {
-  test("10.1 Wide Fan-out (100 Children)", async () => {
+describe("Suite 8: Performance & Scalability", () => {
+  test("8.1 Wide Fan-out (100 Children)", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
