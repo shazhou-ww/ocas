@@ -503,6 +503,9 @@ async function cmdRender(args: string[]): Promise<void> {
       process.stdout.write(output);
     }
   } catch (error) {
+    if (error instanceof CasNodeNotFoundError) {
+      die(`Error: Node not found: ${error.hash}`);
+    }
     if (error instanceof Error) {
       die(error.message);
     }

@@ -36,8 +36,11 @@ export class SchemaMismatchError extends Error {
 }
 
 export class CasNodeNotFoundError extends Error {
-  constructor(hash: string) {
-    super(`CAS node not found: ${hash}`);
+  constructor(
+    public readonly hash: string,
+    message?: string,
+  ) {
+    super(message ?? `CAS node not found: ${hash}`);
     this.name = "CasNodeNotFoundError";
   }
 }
