@@ -294,6 +294,23 @@ async function cmdPut(args: string[]): Promise<void> {
   const typeHash = await resolveTypeHash(typeHashOrAlias);
   const payload = readJsonFile(file);
   const store = openStore();
+
+  // Check if schema exists
+  const schema = getSchema(store, typeHash);
+  if (schema === null) {
+    console.error(`Schema not found: ${typeHash}`);
+    process.exit(1);
+  }
+
+  // Validate payload against schema before storing
+  const tempNode = { type: typeHash, payload, timestamp: Date.now() };
+  if (!validate(store, tempNode)) {
+    console.error(
+      `Validation failed: payload in ${file} does not match schema ${typeHash}`,
+    );
+    process.exit(1);
+  }
+
   const hash = await store.put(typeHash, payload);
   console.log(hash);
 }
