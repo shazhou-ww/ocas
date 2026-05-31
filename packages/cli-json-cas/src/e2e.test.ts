@@ -54,6 +54,11 @@ function stripVolatile(json: string): unknown {
   return strip(JSON.parse(json));
 }
 
+/** Extract the `value` field from a { type, value } envelope JSON string. */
+function envValue(json: string): unknown {
+  return (JSON.parse(json) as { value: unknown }).value;
+}
+
 // ---- Phase 1: CAS Core ----
 
 describe("Phase 1: CAS Core", () => {
@@ -88,8 +93,8 @@ describe("Phase 1: CAS Core", () => {
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
     const { stdout, exitCode } = await runCli(["put", typeHash, nodeFile]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
-    nodeHash = stdout;
+    expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    nodeHash = envValue(stdout) as string;
   });
 
   test("1.6 get returns node JSON (snapshot)", async () => {
@@ -101,19 +106,19 @@ describe("Phase 1: CAS Core", () => {
   test("1.7 has returns true for existing node", async () => {
     const { stdout, exitCode } = await runCli(["has", nodeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toBe("true");
+    expect(envValue(stdout)).toBe(true);
   });
 
   test("1.8 has returns false for non-existing hash", async () => {
     const { stdout, exitCode } = await runCli(["has", "AAAAAAAAAAAAA"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toBe("false");
+    expect(envValue(stdout)).toBe(false);
   });
 
   test("1.9 verify returns ok for valid node", async () => {
     const { stdout, exitCode } = await runCli(["verify", nodeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
   test("1.10 refs lists direct references (snapshot)", async () => {
@@ -132,13 +137,13 @@ describe("Phase 1: CAS Core", () => {
     const nodeFile = join(tmpStore, "test-node.json");
     const { stdout, exitCode } = await runCli(["hash", typeHash, nodeFile]);
     expect(exitCode).toBe(0);
-    expect(stdout).toBe(nodeHash);
+    expect(envValue(stdout)).toBe(nodeHash);
   });
 
   test("1.13 list --type returns nodes of that type", async () => {
     const { stdout, exitCode } = await runCli(["list", "--type", typeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain(nodeHash);
+    expect(envValue(stdout)).toContain(nodeHash);
   });
 });
 
@@ -163,7 +168,7 @@ describe("Phase 2: Schema Validation", () => {
   test("2.2 verify on valid node returns ok (hash + schema)", async () => {
     const { stdout, exitCode } = await runCli(["verify", nodeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toBe("ok");
+    expect(envValue(stdout)).toBe("ok");
   });
 
   test("2.3 put against non-existent schema hash fails", async () => {
@@ -222,12 +227,13 @@ describe("Phase 3: Variable System", () => {
   test("3.5 var set upsert updates existing variable", async () => {
     const node2File = join(tmpStore, "node2.json");
     writeFileSync(node2File, JSON.stringify({ name: "Bob", age: 25 }));
-    const { stdout: node2Hash } = await runCli(["put", typeHash, node2File]);
+    const { stdout: node2Out } = await runCli(["put", typeHash, node2File]);
+    const node2Hash = envValue(node2Out) as string;
     const { exitCode, stdout } = await runCli([
       "var",
       "set",
       "myapp/config",
-      node2Hash.trim(),
+      node2Hash,
     ]);
     expect(exitCode).toBe(0);
     expect(stripVolatile(stdout)).toMatchSnapshot();
@@ -405,7 +411,7 @@ describe("Phase 6: GC", () => {
     const gcNodeFile = join(tmpStore, "gc-node.json");
     writeFileSync(gcNodeFile, JSON.stringify({ name: "GcAlice", age: 30 }));
     const { stdout } = await runCli(["put", typeHash, gcNodeFile]);
-    gcNodeHash = stdout.trim();
+    gcNodeHash = envValue(stdout) as string;
     // Set a var referencing this node so it survives GC during Phase 6
     await runCli(["var", "set", "gc-test/ref", gcNodeHash]);
   });
@@ -428,25 +434,21 @@ describe("Phase 6: GC", () => {
     const { exitCode } = await runCli(["gc"]);
     expect(exitCode).toBe(0);
     const { stdout } = await runCli(["has", gcNodeHash]);
-    expect(stdout).toBe("true");
+    expect(envValue(stdout)).toBe(true);
   });
 
   test("6.3 gc reclaims orphan node", async () => {
     const orphanFile = join(tmpStore, "orphan.json");
     writeFileSync(orphanFile, JSON.stringify({ name: "Orphan", age: 99 }));
-    const { stdout: orphanHashRaw } = await runCli([
-      "put",
-      typeHash,
-      orphanFile,
-    ]);
-    const orphanHash = orphanHashRaw.trim();
+    const { stdout: orphanOut } = await runCli(["put", typeHash, orphanFile]);
+    const orphanHash = envValue(orphanOut) as string;
 
     const { stdout: beforeGc } = await runCli(["has", orphanHash]);
-    expect(beforeGc).toBe("true");
+    expect(envValue(beforeGc)).toBe(true);
 
     await runCli(["gc"]);
     const { stdout: afterGc } = await runCli(["has", orphanHash]);
-    expect(afterGc).toBe("false");
+    expect(envValue(afterGc)).toBe(false);
   });
 });
 

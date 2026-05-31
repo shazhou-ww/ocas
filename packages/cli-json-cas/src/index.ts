@@ -22,6 +22,7 @@ import {
   validate,
   verify,
   walk,
+  wrapEnvelope,
 } from "@uncaged/json-cas";
 import { openStore as openFsStore } from "@uncaged/json-cas-fs";
 
@@ -253,7 +254,7 @@ async function cmdPut(args: string[]): Promise<void> {
   }
 
   const hash = await store.put(typeHash, payload);
-  console.log(hash);
+  out(await wrapEnvelope(store, "@output/put", hash));
 }
 
 async function cmdGet(args: string[]): Promise<void> {
@@ -262,14 +263,14 @@ async function cmdGet(args: string[]): Promise<void> {
   const store = await openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
-  out(node);
+  out(await wrapEnvelope(store, "@output/get", node));
 }
 
 async function cmdHas(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas has <hash>");
   const store = await openStore();
-  console.log(String(store.has(hash)));
+  out(await wrapEnvelope(store, "@output/has", store.has(hash)));
 }
 
 async function cmdVerify(args: string[]): Promise<void> {
@@ -279,12 +280,13 @@ async function cmdVerify(args: string[]): Promise<void> {
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   const ok = await verify(hash, node);
+  let status: string;
   if (!ok) {
-    console.log("corrupted");
+    status = "corrupted";
   } else {
-    const valid = validate(store, node);
-    console.log(valid ? "ok" : "invalid");
+    status = validate(store, node) ? "ok" : "invalid";
   }
+  out(await wrapEnvelope(store, "@output/verify", status));
 }
 
 async function cmdRefs(args: string[]): Promise<void> {
@@ -346,7 +348,8 @@ async function cmdHash(args: string[]): Promise<void> {
   const typeHash = await resolveTypeHash(typeHashOrAlias);
   const payload = readJsonFile(file);
   const hash = await computeHash(typeHash, payload);
-  console.log(hash);
+  const store = await openStore();
+  out(await wrapEnvelope(store, "@output/hash", hash));
 }
 
 async function cmdRender(args: string[]): Promise<void> {
@@ -826,9 +829,8 @@ async function cmdList(_args: string[]): Promise<void> {
     die("Usage: json-cas list --type <hash-or-alias>");
   const typeHash = await resolveTypeHash(typeFlag);
   const store = await openStore();
-  for (const hash of store.listByType(typeHash)) {
-    console.log(hash);
-  }
+  const hashes = Array.from(store.listByType(typeHash));
+  out(await wrapEnvelope(store, "@output/list", hashes));
 }
 
 function printUsage(): void {
@@ -836,16 +838,16 @@ function printUsage(): void {
 Usage: json-cas [--store <path>] [--json] <command> [args]
 
 Commands:
-  put <type-hash> <file.json>       Store node, print hash
-  get <hash>                        Print node as JSON
-  has <hash>                        Print true/false
-  verify <hash>                     Verify integrity + schema, print ok/corrupted/invalid
+  put <type-hash> <file.json>       Store node, print { type, value } envelope (value=hash)
+  get <hash>                        Print node as { type, value } envelope
+  has <hash>                        Print { type, value } envelope (value=boolean)
+  verify <hash>                     Verify integrity + schema → { type, value } (value=ok/corrupted/invalid)
   refs <hash>                       List direct cas_ref edges
   walk <hash> [--format tree]       Recursive traversal
-  hash <type-hash> <file.json>      Compute hash without storing (dry run)
+  hash <type-hash> <file.json>      Compute hash without storing → { type, value } envelope
   render <hash> [options]           Render node as YAML with resolution decay
   render --pipe/-p [options]        Render { type, value } from stdin
-  list --type <hash-or-alias>       List all hashes for a given type
+  list --type <hash-or-alias>       List hashes for a type → { type, value } envelope (value=string[])
   var set <name> <hash> [--tag <tag>...] Create/update a variable
   var get <name> --schema <hash>    Get a variable by name + schema
   var delete <name> [--schema <hash>] Delete variable(s)
