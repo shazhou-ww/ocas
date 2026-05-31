@@ -186,7 +186,7 @@ export function validate(store: Store, node: CasNode): boolean {
  * Handles: direct format, anyOf (nullable refs), items (array refs),
  * properties (nested objects), and additionalProperties (record refs).
  */
-function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
+export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
   const result: Hash[] = [];
 
   if (schema.format === "cas_ref") {

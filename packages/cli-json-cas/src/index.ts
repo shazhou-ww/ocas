@@ -16,6 +16,7 @@ import {
   putSchema,
   refs,
   renderAsync,
+  renderDirect,
   TagLabelConflictError,
   VariableNotFoundError,
   validate,
@@ -386,10 +387,16 @@ async function cmdHash(args: string[]): Promise<void> {
 }
 
 async function cmdRender(args: string[]): Promise<void> {
+  const isPipe = flags.pipe === true || flags.p === true;
   const hash = args[0];
-  if (!hash) {
+
+  if (isPipe && hash) {
+    die("Cannot use --pipe/-p with a hash argument. Use one or the other.");
+  }
+
+  if (!isPipe && !hash) {
     die(
-      "Usage: ucas render <hash> [--resolution <n>] [--decay <n>] [--epsilon <n>]",
+      "Usage: ucas render <hash> [--resolution <n>] [--decay <n>] [--epsilon <n>]\n       ucas render --pipe/-p [--resolution <n>] [--decay <n>] [--epsilon <n>]",
     );
   }
 
@@ -421,15 +428,63 @@ async function cmdRender(args: string[]): Promise<void> {
   }
 
   try {
-    const varStore = openVarStore();
-    const output = await renderAsync(store, hash, {
-      resolution,
-      decay,
-      epsilon,
-      varStore,
-    });
-    // Output to stdout without JSON wrapping (raw output)
-    process.stdout.write(output);
+    if (isPipe) {
+      // Read { type, value } JSON from stdin
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(chunk as Buffer);
+      }
+      const input = Buffer.concat(chunks).toString("utf-8").trim();
+      if (!input) {
+        die("No input on stdin. Pipe a { type, value } JSON envelope.");
+      }
+
+      let envelope: { type: string; value: unknown };
+      try {
+        envelope = JSON.parse(input) as { type: string; value: unknown };
+      } catch {
+        die("Invalid JSON on stdin. Expected { type, value } envelope.");
+        return; // unreachable, for TS
+      }
+
+      if (
+        typeof envelope !== "object" ||
+        envelope === null ||
+        typeof envelope.type !== "string" ||
+        !("value" in envelope)
+      ) {
+        die("Invalid envelope. Expected { type: string, value: unknown }.");
+      }
+
+      // Validate type hash format: 13-char uppercase Crockford Base32
+      if (!/^[0-9A-Z]{13}$/.test(envelope.type)) {
+        die(
+          `Invalid type hash: "${envelope.type}". Expected 13-character uppercase Crockford Base32 string.`,
+        );
+      }
+
+      const output = renderDirect(
+        envelope.type as Hash,
+        envelope.value,
+        store,
+        {
+          resolution,
+          decay,
+          epsilon,
+        },
+      );
+      process.stdout.write(output);
+    } else {
+      const varStore = openVarStore();
+      const output = await renderAsync(store, hash, {
+        resolution,
+        decay,
+        epsilon,
+        varStore,
+      });
+      // Output to stdout without JSON wrapping (raw output)
+      process.stdout.write(output);
+    }
   } catch (error) {
     if (error instanceof Error) {
       die(error.message);
@@ -835,6 +890,7 @@ Commands:
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
   render <hash> [options]           Render node as YAML with resolution decay
+  render --pipe/-p [options]        Render { type, value } from stdin
   cat <hash> [--payload]            Output node (--payload for payload only)
   var set <name> <hash> [--tag <tag>...] Create/update a variable
   var get <name> --schema <hash>    Get a variable by name + schema
@@ -856,7 +912,8 @@ Flags:
   --inline <text>     Inline text content for template set
   --resolution <n>    Initial resolution for render (default: 1.0)
   --decay <n>         Decay factor for render (default: 0.5)
-  --epsilon <n>       Cutoff threshold for render (default: 0.01)`);
+  --epsilon <n>       Cutoff threshold for render (default: 0.01)
+  --pipe, -p          Read { type, value } JSON from stdin for render`);
 }
 
 // ---- Dispatch ----
