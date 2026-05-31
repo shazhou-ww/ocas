@@ -214,7 +214,11 @@ describe("@ Alias Resolution - put", () => {
     const payloadFile = join(testDir, "payload.json");
     writeFileSync(payloadFile, "42");
 
-    const { stdout, exitCode } = await runCliAlias("put", "@number", payloadFile);
+    const { stdout, exitCode } = await runCliAlias(
+      "put",
+      "@number",
+      payloadFile,
+    );
 
     expect(exitCode).toBe(0);
     expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
@@ -226,7 +230,11 @@ describe("@ Alias Resolution - put", () => {
     const payloadFile = join(testDir, "payload.json");
     writeFileSync(payloadFile, JSON.stringify({ foo: "bar" }));
 
-    const { stdout, exitCode } = await runCliAlias("put", "@object", payloadFile);
+    const { stdout, exitCode } = await runCliAlias(
+      "put",
+      "@object",
+      payloadFile,
+    );
 
     expect(exitCode).toBe(0);
     expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
@@ -238,7 +246,11 @@ describe("@ Alias Resolution - put", () => {
     const payloadFile = join(testDir, "payload.json");
     writeFileSync(payloadFile, "{}");
 
-    const { stderr, exitCode } = await runCliAlias("put", "@invalid", payloadFile);
+    const { stderr, exitCode } = await runCliAlias(
+      "put",
+      "@invalid",
+      payloadFile,
+    );
 
     expect(exitCode).not.toBe(0);
     expect(stderr.length).toBeGreaterThan(0);
