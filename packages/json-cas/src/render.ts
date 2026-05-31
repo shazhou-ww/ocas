@@ -1,10 +1,12 @@
 import { refs } from "./schema.js";
 import type { Hash, Store } from "./types.js";
+import type { VariableStore } from "./variable-store.js";
 
 export type RenderOptions = {
   resolution?: number; // (0, 1], default 1.0
   decay?: number; // (0, 1], default 0.5
   epsilon?: number; // >= 0, default 0.01
+  varStore?: VariableStore; // Optional: for template lookup
 };
 
 const DEFAULT_RESOLUTION = 1.0;
@@ -16,6 +18,8 @@ const FLOAT_TOLERANCE = 1e-10;
 /**
  * Render a CAS node as YAML with resolution-based decay.
  * When resolution ≤ epsilon, nodes are rendered as opaque `cas:<hash>` references.
+ * This is the synchronous version without template support.
+ * For template support, use renderAsync() with varStore.
  */
 export function render(
   store: Store,
@@ -38,8 +42,78 @@ export function render(
   }
 
   const visited = new Set<Hash>();
-
   return renderNode(store, hash, resolution, decay, epsilon, visited);
+}
+
+/**
+ * Async render with LiquidJS template support.
+ * When resolution ≤ epsilon, nodes are rendered as opaque `cas:<hash>` references.
+ * If varStore is provided, attempts to use LiquidJS templates first, fallback to YAML.
+ */
+export async function renderAsync(
+  store: Store,
+  hash: Hash,
+  options?: RenderOptions,
+): Promise<string> {
+  const resolution = options?.resolution ?? DEFAULT_RESOLUTION;
+  const decay = options?.decay ?? DEFAULT_DECAY;
+  const epsilon = options?.epsilon ?? DEFAULT_EPSILON;
+  const varStore = options?.varStore;
+
+  // Validate parameters
+  if (resolution < 0 || resolution > 1) {
+    throw new Error("resolution must be in [0, 1]");
+  }
+  if (decay <= 0 || decay > 1) {
+    throw new Error("decay must be in (0, 1]");
+  }
+  if (epsilon < 0) {
+    throw new Error("epsilon must be >= 0");
+  }
+
+  // If varStore provided, try template rendering first
+  if (varStore !== undefined) {
+    try {
+      const { renderWithTemplate } = await import("./liquid-render.js");
+      const node = store.get(hash);
+      if (node !== null) {
+        // Check if a template exists for this type
+        const templateExists = await hasTemplate(store, varStore, node.type);
+        if (templateExists) {
+          return await renderWithTemplate(store, varStore, hash, {
+            resolution,
+            decay,
+            epsilon,
+          });
+        }
+      }
+    } catch {
+      // Fall through to YAML rendering
+    }
+  }
+
+  // Fallback to YAML rendering
+  const visited = new Set<Hash>();
+  return renderNode(store, hash, resolution, decay, epsilon, visited);
+}
+
+/**
+ * Check if a template exists for a given type
+ */
+async function hasTemplate(
+  store: Store,
+  varStore: VariableStore,
+  typeHash: Hash,
+): Promise<boolean> {
+  const varName = `@ucas/template/text/${typeHash}`;
+  try {
+    const { putSchema } = await import("./schema.js");
+    const stringSchema = await putSchema(store, { type: "string" });
+    const variable = varStore.get(varName, stringSchema);
+    return variable !== null;
+  } catch {
+    return false;
+  }
 }
 
 function renderNode(
