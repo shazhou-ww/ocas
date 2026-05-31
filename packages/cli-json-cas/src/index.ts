@@ -15,6 +15,7 @@ import {
   InvalidVariableNameError,
   putSchema,
   refs,
+  render,
   TagLabelConflictError,
   VariableNotFoundError,
   validate,
@@ -28,7 +29,16 @@ import { createFsStore } from "@uncaged/json-cas-fs";
 type Flags = Record<string, string | boolean | string[]>;
 
 /** Flags that consume the next token as their value. All others are boolean. */
-const VALUE_FLAGS = new Set(["store", "format", "var-db", "tag", "schema"]);
+const VALUE_FLAGS = new Set([
+  "store",
+  "format",
+  "var-db",
+  "tag",
+  "schema",
+  "resolution",
+  "decay",
+  "epsilon",
+]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
   const flags: Flags = {};
@@ -374,6 +384,53 @@ async function cmdHash(args: string[]): Promise<void> {
   console.log(hash);
 }
 
+async function cmdRender(args: string[]): Promise<void> {
+  const hash = args[0];
+  if (!hash) {
+    die(
+      "Usage: ucas render <hash> [--resolution <n>] [--decay <n>] [--epsilon <n>]",
+    );
+  }
+
+  const store = openStore();
+
+  // Parse numeric options
+  const resolution =
+    typeof flags.resolution === "string"
+      ? Number.parseFloat(flags.resolution)
+      : undefined;
+  const decay =
+    typeof flags.decay === "string"
+      ? Number.parseFloat(flags.decay)
+      : undefined;
+  const epsilon =
+    typeof flags.epsilon === "string"
+      ? Number.parseFloat(flags.epsilon)
+      : undefined;
+
+  // Validate numeric values
+  if (resolution !== undefined && Number.isNaN(resolution)) {
+    die("--resolution must be a valid number");
+  }
+  if (decay !== undefined && Number.isNaN(decay)) {
+    die("--decay must be a valid number");
+  }
+  if (epsilon !== undefined && Number.isNaN(epsilon)) {
+    die("--epsilon must be a valid number");
+  }
+
+  try {
+    const output = render(store, hash, { resolution, decay, epsilon });
+    // Output to stdout without JSON wrapping (raw YAML)
+    process.stdout.write(output);
+  } catch (error) {
+    if (error instanceof Error) {
+      die(error.message);
+    }
+    die(String(error));
+  }
+}
+
 async function cmdCat(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas cat <hash>");
@@ -602,6 +659,7 @@ Commands:
   refs <hash>                       List direct cas_ref edges
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
+  render <hash> [options]           Render node as YAML with resolution decay
   cat <hash> [--payload]            Output node (--payload for payload only)
   var set <name> <hash> [--tag <tag>...] Create/update a variable
   var get <name> --schema <hash>    Get a variable by name + schema
@@ -611,11 +669,14 @@ Commands:
   gc                                Run garbage collection
 
 Flags:
-  --store <path>   Store directory (default: ~/.uncaged/json-cas)
-  --var-db <path>  Variable database path (default: <store>/variables.db)
-  --json           Compact JSON output
-  --schema <hash>  Schema hash filter for var get/delete/tag/list
-  --tag <tag>      Tag/label (can be repeated): key:value (tag), name (label), :name (delete)`);
+  --store <path>      Store directory (default: ~/.uncaged/json-cas)
+  --var-db <path>     Variable database path (default: <store>/variables.db)
+  --json              Compact JSON output
+  --schema <hash>     Schema hash filter for var get/delete/tag/list
+  --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
+  --resolution <n>    Initial resolution for render (default: 1.0)
+  --decay <n>         Decay factor for render (default: 0.5)
+  --epsilon <n>       Cutoff threshold for render (default: 0.01)`);
 }
 
 // ---- Dispatch ----
@@ -683,6 +744,10 @@ switch (cmd) {
 
   case "hash":
     await cmdHash(rest);
+    break;
+
+  case "render":
+    await cmdRender(rest);
     break;
 
   case "cat":
