@@ -51,16 +51,19 @@ roles:
     output: "A findings report with per-issue root cause and suggested procedure fixes. Set $status to clean or findings (with report hash)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "clean" }
             summary: { type: string }
           required: [$status, summary]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "findings" }
             report: { type: string }
             targetWorkflow: { type: string }
           required: [$status, report, targetWorkflow]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "wrong_project" }
             workflowName: { type: string }
           required: [$status, workflowName]
@@ -93,12 +96,14 @@ roles:
     output: "A change plan stored in CAS. Set $status to ready (with plan hash and repoPath) or no_action (if findings don't warrant changes)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "ready" }
             plan: { type: string }
             repoPath: { type: string }
           required: [$status, plan, repoPath]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "no_action" }
             reason: { type: string }
           required: [$status, reason]
@@ -128,12 +133,14 @@ roles:
     output: "List all files changed and provide a summary. Set $status to done (with branch/worktree), or failed (with reason)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "done" }
             branch: { type: string }
             worktree: { type: string }
           required: [$status, branch, worktree]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "failed" }
             reason: { type: string }
           required: [$status, reason]
@@ -157,12 +164,14 @@ roles:
     output: "Explain your decision. Set $status to approved (with branch/worktree) or rejected (with comments)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "approved" }
             branch: { type: string }
             worktree: { type: string }
           required: [$status, branch, worktree]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "rejected" }
             comments: { type: string }
             worktree: { type: string }
@@ -191,11 +200,13 @@ roles:
     output: "Include PR URL on success or error log on failure. Set $status to committed (with prUrl) or hook_failed (with error)."
     frontmatter:
       oneOf:
-        - properties:
+        - type: object
+          properties:
             $status: { const: "committed" }
             prUrl: { type: string }
           required: [$status, prUrl]
-        - properties:
+        - type: object
+          properties:
             $status: { const: "hook_failed" }
             error: { type: string }
           required: [$status, error]
