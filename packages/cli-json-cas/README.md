@@ -4,7 +4,9 @@ CLI tool for json-cas stores.
 
 ## Overview
 
-`@uncaged/cli-json-cas` provides the `json-cas` command for managing a filesystem-backed store: bootstrap, schema registration, node CRUD, integrity checks, reference listing, and graph walks. It uses `@uncaged/json-cas-fs` for persistence and `@uncaged/json-cas` for core operations.
+`@uncaged/cli-json-cas` provides the `json-cas` command (also aliased `ucas`) for managing a filesystem-backed store: node CRUD, integrity checks, reference listing, graph walks, variables, and output templates. It uses `@uncaged/json-cas-fs` for persistence and `@uncaged/json-cas` for core operations.
+
+The store is **auto-created and bootstrapped** on first use, so there is no `init`/`bootstrap` command. Schemas are ordinary `@schema`-typed nodes — register one with `ucas put @schema file.json` and list them with `ucas list --type @schema`; there is no dedicated `schema` subcommand.
 
 **Dependencies:** `@uncaged/json-cas`, `@uncaged/json-cas-fs`
 
@@ -37,48 +39,95 @@ Usage: json-cas [--store <path>] [--json] <command> [args]
 | Flag | Description |
 |------|-------------|
 | `--store <path>` | Store directory (default: `~/.uncaged/json-cas`) |
-| `--json` | Compact JSON output for commands that print JSON |
+| `--var-db <path>` | Variable database path (default: `<store>/variables.db`) |
+| `--json` | Compact (single-line) JSON output |
+
+### Envelope format
+
+Every JSON-emitting command prints a uniform `{ type, value }` envelope. `type` is the hash
+of the command's `@output/*` result schema and `value` is the command payload. The output
+is therefore self-describing and pipeable: feed any envelope into `render -p` to render its
+`value` (embedded `cas_ref` hashes are expanded). `render` is the only command that emits
+raw, non-envelope text.
+
+```jsonc
+// json-cas has <hash>
+{ "type": "AYHQD2YA9G667", "value": true }
+
+// json-cas template set <schema-hash> --inline "Hi {{ payload.name }}"
+{ "type": "9YJZ09DDAYAWR", "value": { "schemaHash": "7XX5H51CVD9H0", "contentHash": "FC8WACA792B6F" } }
+```
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `init` | Create store directory and write bootstrap seed; prints meta hash |
-| `bootstrap` | Write meta-schema seed into existing store; prints hash |
-| `schema put <file.json>` | Register schema from file; prints type hash |
-| `schema get <type-hash>` | Print schema JSON |
-| `schema list` | List all schemas (`hash  name`) |
-| `schema validate <hash>` | Validate node against its schema; prints `valid` / `invalid` |
-| `put <type-hash> <file.json>` | Store node; prints content hash |
-| `get <hash>` | Print full node as JSON |
-| `has <hash>` | Print `true` or `false` |
-| `verify <hash>` | Verify integrity; prints `ok` or `corrupted` |
-| `refs <hash>` | Print direct `cas_ref` targets (one per line) |
-| `walk <hash>` | BFS traversal; one hash per line |
-| `walk <hash> --format tree` | Tree-formatted traversal |
-| `hash <type-hash> <file.json>` | Compute hash without storing |
-| `cat <hash>` | Print node JSON |
-| `cat <hash> --payload` | Print payload only |
+| Command | Envelope `value` | Result schema |
+|---------|------------------|---------------|
+| `put <type-hash> <file.json>` | stored node hash (string) | `@output/put` |
+| `get <hash>` | `{ type, payload, timestamp }` | `@output/get` |
+| `has <hash>` | boolean | `@output/has` |
+| `verify <hash>` | `ok` / `corrupted` / `invalid` | `@output/verify` |
+| `refs <hash>` | hashes (string[]) | `@output/refs` |
+| `walk <hash> [--format tree]` | hashes (string[]) or tree string | `@output/walk` |
+| `hash <type-hash> <file.json>` | computed hash (string) | `@output/hash` |
+| `render <hash> [options]` | raw text (no envelope) | — |
+| `render --pipe/-p [options]` | raw text from piped envelope | — |
+| `list --type <hash-or-alias>` | hashes (string[]) | `@output/list` |
+| `var set <name> <hash> [--tag ...]` | variable object | `@output/var-set` |
+| `var get <name> --schema <hash>` | variable object | `@output/var-get` |
+| `var delete <name> [--schema <hash>]` | variable or variable[] | `@output/var-delete` |
+| `var tag <name> --schema <hash> <ops...>` | variable object | `@output/var-tag` |
+| `var list [prefix] [--schema <hash>] [--tag ...]` | variable[] | `@output/var-list` |
+| `template set <schema-hash> <file> \| --inline <text>` | `{ schemaHash, contentHash }` | `@output/template-set` |
+| `template get <schema-hash>` | template content (string) | `@output/template-get` |
+| `template list` | `{ schemaHash, contentHash }[]` | `@output/template-list` |
+| `template delete <schema-hash>` | `{ deleted: boolean }` | `@output/template-delete` |
+| `gc` | `{ total, reachable, collected, scanned }` | `@output/gc` |
 
 ### Examples
 
 ```bash
-# Initialize default store at ~/.uncaged/json-cas
-json-cas init
+# Register a schema (schemas are plain @schema nodes) and store a payload
+json-cas put @schema ./schemas/item.json
+# → { "type": "...", "value": "0123456789ABC" }  (the schema's type hash)
 
-# Use a custom store path
-json-cas --store ./data/cas bootstrap
-
-# Register a schema and store a payload
-json-cas schema put ./schemas/item.json
-# → prints type hash, e.g. 0123456789ABCD
-
-json-cas put 0123456789ABCD ./payloads/item.json
-# → prints content hash
+json-cas put 0123456789ABC ./payloads/item.json
+# → { "type": "...", "value": "<content-hash>" }
 
 json-cas get <content-hash> --json
 json-cas verify <content-hash>
 json-cas walk <content-hash> --format tree
+
+# List every registered schema, then extract the hashes with jq
+json-cas list --type @schema | jq -r '.value[]'
+```
+
+### Pipe composition
+
+Because every command shares the `{ type, value }` envelope, output composes directly into
+`render -p`:
+
+```bash
+# put emits a cas_ref hash envelope; render -p dereferences and renders the node
+json-cas put @schema ./schemas/item.json | json-cas render -p
+
+# render gc statistics
+json-cas gc | json-cas render -p
+
+# render every schema referenced by a list result
+json-cas list --type @schema | json-cas render -p
+```
+
+### Templates
+
+`template` commands manage the LiquidJS template bound to a schema (stored as a
+`@ucas/template/text/<schema-hash>` variable). `render <hash>` uses the template registered
+for the node's type, falling back to YAML when none exists.
+
+```bash
+# Bind a template to a schema, then render a node of that type
+json-cas template set 0123456789ABC --inline "Item: {{ payload.name }}"
+json-cas render <content-hash>
+# → Item: Widget
 ```
 
 ## Internal Structure

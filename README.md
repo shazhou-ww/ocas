@@ -88,30 +88,60 @@ Or use the CLI (see [CLI Reference](#cli-reference) and [`packages/cli-json-cas/
 
 ## CLI Reference
 
-Binary: `json-cas` (from `@uncaged/cli-json-cas`). Default store: `~/.uncaged/json-cas`.
+Binary: `json-cas` (also aliased `ucas`, from `@uncaged/cli-json-cas`). Default store:
+`~/.uncaged/json-cas`. The store is auto-created and bootstrapped on first use — there is
+no `init`/`bootstrap` command, and schemas are ordinary `@schema`-typed nodes (`ucas put
+@schema file.json`), so there is no `schema` subcommand.
+
+### Envelope format
+
+Every JSON-emitting command prints a uniform `{ type, value }` envelope. `type` is the hash
+of the command's `@output/*` result schema and `value` is the command payload. This makes
+output self-describing and pipeable: feed any envelope into `render -p` to render its
+`value` (embedded `cas_ref` hashes are expanded). `render` is the only command that emits
+raw (non-envelope) text.
+
+```jsonc
+// ucas has <hash>
+{ "type": "AYHQD2YA9G667", "value": true }
+```
 
 ```
 Usage: json-cas [--store <path>] [--json] <command> [args]
 
-Commands:
-  init                              Create store dir and write bootstrap seed
-  bootstrap                         Write meta-schema seed, print hash
-  schema put <file.json>            Register schema, print type hash
-  schema get <type-hash>            Print schema JSON
-  schema list                       List all schemas (name + hash)
-  schema validate <hash>            Validate node against its schema
-  put <type-hash> <file.json>       Store node, print hash
-  get <hash>                        Print node as JSON
-  has <hash>                        Print true/false
-  verify <hash>                     Verify integrity, print ok/corrupted
-  refs <hash>                       List direct cas_ref edges
-  walk <hash> [--format tree]       Recursive traversal
-  hash <type-hash> <file.json>      Compute hash without storing (dry run)
-  cat <hash> [--payload]            Output node (--payload for payload only)
+Commands (all emit a { type, value } envelope unless noted):
+  put <type-hash> <file.json>       Store node (value = hash)          (@output/put)
+  get <hash>                        Node payload + metadata            (@output/get)
+  has <hash>                        Existence boolean                  (@output/has)
+  verify <hash>                     ok / corrupted / invalid           (@output/verify)
+  refs <hash>                       Direct cas_ref edges               (@output/refs)
+  walk <hash> [--format tree]       Recursive traversal                (@output/walk)
+  hash <type-hash> <file.json>      Compute hash without storing       (@output/hash)
+  render <hash> [options]           Render node as text (raw output)
+  render --pipe/-p [options]        Render a piped envelope (raw output)
+  list --type <hash-or-alias>       Hashes for a type (value = list)   (@output/list)
+  var set|get|delete|tag|list ...   Variable CRUD                      (@output/var-*)
+  template set|get|list|delete ...  Output-template CRUD               (@output/template-*)
+  gc                                Garbage collection                 (@output/gc)
 
 Flags:
   --store <path>   Store directory (default: ~/.uncaged/json-cas)
   --json           Compact JSON output
+  --pipe, -p       Read a { type, value } envelope from stdin for render
+```
+
+### Pipe examples
+
+```bash
+# Store a node, then render the stored content (the put envelope's hash is
+# a cas_ref, so render -p dereferences and renders it):
+ucas put @schema ./schemas/item.json | ucas render -p
+
+# Render garbage-collection stats:
+ucas gc | ucas render -p
+
+# List every schema, then consume the envelope's value array with jq:
+ucas list --type @schema | jq -r '.value[]'
 ```
 
 ## Development

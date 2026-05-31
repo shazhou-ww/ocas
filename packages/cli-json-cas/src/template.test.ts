@@ -103,9 +103,10 @@ describe("template set", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
 
-    const output = JSON.parse(stdout);
-    expect(output).toHaveProperty("contentHash");
-    expect(output.schemaHash).toBe(stringHash);
+    const envelope = JSON.parse(stdout);
+    expect(envelope).toHaveProperty("type");
+    expect(envelope.value).toHaveProperty("contentHash");
+    expect(envelope.value.schemaHash).toBe(stringHash);
   });
 
   test("set template with --inline flag", async () => {
@@ -122,9 +123,10 @@ describe("template set", () => {
 
     expect(exitCode).toBe(0);
 
-    const output = JSON.parse(stdout);
-    expect(output).toHaveProperty("contentHash");
-    expect(output.schemaHash).toBe(stringHash);
+    const envelope = JSON.parse(stdout);
+    expect(envelope).toHaveProperty("type");
+    expect(envelope.value).toHaveProperty("contentHash");
+    expect(envelope.value.schemaHash).toBe(stringHash);
   });
 
   test("update existing template (idempotent)", async () => {
@@ -148,12 +150,12 @@ describe("template set", () => {
 
     expect(exitCode).toBe(0);
 
-    const output = JSON.parse(stdout);
-    expect(output).toHaveProperty("contentHash");
+    const envelope = JSON.parse(stdout);
+    expect(envelope.value).toHaveProperty("contentHash");
 
     // Verify we can get the new version
     const { stdout: getOut } = await runCli("template", "get", stringHash);
-    expect(getOut).toBe("Version 2");
+    expect(JSON.parse(getOut).value).toBe("Version 2");
   });
 
   test("error when file not found", async () => {
@@ -223,7 +225,7 @@ describe("template set", () => {
 
     // Verify content
     const { stdout: getOut } = await runCli("template", "get", stringHash);
-    expect(getOut).toBe(multilineContent);
+    expect(JSON.parse(getOut).value).toBe(multilineContent);
   });
 
   test("support empty templates", async () => {
@@ -240,8 +242,8 @@ describe("template set", () => {
 
     expect(exitCode).toBe(0);
 
-    const output = JSON.parse(stdout);
-    expect(output).toHaveProperty("contentHash");
+    const envelope = JSON.parse(stdout);
+    expect(envelope.value).toHaveProperty("contentHash");
   });
 
   test("error when neither file nor --inline provided", async () => {
@@ -271,12 +273,12 @@ describe("template set", () => {
 
     // Verify content preserved
     const { stdout: getOut } = await runCli("template", "get", stringHash);
-    expect(getOut).toBe(specialContent);
+    expect(JSON.parse(getOut).value).toBe(specialContent);
   });
 });
 
 describe("template get", () => {
-  test("retrieve template as raw text", async () => {
+  test("retrieve template as envelope value", async () => {
     const store = createFsStore(storePath);
     const stringHash = await getStringHash(store);
 
@@ -291,7 +293,9 @@ describe("template get", () => {
 
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
-    expect(stdout).toBe(content);
+    const envelope = JSON.parse(stdout);
+    expect(envelope).toHaveProperty("type");
+    expect(envelope.value).toBe(content);
   });
 
   test("error when template not found", async () => {
@@ -309,27 +313,26 @@ describe("template get", () => {
     const store = createFsStore(storePath);
     const stringHash = await getStringHash(store);
 
-    // Note: runCli helper trims stdout, so we test with content that doesn't have leading/trailing whitespace
-    // The actual CLI preserves whitespace correctly
+    // The envelope's value preserves exact whitespace (JSON-escaped),
+    // so trimming the surrounding JSON output is harmless.
     const content = "spaces\n\ttabs\t\nmixed";
     await runCli("template", "set", stringHash, "--inline", content);
 
     const { stdout } = await runCli("template", "get", stringHash);
 
-    expect(stdout).toBe(content);
+    expect(JSON.parse(stdout).value).toBe(content);
   });
 
   test("support multi-line templates", async () => {
     const store = createFsStore(storePath);
     const stringHash = await getStringHash(store);
 
-    // Note: runCli helper trims stdout, so trailing newline will be removed
     const multiline = "Line 1\nLine 2\nLine 3";
     await runCli("template", "set", stringHash, "--inline", multiline);
 
     const { stdout } = await runCli("template", "get", stringHash);
 
-    expect(stdout).toBe(multiline);
+    expect(JSON.parse(stdout).value).toBe(multiline);
   });
 });
 
@@ -346,34 +349,40 @@ describe("template list", () => {
 
     expect(exitCode).toBe(0);
 
-    const output = JSON.parse(stdout);
-    expect(Array.isArray(output)).toBe(true);
-    expect(output.length).toBeGreaterThanOrEqual(1);
+    const envelope = JSON.parse(stdout);
+    expect(envelope).toHaveProperty("type");
+    expect(Array.isArray(envelope.value)).toBe(true);
+    expect(envelope.value.length).toBeGreaterThanOrEqual(1);
 
     // Check structure
-    const item = output[0];
+    const item = envelope.value[0];
     expect(item).toHaveProperty("schemaHash");
-    expect(item).toHaveProperty("preview");
+    expect(item).toHaveProperty("contentHash");
   });
 
-  test("preview truncation for long content", async () => {
+  test("entry contentHash matches set result", async () => {
     const store = createFsStore(storePath);
     const stringHash = await getStringHash(store);
 
-    const longContent = "a".repeat(200);
-    await runCli("template", "set", stringHash, "--inline", longContent);
+    const { stdout: setOut } = await runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      "Some template content",
+    );
+    const { contentHash } = JSON.parse(setOut).value;
 
     const { stdout } = await runCli("template", "list");
 
-    const output = JSON.parse(stdout) as Array<{
+    const value = JSON.parse(stdout).value as Array<{
       schemaHash: string;
-      preview: string;
+      contentHash: string;
     }>;
-    const item = output.find((i) => i.schemaHash === stringHash);
+    const item = value.find((i) => i.schemaHash === stringHash);
     expect(item).toBeDefined();
     if (item) {
-      expect(item.preview.length).toBeLessThan(longContent.length);
-      expect(item.preview).toContain("...");
+      expect(item.contentHash).toBe(contentHash);
     }
   });
 
@@ -382,9 +391,9 @@ describe("template list", () => {
 
     expect(exitCode).toBe(0);
 
-    const output = JSON.parse(stdout);
-    expect(Array.isArray(output)).toBe(true);
-    expect(output.length).toBe(0);
+    const envelope = JSON.parse(stdout);
+    expect(Array.isArray(envelope.value)).toBe(true);
+    expect(envelope.value.length).toBe(0);
   });
 
   test("exclude non-template variables", async () => {
@@ -400,14 +409,14 @@ describe("template list", () => {
 
     const { stdout } = await runCli("template", "list");
 
-    const output = JSON.parse(stdout);
+    const envelope = JSON.parse(stdout);
     // Should only contain template variables
-    for (const item of output) {
+    for (const item of envelope.value) {
       expect(item.schemaHash).toBeDefined();
     }
   });
 
-  test("output JSON array format", async () => {
+  test("output JSON envelope with array value", async () => {
     const store = createFsStore(storePath);
     const stringHash = await getStringHash(store);
 
@@ -418,27 +427,8 @@ describe("template list", () => {
     // Should be valid JSON
     expect(() => JSON.parse(stdout)).not.toThrow();
 
-    const output = JSON.parse(stdout);
-    expect(Array.isArray(output)).toBe(true);
-  });
-
-  test("preview shows beginning of content", async () => {
-    const store = createFsStore(storePath);
-    const stringHash = await getStringHash(store);
-
-    const content = "Start of template...";
-    await runCli("template", "set", stringHash, "--inline", content);
-
-    const { stdout } = await runCli("template", "list");
-
-    const output = JSON.parse(stdout) as Array<{
-      schemaHash: string;
-      preview: string;
-    }>;
-    const item = output.find((i) => i.schemaHash === stringHash);
-    if (item) {
-      expect(item.preview).toContain("Start");
-    }
+    const envelope = JSON.parse(stdout);
+    expect(Array.isArray(envelope.value)).toBe(true);
   });
 });
 
@@ -458,9 +448,10 @@ describe("template delete", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
 
-    const output = JSON.parse(stdout);
-    expect(output).toHaveProperty("deleted");
-    expect(output.deleted).toBe(true);
+    const envelope = JSON.parse(stdout);
+    expect(envelope).toHaveProperty("type");
+    expect(envelope.value).toHaveProperty("deleted");
+    expect(envelope.value.deleted).toBe(true);
 
     // Verify template is gone
     const { exitCode: getExitCode } = await runCli(
@@ -495,13 +486,13 @@ describe("template delete", () => {
 
     // Verify second still exists
     const { stdout } = await runCli("template", "list");
-    const output = JSON.parse(stdout) as Array<{
+    const value = JSON.parse(stdout).value as Array<{
       schemaHash: string;
-      preview: string;
+      contentHash: string;
     }>;
 
     // Should not find deleted template
-    const deleted = output.find((i) => i.schemaHash === stringHash);
+    const deleted = value.find((i) => i.schemaHash === stringHash);
     expect(deleted).toBeUndefined();
   });
 
@@ -519,7 +510,7 @@ describe("template delete", () => {
       "--inline",
       "Content",
     );
-    const { contentHash } = JSON.parse(setOut);
+    const { contentHash } = JSON.parse(setOut).value;
 
     // Delete the template variable
     await runCli("template", "delete", stringHash);
@@ -577,7 +568,7 @@ describe("template integration", () => {
       stringHash,
     );
     expect(getExit).toBe(0);
-    expect(getOut).toBe(content);
+    expect(JSON.parse(getOut).value).toBe(content);
 
     // List
     const { stdout: listOut, exitCode: listExit } = await runCli(
@@ -585,7 +576,7 @@ describe("template integration", () => {
       "list",
     );
     expect(listExit).toBe(0);
-    const listData = JSON.parse(listOut);
+    const listData = JSON.parse(listOut).value;
     expect(listData.length).toBeGreaterThan(0);
 
     // Delete
@@ -626,8 +617,8 @@ describe("template integration", () => {
 
     // List should show all
     const { stdout } = await runCli("template", "list");
-    const output = JSON.parse(stdout);
-    expect(output.length).toBeGreaterThanOrEqual(1);
+    const value = JSON.parse(stdout).value;
+    expect(value.length).toBeGreaterThanOrEqual(1);
   });
 });
 
