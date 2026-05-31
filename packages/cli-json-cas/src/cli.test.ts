@@ -15,6 +15,11 @@ import { createFsStore, openStore as openFsStore } from "@uncaged/json-cas-fs";
 const pkgPath = resolve(import.meta.dir, "../package.json");
 const entrypoint = resolve(import.meta.dir, "index.ts");
 
+/** Extract the `value` field from a { type, value } envelope JSON string. */
+function envValue(json: string): unknown {
+  return (JSON.parse(json.trim()) as { value: unknown }).value;
+}
+
 /**
  * Register a schema directly via the library (CLI schema put was removed).
  * Returns the type hash.
@@ -168,8 +173,8 @@ describe("@ Alias Resolution - put", () => {
 
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
-    // Should output a valid hash (13 chars)
-    expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    // Should output an envelope whose value is a valid hash (13 chars)
+    expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 
   test("ucas put @number <file> should resolve alias", async () => {
@@ -185,7 +190,7 @@ describe("@ Alias Resolution - put", () => {
     );
 
     expect(exitCode).toBe(0);
-    expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 
   test("ucas put @object <file> should resolve alias", async () => {
@@ -201,7 +206,7 @@ describe("@ Alias Resolution - put", () => {
     );
 
     expect(exitCode).toBe(0);
-    expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 
   test("ucas put @invalid <file> should fail", async () => {
@@ -236,7 +241,7 @@ describe("@ Alias Resolution - hash", () => {
 
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
-    expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 });
 
@@ -313,10 +318,10 @@ describe("Issue #50: Schema Validation in put", () => {
 
         expect(exitCode).toBe(0);
         expect(stderr).toBe("");
-        expect(stdout.trim()).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+        expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
 
         // Verify node was stored
-        const hash = stdout.trim();
+        const hash = envValue(stdout) as string;
         const { exitCode: hasExitCode } = await runCli(["has", hash], tmpStore);
         expect(hasExitCode).toBe(0);
       } finally {
@@ -355,7 +360,7 @@ describe("Issue #50: Schema Validation in put", () => {
         );
 
         expect(exitCode).toBe(0);
-        expect(stdout.trim()).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+        expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
       } finally {
         rmSync(tmpStore, { recursive: true, force: true });
       }
@@ -403,7 +408,7 @@ describe("Issue #50: Schema Validation in put", () => {
         );
 
         expect(exitCode).toBe(0);
-        expect(stdout.trim()).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+        expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
       } finally {
         rmSync(tmpStore, { recursive: true, force: true });
       }
@@ -423,7 +428,7 @@ describe("Issue #50: Schema Validation in put", () => {
         );
 
         expect(exitCode).toBe(0);
-        expect(stdout.trim()).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+        expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
       } finally {
         rmSync(tmpStore, { recursive: true, force: true });
       }
@@ -469,7 +474,7 @@ describe("Issue #50: Schema Validation in put", () => {
           ["has", "0000000000000"],
           tmpStore,
         );
-        expect(hasOutput.trim()).toBe("false");
+        expect(envValue(hasOutput)).toBe(false);
       } finally {
         rmSync(tmpStore, { recursive: true, force: true });
       }
@@ -692,7 +697,7 @@ describe("Issue #50: Schema Validation in put", () => {
         );
 
         expect(exitCode).toBe(0);
-        expect(stdout.trim()).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+        expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
       } finally {
         rmSync(tmpStore, { recursive: true, force: true });
       }
@@ -850,33 +855,30 @@ describe("Suite 6: CLI Integration with Templates", () => {
       // Create node
       const nodeFile = join(tmpStore, "node.json");
       writeFileSync(nodeFile, JSON.stringify({ name: "Alice" }));
-      const { stdout: nodeHash } = await runCli(
+      const { stdout: nodeOut } = await runCli(
         ["put", schemaHash.trim(), nodeFile],
         tmpStore,
       );
+      const nodeHash = envValue(nodeOut) as string;
 
       // Create template file (JSON-encoded string)
       const templateFile = join(tmpStore, "template.json");
       writeFileSync(templateFile, JSON.stringify("Hello {{ payload.name }}!"));
-      const { stdout: tmplHash } = await runCli(
+      const { stdout: tmplOut } = await runCli(
         ["put", "@string", templateFile],
         tmpStore,
       );
+      const tmplHash = envValue(tmplOut) as string;
 
       // Register template
       await runCli(
-        [
-          "var",
-          "set",
-          `@ucas/template/text/${schemaHash.trim()}`,
-          tmplHash.trim(),
-        ],
+        ["var", "set", `@ucas/template/text/${schemaHash.trim()}`, tmplHash],
         tmpStore,
       );
 
       // Render with template
       const { stdout: output, exitCode } = await runCli(
-        ["render", nodeHash.trim()],
+        ["render", nodeHash],
         tmpStore,
       );
 
@@ -911,21 +913,23 @@ describe("Suite 6: CLI Integration with Templates", () => {
       // Create child node
       const childFile = join(tmpStore, "child.json");
       writeFileSync(childFile, JSON.stringify({ value: "child", child: null }));
-      const { stdout: childHash } = await runCli(
+      const { stdout: childOut } = await runCli(
         ["put", schemaHash.trim(), childFile],
         tmpStore,
       );
+      const childHash = envValue(childOut) as string;
 
       // Create parent node
       const parentFile = join(tmpStore, "parent.json");
       writeFileSync(
         parentFile,
-        JSON.stringify({ value: "parent", child: childHash.trim() }),
+        JSON.stringify({ value: "parent", child: childHash }),
       );
-      const { stdout: parentHash } = await runCli(
+      const { stdout: parentOut } = await runCli(
         ["put", schemaHash.trim(), parentFile],
         tmpStore,
       );
+      const parentHash = envValue(parentOut) as string;
 
       // Create template showing resolution (JSON-encoded string)
       const templateFile = join(tmpStore, "template.json");
@@ -933,25 +937,21 @@ describe("Suite 6: CLI Integration with Templates", () => {
         templateFile,
         JSON.stringify("{{ payload.value }}(res={{ resolution }})"),
       );
-      const { stdout: tmplHash } = await runCli(
+      const { stdout: tmplOut } = await runCli(
         ["put", "@string", templateFile],
         tmpStore,
       );
+      const tmplHash = envValue(tmplOut) as string;
 
       // Register template
       await runCli(
-        [
-          "var",
-          "set",
-          `@ucas/template/text/${schemaHash.trim()}`,
-          tmplHash.trim(),
-        ],
+        ["var", "set", `@ucas/template/text/${schemaHash.trim()}`, tmplHash],
         tmpStore,
       );
 
       // Render with custom decay
       const { stdout: output, exitCode } = await runCli(
-        ["render", parentHash.trim(), "--decay", "0.7"],
+        ["render", parentHash, "--decay", "0.7"],
         tmpStore,
       );
 
@@ -979,10 +979,11 @@ describe("Suite 6: CLI Integration with Templates", () => {
 
       const nodeFile = join(tmpStore, "node.json");
       writeFileSync(nodeFile, JSON.stringify({ name: "Bob" }));
-      const { stdout: nodeHash } = await runCli(
+      const { stdout: nodeOut } = await runCli(
         ["put", schemaHash.trim(), nodeFile],
         tmpStore,
       );
+      const nodeHash = envValue(nodeOut) as string;
 
       // Create template (JSON-encoded string)
       const templateFile = join(tmpStore, "template.json");
@@ -990,25 +991,21 @@ describe("Suite 6: CLI Integration with Templates", () => {
         templateFile,
         JSON.stringify("Greetings {{ payload.name }}!"),
       );
-      const { stdout: tmplHash } = await runCli(
+      const { stdout: tmplOut } = await runCli(
         ["put", "@string", templateFile],
         tmpStore,
       );
+      const tmplHash = envValue(tmplOut) as string;
 
       await runCli(
-        [
-          "var",
-          "set",
-          `@ucas/template/text/${schemaHash.trim()}`,
-          tmplHash.trim(),
-        ],
+        ["var", "set", `@ucas/template/text/${schemaHash.trim()}`, tmplHash],
         tmpStore,
       );
 
       const { stdout: output, exitCode } = await runCli(
         [
           "render",
-          nodeHash.trim(),
+          nodeHash,
           "--resolution",
           "0.8",
           "--decay",
@@ -1043,14 +1040,15 @@ describe("Suite 6: CLI Integration with Templates", () => {
 
       const nodeFile = join(tmpStore, "node.json");
       writeFileSync(nodeFile, JSON.stringify({ name: "Charlie" }));
-      const { stdout: nodeHash } = await runCli(
+      const { stdout: nodeOut } = await runCli(
         ["put", schemaHash.trim(), nodeFile],
         tmpStore,
       );
+      const nodeHash = envValue(nodeOut) as string;
 
       // No template registered - should fall back to YAML
       const { stdout: output, exitCode } = await runCli(
-        ["render", nodeHash.trim()],
+        ["render", nodeHash],
         tmpStore,
       );
 
@@ -1079,13 +1077,14 @@ describe("Suite 6: CLI Integration with Templates", () => {
 
       const nodeFile = join(tmpStore, "node.json");
       writeFileSync(nodeFile, JSON.stringify({ name: "Test" }));
-      const { stdout: nodeHash } = await runCli(
+      const { stdout: nodeOut } = await runCli(
         ["put", schemaHash.trim(), nodeFile],
         tmpStore,
       );
+      const nodeHash = envValue(nodeOut) as string;
 
       const { exitCode, stderr } = await runCli(
-        ["render", nodeHash.trim(), "--decay", "1.5"],
+        ["render", nodeHash, "--decay", "1.5"],
         tmpStore,
       );
 
@@ -1126,14 +1125,15 @@ describe("Suite 6: CLI Integration with Templates", () => {
       // Create and store a simple string node
       const nodeFile = join(tmpStore, "test.json");
       writeFileSync(nodeFile, JSON.stringify("hello world"));
-      const { stdout: nodeHash } = await runCli(
+      const { stdout: nodeOut } = await runCli(
         ["put", stringType, nodeFile],
         tmpStore,
       );
+      const nodeHash = envValue(nodeOut) as string;
 
       // Render the valid hash
       const { exitCode, stdout, stderr } = await runCli(
-        ["render", nodeHash.trim()],
+        ["render", nodeHash],
         tmpStore,
       );
 

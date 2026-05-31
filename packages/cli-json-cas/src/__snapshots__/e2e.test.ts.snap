@@ -2,15 +2,23 @@
 
 exports[`Phase 1: CAS Core 1.6 get returns node JSON (snapshot) 1`] = `
 {
-  "payload": {
-    "age": 30,
-    "name": "Alice",
+  "type": "ASE7K6A0HG8W9",
+  "value": {
+    "payload": {
+      "age": 30,
+      "name": "Alice",
+    },
+    "type": "7XX5H51CVD9H0",
   },
-  "type": "7XX5H51CVD9H0",
 }
 `;
 
-exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `"ok"`;
+exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `
+{
+  "type": "8E2M8H30BHXS8",
+  "value": "ok",
+}
+`;
 
 exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `""`;
 
@@ -216,16 +224,16 @@ exports[`Phase 7: Edge Cases 7.5 no subcommand shows help text 1`] = `
 "Usage: json-cas [--store <path>] [--json] <command> [args]
 
 Commands:
-  put <type-hash> <file.json>       Store node, print hash
-  get <hash>                        Print node as JSON
-  has <hash>                        Print true/false
-  verify <hash>                     Verify integrity + schema, print ok/corrupted/invalid
+  put <type-hash> <file.json>       Store node, print { type, value } envelope (value=hash)
+  get <hash>                        Print node as { type, value } envelope
+  has <hash>                        Print { type, value } envelope (value=boolean)
+  verify <hash>                     Verify integrity + schema → { type, value } (value=ok/corrupted/invalid)
   refs <hash>                       List direct cas_ref edges
   walk <hash> [--format tree]       Recursive traversal
-  hash <type-hash> <file.json>      Compute hash without storing (dry run)
+  hash <type-hash> <file.json>      Compute hash without storing → { type, value } envelope
   render <hash> [options]           Render node as YAML with resolution decay
   render --pipe/-p [options]        Render { type, value } from stdin
-  list --type <hash-or-alias>       List all hashes for a given type
+  list --type <hash-or-alias>       List hashes for a type → { type, value } envelope (value=string[])
   var set <name> <hash> [--tag <tag>...] Create/update a variable
   var get <name> --schema <hash>    Get a variable by name + schema
   var delete <name> [--schema <hash>] Delete variable(s)
