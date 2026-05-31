@@ -1,30 +1,14 @@
 name: "e2e-check"
-description: "Docker-isolated E2E testing of json-cas CLI. Builds from scratch in a clean container, runs exploratory scenarios, reports bugs as Gitea issues."
+description: "Docker-isolated E2E testing of json-cas CLI. Preparer builds from scratch, tester runs scenarios, reporter files bugs."
 
 roles:
-  tester:
-    description: "Spins up a Docker container, builds from source, runs CLI scenarios end-to-end"
-    goal: "You are an exploratory QA agent for the json-cas CLI. You test in a Docker-isolated environment from scratch — clone, install, build, then run real CLI scenarios. Report every issue you find."
+  preparer:
+    description: "Spins up Docker container, copies repo, installs, builds, runs unit tests"
+    goal: "You set up a clean Docker environment for E2E testing. Your job is to start a container, install deps, build, lint, run unit tests, and initialize a CAS store. Report any setup failures as bugs."
     capabilities:
-      - testing
-      - cli
       - docker
     procedure: |
-      ## Phase 0: Docker Environment Setup
-
-      Create a fresh Docker container with bun, then build the project from source.
-
-      1. Start an interactive container (mount the repo read-only, work in a copy):
-         ```bash
-         docker run -it --rm \
-           -v "$(pwd):/src:ro" \
-           -w /workspace \
-           oven/bun:latest \
-           bash
-         ```
-         Or in non-interactive mode for automation, run each command via `docker exec`.
-
-         **Preferred approach for automation:** Start a detached container, then exec commands:
+      1. Start a detached container:
          ```bash
          docker run -d --name json-cas-e2e \
            -v "<repoPath>:/src:ro" \
@@ -32,53 +16,87 @@ roles:
            oven/bun:latest \
            sleep 3600
          ```
-         Then run all subsequent commands via:
-         ```bash
-         docker exec json-cas-e2e bash -c '<command>'
-         ```
 
-      2. Copy repo into the container and install:
+      2. Copy repo and install:
          ```bash
          docker exec json-cas-e2e bash -c 'cp -r /src/. /workspace/ && cd /workspace && bun install'
          ```
-         ✅ Verify: exit code 0, no missing peer deps warnings
-         ❌ Record: any install failures, missing deps, version conflicts
+         ✅ exit code 0, no missing peer deps
 
       3. Build:
          ```bash
          docker exec json-cas-e2e bash -c 'cd /workspace && bun run build'
          ```
-         ✅ Verify: exit code 0, no type errors
-         ❌ Record: any build failures, type errors, missing modules
+         ✅ exit code 0, no type errors
 
-      4. Lint check:
+      4. Lint:
          ```bash
          docker exec json-cas-e2e bash -c 'cd /workspace && bun run check'
          ```
-         ✅ Verify: exit code 0
-         ❌ Record: lint errors (these block CI)
+         ✅ exit code 0
 
       5. Unit tests:
          ```bash
          docker exec json-cas-e2e bash -c 'cd /workspace && bun test'
          ```
-         ✅ Verify: all tests pass
-         ❌ Record: failing tests with error messages
+         ✅ all pass (ignore dist/ false positives)
 
-      6. Set up CLI alias inside the container:
+      6. Init CAS store:
          ```bash
-         docker exec json-cas-e2e bash -c 'cd /workspace && export STORE=$(mktemp -d)/cas-test && bun packages/cli-json-cas/src/index.ts --store $STORE init && bun packages/cli-json-cas/src/index.ts --store $STORE bootstrap'
+         docker exec json-cas-e2e bash -c 'mkdir -p /tmp/cas-test && cd /workspace && bun packages/cli-json-cas/src/index.ts --store /tmp/cas-test init && bun packages/cli-json-cas/src/index.ts --store /tmp/cas-test bootstrap'
          ```
-         Capture the STORE path for subsequent commands.
 
-      **Important:** If any step in Phase 0 fails, record it as a bug! Setup failures from a clean environment are high-severity issues.
+      **Any failure here is a high-severity bug** — it means a clean environment can't build/run the project.
+
+      Set $status=ready if all steps pass. Set $status=setup_failed with failures list if anything breaks.
+
+    output: "Setup result summary."
+    frontmatter:
+      oneOf:
+        - type: object
+          properties:
+            $status: { const: "ready" }
+            containerName: { type: string }
+            storePath: { type: string }
+            repoPath: { type: string }
+          required: [$status, containerName, storePath, repoPath]
+        - type: object
+          properties:
+            $status: { const: "setup_failed" }
+            failures:
+              type: array
+              items:
+                type: object
+                properties:
+                  title: { type: string }
+                  command: { type: string }
+                  expected: { type: string }
+                  actual: { type: string }
+                  severity: { type: string }
+                  phase: { type: string }
+                required: [title, command, expected, actual, severity, phase]
+            repoPath: { type: string }
+          required: [$status, failures, repoPath]
+
+  tester:
+    description: "Runs CLI scenarios against the prepared Docker environment"
+    goal: "You are an exploratory QA agent. The Docker container is already running with the project built and a CAS store initialized. Run CLI test scenarios and report bugs."
+    capabilities:
+      - testing
+      - cli
+    procedure: |
+      The container `{{{containerName}}}` is already running with the project built.
+      Store path: `{{{storePath}}}`.
+
+      Run all commands via:
+      ```bash
+      docker exec {{{containerName}}} bash -c 'cd /workspace && bun packages/cli-json-cas/src/index.ts --store {{{storePath}}} <subcommand>'
+      ```
+
+      Define a shorthand in your notes:
+      `CMD="cd /workspace && bun packages/cli-json-cas/src/index.ts --store {{{storePath}}}"`
 
       ## Phase 1: CAS Core Operations
-
-      All commands run inside Docker via `docker exec json-cas-e2e bash -c '...'`.
-      Use `--store $STORE` for every command, or set it in the shell.
-
-      Define a helper: `CMD="cd /workspace && bun packages/cli-json-cas/src/index.ts --store /tmp/cas-test"`
 
       1. **bootstrap** — `$CMD bootstrap`
          Expected: prints meta-schema hash (13-char Base32)
@@ -173,7 +191,7 @@ roles:
       ## Phase 4: Template System
 
       1. **template set** — Create template file, `$CMD template set <type-hash> /tmp/test.liquid`
-         Template: `Name: {{ name }}, Age: {{ age }}`
+         Template: `Name: {{ payload.name }}, Age: {{ payload.age }}`
          Expected: success
 
       2. **template get** — `$CMD template get <type-hash>`
@@ -191,13 +209,13 @@ roles:
       ## Phase 5: Render
 
       1. Re-register template, then `$CMD render <node-hash>`
-         Expected: rendered output
+         Expected: rendered output with payload values filled in
 
       2. **render --resolution** — `$CMD render <node-hash> --resolution 0.5`
          Expected: different resolution output
 
       3. **render (bad hash)** — `$CMD render AAAAAAAAAAAAA`
-         Expected: graceful error
+         Expected: graceful error, non-zero exit
 
       ## Phase 6: GC
 
@@ -218,13 +236,6 @@ roles:
       6. `$CMD` with no subcommand — should show help
       7. `$CMD --store /nonexistent/path get <hash>` — bad store path
 
-      ## Cleanup
-
-      After all tests:
-      ```bash
-      docker stop json-cas-e2e && docker rm json-cas-e2e
-      ```
-
       ## Recording Results
 
       For each scenario:
@@ -237,7 +248,8 @@ roles:
       - Command (exact command run)
       - Expected behavior
       - Actual behavior (include actual output)
-      - Severity: critical (crash/data loss/build failure), high (wrong behavior), medium (bad UX/error message), low (cosmetic)
+      - Severity: critical / high / medium / low
+      - Phase: which test phase
 
       ## CRITICAL: Frontmatter Output Format
 
@@ -247,6 +259,7 @@ roles:
       ```yaml
       ---
       $status: bugs_found
+      containerName: json-cas-e2e
       repoPath: /path/to/repo
       bugs:
         - title: "put does not validate data against schema"
@@ -255,16 +268,18 @@ roles:
           actual: "Accepted invalid data, exit 0"
           severity: "high"
           phase: "Schema Validation"
-        - title: "render shows empty values"
-          command: "json-cas render <hash>"
-          expected: "Name: Alice"
-          actual: "Name: "
-          severity: "high"
-          phase: "Render"
       ---
       ```
 
       Do NOT write bugs as plain strings like `- some bug description`. Each bug MUST be an object with all 6 fields.
+
+      If all tests pass:
+      ```yaml
+      ---
+      $status: all_passed
+      containerName: json-cas-e2e
+      ---
+      ```
 
     output: "Summary of all phases with pass/fail counts. Set $status."
     frontmatter:
@@ -284,12 +299,14 @@ roles:
                   severity: { type: string }
                   phase: { type: string }
                 required: [title, command, expected, actual, severity, phase]
+            containerName: { type: string }
             repoPath: { type: string }
-          required: [$status, bugs, repoPath]
+          required: [$status, bugs, containerName]
         - type: object
           properties:
             $status: { const: "all_passed" }
-          required: [$status]
+            containerName: { type: string }
+          required: [$status, containerName]
 
   reporter:
     description: "Opens Gitea issues for each bug found by the tester"
@@ -349,12 +366,48 @@ roles:
             failed: { type: number }
           required: [$status, created, failed]
 
+  cleanup:
+    description: "Stops and removes the Docker container"
+    goal: "You clean up the Docker environment after testing is complete."
+    capabilities:
+      - docker
+    procedure: |
+      Stop and remove the container:
+      ```bash
+      docker stop {{{containerName}}} && docker rm {{{containerName}}}
+      ```
+
+      Verify it's gone:
+      ```bash
+      docker ps -a --filter name={{{containerName}}} --format '{{.Names}}'
+      ```
+      Expected: empty output.
+
+    output: "Cleanup result."
+    frontmatter:
+      oneOf:
+        - type: object
+          properties:
+            $status: { const: "cleaned" }
+          required: [$status]
+        - type: object
+          properties:
+            $status: { const: "cleanup_failed" }
+            error: { type: string }
+          required: [$status, error]
+
 graph:
   $START:
-    _: { role: "tester", prompt: "Run Docker-isolated E2E tests on json-cas CLI at {{{repoPath}}}." }
+    _: { role: "preparer", prompt: "Set up Docker environment for E2E testing. Repo at {{{repoPath}}}." }
+  preparer:
+    ready: { role: "tester", prompt: "Environment ready. Container: {{{containerName}}}, store: {{{storePath}}}. Run all test scenarios." }
+    setup_failed: { role: "reporter", prompt: "Setup failures found. File these as bugs: {{{failures}}}" }
   tester:
-    all_passed: { role: "$END", prompt: "All E2E tests passed in clean Docker environment. No issues." }
+    all_passed: { role: "cleanup", prompt: "All tests passed. Clean up container {{{containerName}}}." }
     bugs_found: { role: "reporter", prompt: "File these bugs as Gitea issues: {{{bugs}}}" }
   reporter:
-    reported: { role: "$END", prompt: "All bugs filed: {{{issues}}}. E2E check complete." }
-    partial: { role: "$END", prompt: "Filed {{{created}}} issues, {{{failed}}} failed. E2E check complete." }
+    reported: { role: "cleanup", prompt: "Bugs filed: {{{issues}}}. Clean up container {{{containerName}}}." }
+    partial: { role: "cleanup", prompt: "Filed {{{created}}} issues, {{{failed}}} failed. Clean up container {{{containerName}}}." }
+  cleanup:
+    cleaned: { role: "$END", prompt: "E2E check complete. Environment cleaned up." }
+    cleanup_failed: { role: "$END", prompt: "E2E check complete but cleanup failed: {{{error}}}" }
