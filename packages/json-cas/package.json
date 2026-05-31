@@ -15,8 +15,7 @@
     "src"
   ],
   "scripts": {
-    "test": "bun test",
-    "prepublishOnly": "echo '请用 bun run release 从根目录发版' && exit 1"
+    "test": "bun test"
   },
   "dependencies": {
     "ajv": "^8.20.0",
