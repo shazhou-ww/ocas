@@ -1,0 +1,305 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Phase 1: CAS Core 1.3 schema get returns schema JSON (snapshot) 1`] = `
+"{
+  "type": "object",
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "age": {
+      "type": "number"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}"
+`;
+
+exports[`Phase 1: CAS Core 1.4 schema list shows registered schemas 1`] = `
+"8J5E9WCD54ZJZ  (unnamed)
+89ZQWMV9PTC7B  (unnamed)
+86QB0Q5VA7797  (unnamed)
+AKEX4KYV98MGT  (unnamed)
+AGSJVKM01WNKZ  (unnamed)
+7XX5H51CVD9H0  (unnamed)"
+`;
+
+exports[`Phase 1: CAS Core 1.6 get returns node JSON (snapshot) 1`] = `
+{
+  "payload": {
+    "age": 30,
+    "name": "Alice",
+  },
+  "type": "7XX5H51CVD9H0",
+}
+`;
+
+exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `"ok"`;
+
+exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `""`;
+
+exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `"ERARPP19YJT05"`;
+
+exports[`Phase 1: CAS Core 1.13 cat returns full node (snapshot) 1`] = `
+{
+  "payload": {
+    "age": 30,
+    "name": "Alice",
+  },
+  "type": "7XX5H51CVD9H0",
+}
+`;
+
+exports[`Phase 1: CAS Core 1.14 cat --payload returns only payload (snapshot) 1`] = `
+"{
+  "age": 30,
+  "name": "Alice"
+}"
+`;
+
+exports[`Phase 2: Schema Validation 2.2 schema validate on valid node returns valid 1`] = `"valid"`;
+
+exports[`Phase 2: Schema Validation 2.3 put against non-existent schema hash fails 1`] = `"Schema not found: AAAAAAAAAAAAA"`;
+
+exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": {
+    "labels": [],
+    "name": "myapp/config",
+    "schema": "7XX5H51CVD9H0",
+    "tags": {},
+    "value": "ERARPP19YJT05",
+  },
+}
+`;
+
+exports[`Phase 3: Variable System 3.2 var get returns variable 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": {
+    "labels": [],
+    "name": "myapp/config",
+    "schema": "7XX5H51CVD9H0",
+    "tags": {},
+    "value": "ERARPP19YJT05",
+  },
+}
+`;
+
+exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": [
+    {
+      "labels": [],
+      "name": "myapp/config",
+      "schema": "7XX5H51CVD9H0",
+      "tags": {},
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
+`;
+
+exports[`Phase 3: Variable System 3.4 var list prefix filters by prefix 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": [
+    {
+      "labels": [],
+      "name": "myapp/config",
+      "schema": "7XX5H51CVD9H0",
+      "tags": {},
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
+`;
+
+exports[`Phase 3: Variable System 3.5 var set upsert updates existing variable 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": {
+    "labels": [],
+    "name": "myapp/config",
+    "schema": "7XX5H51CVD9H0",
+    "tags": {},
+    "value": "F68P1BZ46YDXM",
+  },
+}
+`;
+
+exports[`Phase 3: Variable System 3.6 var tag adds kv tag and label 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": {
+    "labels": [
+      "important",
+    ],
+    "name": "myapp/config",
+    "schema": "7XX5H51CVD9H0",
+    "tags": {
+      "env": "prod",
+    },
+    "value": "ERARPP19YJT05",
+  },
+}
+`;
+
+exports[`Phase 3: Variable System 3.7 var list --tag env:prod filters by kv tag 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": [
+    {
+      "labels": [
+        "important",
+      ],
+      "name": "myapp/config",
+      "schema": "7XX5H51CVD9H0",
+      "tags": {
+        "env": "prod",
+      },
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
+`;
+
+exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": [
+    {
+      "labels": [
+        "important",
+      ],
+      "name": "myapp/config",
+      "schema": "7XX5H51CVD9H0",
+      "tags": {
+        "env": "prod",
+      },
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
+`;
+
+exports[`Phase 3: Variable System 3.9 var tag remove deletes label 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": {
+    "labels": [],
+    "name": "myapp/config",
+    "schema": "7XX5H51CVD9H0",
+    "tags": {
+      "env": "prod",
+    },
+    "value": "ERARPP19YJT05",
+  },
+}
+`;
+
+exports[`Phase 3: Variable System 3.10 var delete removes variable 1`] = `
+{
+  "type": "E1D32N3GT69Q8",
+  "value": [
+    {
+      "labels": [],
+      "name": "myapp/config",
+      "schema": "7XX5H51CVD9H0",
+      "tags": {
+        "env": "prod",
+      },
+      "value": "ERARPP19YJT05",
+    },
+  ],
+}
+`;
+
+exports[`Phase 3: Variable System 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=myapp/config, schema=7XX5H51CVD9H0"`;
+
+exports[`Phase 4: Template System 4.1 template set registers template 1`] = `
+"{
+  "schemaHash": "7XX5H51CVD9H0",
+  "contentHash": "FC8WACA792B6F"
+}"
+`;
+
+exports[`Phase 4: Template System 4.2 template get returns template text 1`] = `"Name: {{ payload.name }}, Age: {{ payload.age }}"`;
+
+exports[`Phase 4: Template System 4.3 template list shows registered templates 1`] = `
+"[
+  {
+    "schemaHash": "7XX5H51CVD9H0",
+    "preview": "Name: {{ payload.name }}, Age: {{ payload.age }}"
+  }
+]"
+`;
+
+exports[`Phase 4: Template System 4.4 template delete removes template 1`] = `
+"{
+  "deleted": true
+}"
+`;
+
+exports[`Phase 4: Template System 4.5 template get deleted template returns not found 1`] = `"Error: Template not found for schema: 7XX5H51CVD9H0"`;
+
+exports[`Phase 5: Render 5.1 render fills payload variables 1`] = `"Hello Alice!"`;
+
+exports[`Phase 5: Render 5.2 render --resolution with different value 1`] = `"Hello Alice!"`;
+
+exports[`Phase 7: Edge Cases 7.1 get non-existent hash errors gracefully 1`] = `"Node not found: AAAAAAAAAAAAA"`;
+
+exports[`Phase 7: Edge Cases 7.3 var set empty name errors 1`] = `"Usage: json-cas var set <name> <hash> [--tag <tag>...]"`;
+
+exports[`Phase 7: Edge Cases 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Segment "invalid name!" contains invalid characters (only @, a-z, A-Z, 0-9, ., _, - allowed)"`;
+
+exports[`Phase 7: Edge Cases 7.5 schema put invalid schema errors 1`] = `"Invalid schema: input does not conform to the json-cas JSON Schema meta-schema"`;
+
+exports[`Phase 7: Edge Cases 7.6 no subcommand shows help text 1`] = `
+"Usage: json-cas [--store <path>] [--json] <command> [args]
+
+Commands:
+  init                              Create store dir and write bootstrap seed
+  bootstrap                         Write meta-schema seed, print hash
+  schema put <file.json>            Register schema, print type hash
+  schema get <type-hash>            Print schema JSON
+  schema list                       List all schemas (name + hash)
+  schema validate <hash>            Validate node against its schema
+  put <type-hash> <file.json>       Store node, print hash
+  get <hash>                        Print node as JSON
+  has <hash>                        Print true/false
+  verify <hash>                     Verify integrity, print ok/corrupted
+  refs <hash>                       List direct cas_ref edges
+  walk <hash> [--format tree]       Recursive traversal
+  hash <type-hash> <file.json>      Compute hash without storing (dry run)
+  render <hash> [options]           Render node as YAML with resolution decay
+  render --pipe/-p [options]        Render { type, value } from stdin
+  cat <hash> [--payload]            Output node (--payload for payload only)
+  var set <name> <hash> [--tag <tag>...] Create/update a variable
+  var get <name> --schema <hash>    Get a variable by name + schema
+  var delete <name> [--schema <hash>] Delete variable(s)
+  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables
+  var tag <name> --schema <hash> <operations...> Modify tags/labels
+  template set <schema-hash> <file> | --inline <text> Set template for schema
+  template get <schema-hash>        Get template content as raw text
+  template list                     List all templates
+  template delete <schema-hash>     Delete template for schema
+  gc                                Run garbage collection
+
+Flags:
+  --store <path>      Store directory (default: ~/.uncaged/json-cas)
+  --var-db <path>     Variable database path (default: <store>/variables.db)
+  --json              Compact JSON output
+  --schema <hash>     Schema hash filter for var get/delete/tag/list
+  --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
+  --inline <text>     Inline text content for template set
+  --resolution <n>    Initial resolution for render (default: 1.0)
+  --decay <n>         Decay factor for render (default: 0.5)
+  --epsilon <n>       Cutoff threshold for render (default: 0.01)
+  --pipe, -p          Read { type, value } JSON from stdin for render"
+`;
