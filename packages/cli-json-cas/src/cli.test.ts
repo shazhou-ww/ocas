@@ -1,12 +1,35 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { bootstrap } from "@uncaged/json-cas";
-import { createFsStore } from "@uncaged/json-cas-fs";
+import type { JSONSchema } from "@uncaged/json-cas";
+import { bootstrap, putSchema } from "@uncaged/json-cas";
+import { createFsStore, openStore as openFsStore } from "@uncaged/json-cas-fs";
 
 const pkgPath = resolve(import.meta.dir, "../package.json");
 const entrypoint = resolve(import.meta.dir, "index.ts");
+
+/**
+ * Register a schema directly via the library (CLI schema put was removed).
+ * Returns the type hash.
+ */
+async function putSchemaFile(
+  storePath: string,
+  schemaFilePath: string,
+): Promise<string> {
+  const store = await openFsStore(storePath);
+  const schema = JSON.parse(
+    readFileSync(schemaFilePath, "utf-8"),
+  ) as JSONSchema;
+  const hash = await putSchema(store, schema);
+  return hash;
+}
 
 async function runCli(
   args: string[],
@@ -129,86 +152,6 @@ async function runCliAlias(...args: string[]): Promise<{
     exitCode: proc.exitCode ?? 0,
   };
 }
-
-describe("@ Alias Resolution - schema get", () => {
-  test("ucas schema get @string should work", async () => {
-    await runCliAlias("init"); // Initialize store
-
-    const { stdout, stderr, exitCode } = await runCliAlias(
-      "schema",
-      "get",
-      "@string",
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    const schema = JSON.parse(stdout);
-    expect(schema).toEqual({ type: "string" });
-  });
-
-  test("ucas schema get @number should work", async () => {
-    await runCliAlias("init");
-
-    const { stdout, exitCode } = await runCliAlias("schema", "get", "@number");
-
-    expect(exitCode).toBe(0);
-    const schema = JSON.parse(stdout);
-    expect(schema).toEqual({ type: "number" });
-  });
-
-  test("ucas schema get @object should work", async () => {
-    await runCliAlias("init");
-
-    const { stdout, exitCode } = await runCliAlias("schema", "get", "@object");
-
-    expect(exitCode).toBe(0);
-    const schema = JSON.parse(stdout);
-    expect(schema).toEqual({ type: "object" });
-  });
-
-  test("ucas schema get @array should work", async () => {
-    await runCliAlias("init");
-
-    const { stdout, exitCode } = await runCliAlias("schema", "get", "@array");
-
-    expect(exitCode).toBe(0);
-    const schema = JSON.parse(stdout);
-    expect(schema).toEqual({ type: "array" });
-  });
-
-  test("ucas schema get @bool should work", async () => {
-    await runCliAlias("init");
-
-    const { stdout, exitCode } = await runCliAlias("schema", "get", "@bool");
-
-    expect(exitCode).toBe(0);
-    const schema = JSON.parse(stdout);
-    expect(schema).toEqual({ type: "boolean" });
-  });
-
-  test("ucas schema get @schema should work", async () => {
-    await runCliAlias("init");
-
-    const { stdout, exitCode } = await runCliAlias("schema", "get", "@schema");
-
-    expect(exitCode).toBe(0);
-    const schema = JSON.parse(stdout);
-    expect(schema).toHaveProperty("type", "object");
-    expect(schema).toHaveProperty(
-      "description",
-      "json-cas JSON Schema meta-schema",
-    );
-  });
-
-  test("ucas schema get @invalid should fail gracefully", async () => {
-    await runCliAlias("init");
-
-    const { stderr, exitCode } = await runCliAlias("schema", "get", "@invalid");
-
-    expect(exitCode).not.toBe(0);
-    expect(stderr).toContain("Schema not found");
-  });
-});
 
 describe("@ Alias Resolution - put", () => {
   test("ucas put @string <file> should resolve alias", async () => {
@@ -357,10 +300,7 @@ describe("Issue #50: Schema Validation in put", () => {
             additionalProperties: false,
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Create valid payload
         const payloadFile = join(tmpStore, "payload.json");
@@ -403,10 +343,7 @@ describe("Issue #50: Schema Validation in put", () => {
             additionalProperties: false,
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Payload with only required properties
         const payloadFile = join(tmpStore, "payload.json");
@@ -448,10 +385,7 @@ describe("Issue #50: Schema Validation in put", () => {
             additionalProperties: false,
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Payload with nested structure
         const payloadFile = join(tmpStore, "payload.json");
@@ -513,10 +447,7 @@ describe("Issue #50: Schema Validation in put", () => {
             additionalProperties: false,
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Payload with name as number
         const payloadFile = join(tmpStore, "payload.json");
@@ -560,10 +491,7 @@ describe("Issue #50: Schema Validation in put", () => {
             additionalProperties: false,
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Empty payload
         const payloadFile = join(tmpStore, "payload.json");
@@ -596,10 +524,7 @@ describe("Issue #50: Schema Validation in put", () => {
             additionalProperties: false,
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Payload with extra property
         const payloadFile = join(tmpStore, "payload.json");
@@ -634,10 +559,7 @@ describe("Issue #50: Schema Validation in put", () => {
             items: { type: "string" },
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Payload is an object
         const payloadFile = join(tmpStore, "payload.json");
@@ -676,10 +598,7 @@ describe("Issue #50: Schema Validation in put", () => {
             },
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Payload with wrong nested type
         const payloadFile = join(tmpStore, "payload.json");
@@ -760,10 +679,7 @@ describe("Issue #50: Schema Validation in put", () => {
             additionalProperties: false,
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Invalid payload
         const payloadFile = join(tmpStore, "payload.json");
@@ -798,10 +714,7 @@ describe("Issue #50: Schema Validation in put", () => {
             },
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         // Valid cas_ref
         const validFile = join(tmpStore, "valid.json");
@@ -843,11 +756,8 @@ describe("Issue #50: Schema Validation in put", () => {
           }),
         );
 
-        const { exitCode } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
-        expect(exitCode).toBe(0);
+        const hash = await putSchemaFile(tmpStore, schemaFile);
+        expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
       } finally {
         rmSync(tmpStore, { recursive: true, force: true });
       }
@@ -869,10 +779,7 @@ describe("Issue #50: Schema Validation in put", () => {
             required: ["name"],
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         const payloadFile = join(tmpStore, "payload.json");
         writeFileSync(payloadFile, JSON.stringify({ name: 123 }));
@@ -903,10 +810,7 @@ describe("Issue #50: Schema Validation in put", () => {
             properties: { name: { type: "string" } },
           }),
         );
-        const { stdout: schemaHash } = await runCli(
-          ["schema", "put", schemaFile],
-          tmpStore,
-        );
+        const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
         const payloadFile = join(tmpStore, "payload.json");
         writeFileSync(payloadFile, JSON.stringify({ name: 123 }));
@@ -941,10 +845,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
           properties: { name: { type: "string" } },
         }),
       );
-      const { stdout: schemaHash } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
       // Create node
       const nodeFile = join(tmpStore, "node.json");
@@ -1005,10 +906,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
           },
         }),
       );
-      const { stdout: schemaHash } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
       // Create child node
       const childFile = join(tmpStore, "child.json");
@@ -1077,10 +975,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
           properties: { name: { type: "string" } },
         }),
       );
-      const { stdout: schemaHash } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
       const nodeFile = join(tmpStore, "node.json");
       writeFileSync(nodeFile, JSON.stringify({ name: "Bob" }));
@@ -1144,10 +1039,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
           properties: { name: { type: "string" } },
         }),
       );
-      const { stdout: schemaHash } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
       const nodeFile = join(tmpStore, "node.json");
       writeFileSync(nodeFile, JSON.stringify({ name: "Charlie" }));
@@ -1183,10 +1075,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
           properties: { name: { type: "string" } },
         }),
       );
-      const { stdout: schemaHash } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
       const nodeFile = join(tmpStore, "node.json");
       writeFileSync(nodeFile, JSON.stringify({ name: "Test" }));
@@ -1303,140 +1192,6 @@ describe("Suite 6: CLI Integration with Templates", () => {
       expect(exitCode).toBe(0);
       expect(stdout).toContain("test");
       expect(stderr).toBe("");
-    } finally {
-      rmSync(tmpStore, { recursive: true, force: true });
-    }
-  });
-});
-
-// ---- schema put - invalid schema error handling ----
-
-describe("schema put - invalid schema error handling", () => {
-  test("invalid schema - unknown type value shows clean error", async () => {
-    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
-    try {
-      await runCli(["init"], tmpStore);
-
-      const schemaFile = join(tmpStore, "invalid-schema.json");
-      writeFileSync(schemaFile, JSON.stringify({ type: "invalid" }));
-
-      const { exitCode, stderr, stdout } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
-
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toContain("Invalid schema");
-      expect(stderr).not.toContain("at ");
-      expect(stdout).toBe("");
-    } finally {
-      rmSync(tmpStore, { recursive: true, force: true });
-    }
-  });
-
-  test("invalid schema - unknown key shows clean error", async () => {
-    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
-    try {
-      await runCli(["init"], tmpStore);
-
-      const schemaFile = join(tmpStore, "invalid-schema.json");
-      writeFileSync(
-        schemaFile,
-        JSON.stringify({ type: "string", unknownKey: true }),
-      );
-
-      const { exitCode, stderr, stdout } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
-
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toContain("Invalid schema");
-      expect(stderr).not.toContain("at ");
-      expect(stdout).toBe("");
-    } finally {
-      rmSync(tmpStore, { recursive: true, force: true });
-    }
-  });
-
-  test("invalid schema - invalid nested schema shows clean error", async () => {
-    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
-    try {
-      await runCli(["init"], tmpStore);
-
-      const schemaFile = join(tmpStore, "invalid-schema.json");
-      writeFileSync(
-        schemaFile,
-        JSON.stringify({
-          type: "object",
-          properties: {
-            name: { type: "invalid" },
-          },
-        }),
-      );
-
-      const { exitCode, stderr, stdout } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
-
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toContain("Invalid schema");
-      expect(stderr).not.toContain("at ");
-      expect(stdout).toBe("");
-    } finally {
-      rmSync(tmpStore, { recursive: true, force: true });
-    }
-  });
-
-  test("invalid schema - non-object root shows clean error", async () => {
-    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
-    try {
-      await runCli(["init"], tmpStore);
-
-      const schemaFile = join(tmpStore, "invalid-schema.json");
-      writeFileSync(schemaFile, JSON.stringify(["type", "string"]));
-
-      const { exitCode, stderr, stdout } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
-
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toContain("Invalid schema");
-      expect(stderr).not.toContain("at ");
-      expect(stdout).toBe("");
-    } finally {
-      rmSync(tmpStore, { recursive: true, force: true });
-    }
-  });
-
-  test("valid schema still works (regression)", async () => {
-    const tmpStore = mkdtempSync(join(tmpdir(), "json-cas-test-"));
-    try {
-      await runCli(["init"], tmpStore);
-
-      const schemaFile = join(tmpStore, "valid-schema.json");
-      writeFileSync(
-        schemaFile,
-        JSON.stringify({
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            age: { type: "number" },
-          },
-          required: ["name"],
-        }),
-      );
-
-      const { exitCode, stderr, stdout } = await runCli(
-        ["schema", "put", schemaFile],
-        tmpStore,
-      );
-
-      expect(exitCode).toBe(0);
-      expect(stderr).toBe("");
-      expect(stdout.trim()).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
     } finally {
       rmSync(tmpStore, { recursive: true, force: true });
     }

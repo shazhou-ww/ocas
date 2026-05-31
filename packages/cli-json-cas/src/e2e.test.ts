@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -57,7 +57,7 @@ function stripVolatile(json: string): unknown {
 // ---- Phase 1: CAS Core ----
 
 describe("Phase 1: CAS Core", () => {
-  test("1.1 schema put returns type hash (auto-bootstraps store)", async () => {
+  test("1.1 init + put with @object bootstraps store", async () => {
     const schemaFile = join(tmpStore, "test-schema.json");
     writeFileSync(
       schemaFile,
@@ -71,23 +71,16 @@ describe("Phase 1: CAS Core", () => {
         additionalProperties: false,
       }),
     );
-    const { stdout, exitCode } = await runCli(["schema", "put", schemaFile]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
-    typeHash = stdout;
-  });
-
-  test("1.3 schema get returns schema JSON (snapshot)", async () => {
-    const { stdout, exitCode } = await runCli(["schema", "get", typeHash]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
-  });
-
-  test("1.4 schema list shows registered schemas", async () => {
-    const { stdout, exitCode } = await runCli(["schema", "list"]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
-    expect(stdout).toContain(typeHash);
+    // Use putSchema via the library to register schema, since CLI schema put is removed
+    const { openStore: openFsStore } = await import("@uncaged/json-cas-fs");
+    const { putSchema } = await import("@uncaged/json-cas");
+    const store = await openFsStore(tmpStore);
+    const hash = await putSchema(
+      store,
+      JSON.parse(readFileSync(schemaFile, "utf-8")),
+    );
+    typeHash = hash;
+    expect(typeHash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 
   test("1.5 put returns node hash", async () => {
@@ -142,19 +135,10 @@ describe("Phase 1: CAS Core", () => {
     expect(stdout).toBe(nodeHash);
   });
 
-  test("1.13 cat returns full node (snapshot)", async () => {
-    const { stdout, exitCode } = await runCli(["cat", nodeHash]);
+  test("1.13 list --type returns nodes of that type", async () => {
+    const { stdout, exitCode } = await runCli(["list", "--type", typeHash]);
     expect(exitCode).toBe(0);
-    expect(stripVolatile(stdout)).toMatchSnapshot();
-  });
-
-  test("1.14 cat --payload returns only payload (snapshot)", async () => {
-    const { stdout, exitCode } = await runCli(["cat", nodeHash, "--payload"]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
-    const parsed = JSON.parse(stdout) as Record<string, unknown>;
-    expect(parsed).not.toHaveProperty("type");
-    expect(parsed).toHaveProperty("name", "Alice");
+    expect(stdout).toContain(nodeHash);
   });
 });
 
@@ -176,10 +160,10 @@ describe("Phase 2: Schema Validation", () => {
     // Do NOT snapshot stderr — it embeds a machine-specific tmp path
   });
 
-  test("2.2 schema validate on valid node returns valid", async () => {
-    const { stdout, exitCode } = await runCli(["schema", "validate", nodeHash]);
+  test("2.2 verify on valid node returns ok (hash + schema)", async () => {
+    const { stdout, exitCode } = await runCli(["verify", nodeHash]);
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stdout).toBe("ok");
   });
 
   test("2.3 put against non-existent schema hash fails", async () => {
@@ -504,20 +488,7 @@ describe("Phase 7: Edge Cases", () => {
     expect(stderr).toMatchSnapshot();
   });
 
-  test("7.5 schema put invalid schema errors", async () => {
-    const badSchemaFile = join(tmpStore, "bad-schema.json");
-    writeFileSync(badSchemaFile, JSON.stringify({ type: "invalid" }));
-    const { stdout, stderr, exitCode } = await runCli([
-      "schema",
-      "put",
-      badSchemaFile,
-    ]);
-    expect(exitCode).not.toBe(0);
-    expect(stdout).toBe("");
-    expect(stderr).toMatchSnapshot();
-  });
-
-  test("7.6 no subcommand shows help text", async () => {
+  test("7.5 no subcommand shows help text", async () => {
     const { stdout, stderr, exitCode: _exitCode } = await runCli([]);
     const combined = stdout + stderr;
     expect(combined.length).toBeGreaterThan(0);
@@ -525,7 +496,7 @@ describe("Phase 7: Edge Cases", () => {
     expect(combined.toLowerCase()).toContain("usage");
   });
 
-  test("7.7 --store path is a file errors", async () => {
+  test("7.6 --store path is a file errors", async () => {
     const fileAsStore = join(tmpStore, "not-a-directory");
     writeFileSync(fileAsStore, "test");
     const proc = Bun.spawn(

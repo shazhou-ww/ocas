@@ -17,7 +17,6 @@ import {
   refs,
   renderAsync,
   renderDirect,
-  SchemaValidationError,
   TagLabelConflictError,
   VariableNotFoundError,
   validate,
@@ -41,6 +40,7 @@ const VALUE_FLAGS = new Set([
   "decay",
   "epsilon",
   "inline",
+  "type",
 ]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
@@ -227,61 +227,6 @@ function parseTagsLabels(args: string[]): {
 
 // ---- Commands ----
 
-async function cmdSchemaPut(args: string[]): Promise<void> {
-  const file = args[0];
-  if (!file) die("Usage: json-cas schema put <file.json>");
-  const schema = readJsonFile(file) as JSONSchema;
-  const store = await openStore();
-  try {
-    const hash = await putSchema(store, schema);
-    console.log(hash);
-  } catch (e) {
-    if (e instanceof SchemaValidationError) {
-      die(e.message);
-    }
-    throw e;
-  }
-}
-
-async function cmdSchemaGet(args: string[]): Promise<void> {
-  const hashOrAlias = args[0];
-  if (!hashOrAlias) die("Usage: json-cas schema get <type-hash>");
-  const hash = await resolveTypeHash(hashOrAlias);
-  const store = await openStore();
-  const schema = getSchema(store, hash);
-  if (schema === null) die(`Schema not found: ${hashOrAlias}`);
-  out(schema);
-}
-
-async function cmdSchemaList(): Promise<void> {
-  const store = await openStore();
-  const builtinSchemas = await bootstrap(store);
-  const metaHash = builtinSchemas["@schema"];
-  if (!metaHash) throw new Error("Meta-schema not found");
-  for (const hash of store.listByType(metaHash)) {
-    if (hash === metaHash) continue;
-    const node = store.get(hash);
-    if (node !== null) {
-      const schema = node.payload as JSONSchema;
-      const name =
-        (schema.title as string | undefined) ??
-        (schema.description as string | undefined) ??
-        "(unnamed)";
-      console.log(`${hash}  ${name}`);
-    }
-  }
-}
-
-async function cmdSchemaValidate(args: string[]): Promise<void> {
-  const hash = args[0];
-  if (!hash) die("Usage: json-cas schema validate <hash>");
-  const store = await openStore();
-  const node = store.get(hash);
-  if (node === null) die(`Node not found: ${hash}`);
-  const valid = validate(store, node);
-  console.log(valid ? "valid" : "invalid");
-}
-
 async function cmdPut(args: string[]): Promise<void> {
   const typeHashOrAlias = args[0];
   const file = args[1];
@@ -334,7 +279,12 @@ async function cmdVerify(args: string[]): Promise<void> {
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   const ok = await verify(hash, node);
-  console.log(ok ? "ok" : "corrupted");
+  if (!ok) {
+    console.log("corrupted");
+  } else {
+    const valid = validate(store, node);
+    console.log(valid ? "ok" : "invalid");
+  }
 }
 
 async function cmdRefs(args: string[]): Promise<void> {
@@ -506,19 +456,6 @@ async function cmdRender(args: string[]): Promise<void> {
       die(error.message);
     }
     die(String(error));
-  }
-}
-
-async function cmdCat(args: string[]): Promise<void> {
-  const hash = args[0];
-  if (!hash) die("Usage: json-cas cat <hash>");
-  const store = await openStore();
-  const node = store.get(hash);
-  if (node === null) die(`Node not found: ${hash}`);
-  if (flags.payload === true) {
-    out(node.payload);
-  } else {
-    out(node);
   }
 }
 
@@ -883,25 +820,32 @@ async function cmdGc(_args: string[]): Promise<void> {
   }
 }
 
+async function cmdList(_args: string[]): Promise<void> {
+  const typeFlag = flags.type;
+  if (typeof typeFlag !== "string")
+    die("Usage: json-cas list --type <hash-or-alias>");
+  const typeHash = await resolveTypeHash(typeFlag);
+  const store = await openStore();
+  for (const hash of store.listByType(typeHash)) {
+    console.log(hash);
+  }
+}
+
 function printUsage(): void {
   console.log(`\
 Usage: json-cas [--store <path>] [--json] <command> [args]
 
 Commands:
-  schema put <file.json>            Register schema, print type hash
-  schema get <type-hash>            Print schema JSON
-  schema list                       List all schemas (name + hash)
-  schema validate <hash>            Validate node against its schema
   put <type-hash> <file.json>       Store node, print hash
   get <hash>                        Print node as JSON
   has <hash>                        Print true/false
-  verify <hash>                     Verify integrity, print ok/corrupted
+  verify <hash>                     Verify integrity + schema, print ok/corrupted/invalid
   refs <hash>                       List direct cas_ref edges
   walk <hash> [--format tree]       Recursive traversal
   hash <type-hash> <file.json>      Compute hash without storing (dry run)
   render <hash> [options]           Render node as YAML with resolution decay
   render --pipe/-p [options]        Render { type, value } from stdin
-  cat <hash> [--payload]            Output node (--payload for payload only)
+  list --type <hash-or-alias>       List all hashes for a given type
   var set <name> <hash> [--tag <tag>...] Create/update a variable
   var get <name> --schema <hash>    Get a variable by name + schema
   var delete <name> [--schema <hash>] Delete variable(s)
@@ -936,27 +880,6 @@ if (!cmd) {
 }
 
 switch (cmd) {
-  case "schema": {
-    const [sub, ...subRest] = rest;
-    switch (sub) {
-      case "put":
-        await cmdSchemaPut(subRest);
-        break;
-      case "get":
-        await cmdSchemaGet(subRest);
-        break;
-      case "list":
-        await cmdSchemaList();
-        break;
-      case "validate":
-        await cmdSchemaValidate(subRest);
-        break;
-      default:
-        die(`Unknown schema subcommand: ${sub ?? "(none)"}`);
-    }
-    break;
-  }
-
   case "put":
     await cmdPut(rest);
     break;
@@ -989,8 +912,8 @@ switch (cmd) {
     await cmdRender(rest);
     break;
 
-  case "cat":
-    await cmdCat(rest);
+  case "list":
+    await cmdList(rest);
     break;
 
   case "var": {
