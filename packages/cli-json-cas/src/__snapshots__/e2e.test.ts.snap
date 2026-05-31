@@ -264,8 +264,6 @@ exports[`Phase 7: Edge Cases 7.6 no subcommand shows help text 1`] = `
 "Usage: json-cas [--store <path>] [--json] <command> [args]
 
 Commands:
-  init                              Create store dir and write bootstrap seed
-  bootstrap                         Write meta-schema seed, print hash
   schema put <file.json>            Register schema, print type hash
   schema get <type-hash>            Print schema JSON
   schema list                       List all schemas (name + hash)

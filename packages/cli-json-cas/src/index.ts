@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Hash, JSONSchema, Store, VariableStore } from "@uncaged/json-cas";
@@ -24,7 +24,7 @@ import {
   verify,
   walk,
 } from "@uncaged/json-cas";
-import { createFsStore } from "@uncaged/json-cas-fs";
+import { openStore as openFsStore } from "@uncaged/json-cas-fs";
 
 // ---- Argument parsing ----
 
@@ -113,26 +113,16 @@ function readJsonFile(file: string): unknown {
 }
 
 /**
- * Validate that the store directory exists.
- * Dies with a clear error message if not found.
+ * Open the filesystem-backed CAS store.
+ * Automatically creates directory and bootstraps if needed.
  */
-function validateStoreExists(path: string): void {
-  if (!existsSync(path)) {
-    die(`Store not found at ${path}`);
-  }
-}
-
-function openStore(shouldCreate = false): Store {
+async function openStore(): Promise<Store> {
   const fullPath = resolve(storePath);
-  if (!shouldCreate) {
-    validateStoreExists(fullPath);
-  }
-  return createFsStore(fullPath);
+  return await openFsStore(fullPath);
 }
 
-function openVarStore(): VariableStore {
-  const store = openStore(true);
-  mkdirSync(resolve(storePath), { recursive: true });
+async function openVarStore(): Promise<VariableStore> {
+  const store = await openStore();
   return createVariableStore(resolve(varDbPath), store);
 }
 
@@ -141,12 +131,9 @@ function openVarStore(): VariableStore {
  * If the input starts with @, resolve it via bootstrap
  * Otherwise, return the hash as-is
  */
-async function resolveTypeHash(
-  typeHashOrAlias: string,
-  shouldCreate = false,
-): Promise<Hash> {
+async function resolveTypeHash(typeHashOrAlias: string): Promise<Hash> {
   if (typeHashOrAlias.startsWith("@")) {
-    const store = openStore(shouldCreate);
+    const store = await openStore();
     const builtinSchemas = await bootstrap(store);
     const resolvedHash = builtinSchemas[typeHashOrAlias];
     if (!resolvedHash) {
@@ -162,7 +149,7 @@ async function resolveTypeHash(
  * This is the type hash used in JSON envelopes
  */
 async function getVariableSchemaHash(): Promise<Hash> {
-  const store = openStore();
+  const store = await openStore();
 
   // Define the Variable JSON Schema (updated for new model with composite key)
   const variableSchema: JSONSchema = {
@@ -240,27 +227,11 @@ function parseTagsLabels(args: string[]): {
 
 // ---- Commands ----
 
-async function cmdInit(): Promise<void> {
-  const dir = resolve(storePath);
-  mkdirSync(dir, { recursive: true });
-  const store = createFsStore(dir);
-  const builtinSchemas = await bootstrap(store);
-  const metaHash = builtinSchemas["@schema"];
-  console.log(metaHash);
-}
-
-async function cmdBootstrap(): Promise<void> {
-  const store = openStore(true);
-  const builtinSchemas = await bootstrap(store);
-  const metaHash = builtinSchemas["@schema"];
-  console.log(metaHash);
-}
-
 async function cmdSchemaPut(args: string[]): Promise<void> {
   const file = args[0];
   if (!file) die("Usage: json-cas schema put <file.json>");
   const schema = readJsonFile(file) as JSONSchema;
-  const store = openStore(true);
+  const store = await openStore();
   try {
     const hash = await putSchema(store, schema);
     console.log(hash);
@@ -276,14 +247,14 @@ async function cmdSchemaGet(args: string[]): Promise<void> {
   const hashOrAlias = args[0];
   if (!hashOrAlias) die("Usage: json-cas schema get <type-hash>");
   const hash = await resolveTypeHash(hashOrAlias);
-  const store = openStore();
+  const store = await openStore();
   const schema = getSchema(store, hash);
   if (schema === null) die(`Schema not found: ${hashOrAlias}`);
   out(schema);
 }
 
 async function cmdSchemaList(): Promise<void> {
-  const store = openStore();
+  const store = await openStore();
   const builtinSchemas = await bootstrap(store);
   const metaHash = builtinSchemas["@schema"];
   if (!metaHash) throw new Error("Meta-schema not found");
@@ -304,7 +275,7 @@ async function cmdSchemaList(): Promise<void> {
 async function cmdSchemaValidate(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas schema validate <hash>");
-  const store = openStore();
+  const store = await openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   const valid = validate(store, node);
@@ -316,9 +287,9 @@ async function cmdPut(args: string[]): Promise<void> {
   const file = args[1];
   if (!typeHashOrAlias || !file)
     die("Usage: json-cas put <type-hash> <file.json>");
-  const typeHash = await resolveTypeHash(typeHashOrAlias, true);
+  const typeHash = await resolveTypeHash(typeHashOrAlias);
   const payload = readJsonFile(file);
-  const store = openStore(true);
+  const store = await openStore();
 
   // Check if schema exists
   const schema = getSchema(store, typeHash);
@@ -343,7 +314,7 @@ async function cmdPut(args: string[]): Promise<void> {
 async function cmdGet(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas get <hash>");
-  const store = openStore();
+  const store = await openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   out(node);
@@ -352,14 +323,14 @@ async function cmdGet(args: string[]): Promise<void> {
 async function cmdHas(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas has <hash>");
-  const store = openStore();
+  const store = await openStore();
   console.log(String(store.has(hash)));
 }
 
 async function cmdVerify(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas verify <hash>");
-  const store = openStore();
+  const store = await openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   const ok = await verify(hash, node);
@@ -369,7 +340,7 @@ async function cmdVerify(args: string[]): Promise<void> {
 async function cmdRefs(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas refs <hash>");
-  const store = openStore();
+  const store = await openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   const refHashes = refs(store, node);
@@ -381,7 +352,7 @@ async function cmdRefs(args: string[]): Promise<void> {
 async function cmdWalk(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas walk <hash> [--format tree]");
-  const store = openStore();
+  const store = await openStore();
   const format = flags.format;
 
   if (format === "tree") {
@@ -422,7 +393,7 @@ async function cmdHash(args: string[]): Promise<void> {
   const file = args[1];
   if (!typeHashOrAlias || !file)
     die("Usage: json-cas hash <type-hash> <file.json>");
-  const typeHash = await resolveTypeHash(typeHashOrAlias, true);
+  const typeHash = await resolveTypeHash(typeHashOrAlias);
   const payload = readJsonFile(file);
   const hash = await computeHash(typeHash, payload);
   console.log(hash);
@@ -442,7 +413,7 @@ async function cmdRender(args: string[]): Promise<void> {
     );
   }
 
-  const store = openStore();
+  const store = await openStore();
 
   // Parse numeric options
   const resolution =
@@ -517,7 +488,7 @@ async function cmdRender(args: string[]): Promise<void> {
       );
       process.stdout.write(output);
     } else {
-      const varStore = openVarStore();
+      const varStore = await openVarStore();
       const output = await renderAsync(store, hash, {
         resolution,
         decay,
@@ -541,7 +512,7 @@ async function cmdRender(args: string[]): Promise<void> {
 async function cmdCat(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: json-cas cat <hash>");
-  const store = openStore();
+  const store = await openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   if (flags.payload === true) {
@@ -560,7 +531,7 @@ async function cmdVarSet(args: string[]): Promise<void> {
     die("Usage: json-cas var set <name> <hash> [--tag <tag>...]");
   }
 
-  const varStore = openVarStore();
+  const varStore = await openVarStore();
 
   try {
     // Parse tags/labels from --tag flags
@@ -611,7 +582,7 @@ async function cmdVarGet(args: string[]): Promise<void> {
     die("Usage: json-cas var get <name> --schema <hash>");
   }
 
-  const varStore = openVarStore();
+  const varStore = await openVarStore();
 
   try {
     const variable = varStore.get(name, schema);
@@ -633,7 +604,7 @@ async function cmdVarDelete(args: string[]): Promise<void> {
     die("Usage: json-cas var delete <name> [--schema <hash>]");
   }
 
-  const varStore = openVarStore();
+  const varStore = await openVarStore();
 
   try {
     if (schema !== undefined) {
@@ -670,7 +641,7 @@ async function cmdVarTag(args: string[]): Promise<void> {
     die("Usage: json-cas var tag <name> --schema <hash> <operations...>");
   }
 
-  const varStore = openVarStore();
+  const varStore = await openVarStore();
 
   try {
     const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
@@ -702,7 +673,7 @@ async function cmdVarList(args: string[]): Promise<void> {
   const schema = flags.schema as string | undefined;
   const tagFlags = flags.tag;
 
-  const varStore = openVarStore();
+  const varStore = await openVarStore();
 
   try {
     // Parse tags/labels from --tag flags
@@ -744,8 +715,7 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     die("Usage: json-cas template set <schema-hash> <file> | --inline <text>");
   }
 
-  const store = openStore();
-  mkdirSync(resolve(storePath), { recursive: true });
+  const store = await openStore();
   const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
@@ -816,8 +786,7 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
     die("Usage: json-cas template get <schema-hash>");
   }
 
-  const store = openStore();
-  mkdirSync(resolve(storePath), { recursive: true });
+  const store = await openStore();
   const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
@@ -843,8 +812,7 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
 }
 
 async function cmdTemplateList(_args: string[]): Promise<void> {
-  const store = openStore();
-  mkdirSync(resolve(storePath), { recursive: true });
+  const store = await openStore();
   const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
@@ -884,8 +852,7 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
     die("Usage: json-cas template delete <schema-hash>");
   }
 
-  const store = openStore();
-  mkdirSync(resolve(storePath), { recursive: true });
+  const store = await openStore();
   const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
@@ -905,7 +872,7 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
 }
 
 async function cmdGc(_args: string[]): Promise<void> {
-  const store = createFsStore(storePath);
+  const store = await openStore();
   const varStore = createVariableStore(varDbPath, store);
 
   try {
@@ -921,8 +888,6 @@ function printUsage(): void {
 Usage: json-cas [--store <path>] [--json] <command> [args]
 
 Commands:
-  init                              Create store dir and write bootstrap seed
-  bootstrap                         Write meta-schema seed, print hash
   schema put <file.json>            Register schema, print type hash
   schema get <type-hash>            Print schema JSON
   schema list                       List all schemas (name + hash)
@@ -971,14 +936,6 @@ if (!cmd) {
 }
 
 switch (cmd) {
-  case "init":
-    await cmdInit();
-    break;
-
-  case "bootstrap":
-    await cmdBootstrap();
-    break;
-
   case "schema": {
     const [sub, ...subRest] = rest;
     switch (sub) {
