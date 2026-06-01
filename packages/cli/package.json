@@ -10,8 +10,8 @@
     "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
-    "@ocas/core": "0.1.0",
-    "@ocas/fs": "0.1.0"
+    "@ocas/core": "workspace:*",
+    "@ocas/fs": "workspace:*"
   },
   "repository": {
     "type": "git",

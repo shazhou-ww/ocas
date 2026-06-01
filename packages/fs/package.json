@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "cborg": "^4.2.3",
-    "@ocas/core": "0.1.0"
+    "@ocas/core": "workspace:*"
   },
   "repository": {
     "type": "git",
