@@ -32,23 +32,26 @@ const OUTPUT_ALIASES = [
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe("bootstrap - Built-in Schemas", () => {
-  test("should return map of 26 built-in schema aliases to hashes", async () => {
+  test("should return map of 29 built-in schema aliases to hashes", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
-    // Should return object with 6 primitive + 20 output aliases = 26
+    // Should return object with 9 primitive + 20 output aliases = 29
     expect(builtinSchemas).toHaveProperty("@ocas/schema");
     expect(builtinSchemas).toHaveProperty("@ocas/string");
     expect(builtinSchemas).toHaveProperty("@ocas/number");
+    expect(builtinSchemas).toHaveProperty("@ocas/integer");
+    expect(builtinSchemas).toHaveProperty("@ocas/boolean");
+    expect(builtinSchemas).toHaveProperty("@ocas/bool");
     expect(builtinSchemas).toHaveProperty("@ocas/object");
     expect(builtinSchemas).toHaveProperty("@ocas/array");
-    expect(builtinSchemas).toHaveProperty("@ocas/bool");
+    expect(builtinSchemas).toHaveProperty("@ocas/null");
 
     for (const alias of OUTPUT_ALIASES) {
       expect(builtinSchemas).toHaveProperty(alias);
     }
 
-    expect(Object.keys(builtinSchemas)).toHaveLength(26);
+    expect(Object.keys(builtinSchemas)).toHaveLength(29);
 
     // All values should be valid hashes
     for (const [_alias, hash] of Object.entries(builtinSchemas)) {

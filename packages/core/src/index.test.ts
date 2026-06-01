@@ -271,9 +271,12 @@ describe("bootstrap", () => {
     expect(builtinSchemas).toHaveProperty("@ocas/schema");
     expect(builtinSchemas).toHaveProperty("@ocas/string");
     expect(builtinSchemas).toHaveProperty("@ocas/number");
+    expect(builtinSchemas).toHaveProperty("@ocas/integer");
+    expect(builtinSchemas).toHaveProperty("@ocas/boolean");
+    expect(builtinSchemas).toHaveProperty("@ocas/bool");
     expect(builtinSchemas).toHaveProperty("@ocas/object");
     expect(builtinSchemas).toHaveProperty("@ocas/array");
-    expect(builtinSchemas).toHaveProperty("@ocas/bool");
+    expect(builtinSchemas).toHaveProperty("@ocas/null");
 
     // All values should be valid hashes
     for (const hash of Object.values(builtinSchemas)) {
@@ -281,7 +284,7 @@ describe("bootstrap", () => {
       expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
     }
 
-    expect(Object.keys(builtinSchemas)).toHaveLength(26);
+    expect(Object.keys(builtinSchemas)).toHaveLength(29);
   });
 
   test("meta-schema node is stored and retrievable", async () => {
@@ -318,7 +321,7 @@ describe("bootstrap", () => {
     const h2 = await bootstrap(store);
 
     expect(h1).toEqual(h2);
-    // All 26 built-in schemas should be typed by the meta-schema
-    expect(store.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(26);
+    // All built-in schemas typed by the meta-schema (1 self + 7 unique primitives + 20 outputs)
+    expect(store.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(28);
   });
 });

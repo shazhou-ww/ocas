@@ -10,7 +10,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import type { BootstrapCapableStore, CasNode, Hash } from "@ocas/core";
+import type {
+  BootstrapCapableStore,
+  CasNode,
+  Hash,
+  VariableStore,
+} from "@ocas/core";
 
 import {
   BOOTSTRAP_STORE,
@@ -310,10 +315,15 @@ export function createFsStore(dir: string): BootstrapCapableStore {
  * 4. Runs bootstrap (which is idempotent)
  *
  * @param dir - The directory path for the store
+ * @param varStore - Optional variable store; when provided, builtin schema
+ *   aliases are written to it during bootstrap
  * @returns A Promise resolving to the BootstrapCapableStore
  * @throws Error if the path exists but is not a directory
  */
-export async function openStore(dir: string): Promise<BootstrapCapableStore> {
+export async function openStore(
+  dir: string,
+  varStore?: VariableStore,
+): Promise<BootstrapCapableStore> {
   // Create directory if it doesn't exist
   try {
     mkdirSync(dir, { recursive: true });
@@ -323,7 +333,7 @@ export async function openStore(dir: string): Promise<BootstrapCapableStore> {
       if (nodeError.code === "EACCES") {
         throw new Error(`Permission denied: cannot access store at ${dir}`);
       }
-      if (nodeError.code === "ENOTDIR") {
+      if (nodeError.code === "ENOTDIR" || nodeError.code === "EEXIST") {
         throw new Error(`Path exists but is not a directory: ${dir}`);
       }
     }
@@ -350,7 +360,7 @@ export async function openStore(dir: string): Promise<BootstrapCapableStore> {
   const store = createFsStore(dir);
 
   // Bootstrap (idempotent)
-  await bootstrap(store);
+  await bootstrap(store, varStore);
 
   return store;
 }
