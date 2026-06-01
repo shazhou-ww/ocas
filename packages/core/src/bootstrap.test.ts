@@ -1,0 +1,340 @@
+import { describe, expect, test } from "bun:test";
+import { bootstrap } from "./bootstrap.js";
+import type { JSONSchema } from "./schema.js";
+import { getSchema } from "./schema.js";
+import { createMemoryStore } from "./store.js";
+
+const OUTPUT_ALIASES = [
+  "@output/put",
+  "@output/get",
+  "@output/has",
+  "@output/hash",
+  "@output/verify",
+  "@output/refs",
+  "@output/walk",
+  "@output/list",
+  "@output/list-meta",
+  "@output/list-schema",
+  "@output/var-set",
+  "@output/var-get",
+  "@output/var-delete",
+  "@output/var-tag",
+  "@output/var-list",
+  "@output/template-set",
+  "@output/template-get",
+  "@output/template-list",
+  "@output/template-delete",
+  "@output/gc",
+] as const;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Built-in Schema Registration Tests
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("bootstrap - Built-in Schemas", () => {
+  test("should return map of 26 built-in schema aliases to hashes", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    // Should return object with 6 primitive + 20 output aliases = 26
+    expect(builtinSchemas).toHaveProperty("@schema");
+    expect(builtinSchemas).toHaveProperty("@string");
+    expect(builtinSchemas).toHaveProperty("@number");
+    expect(builtinSchemas).toHaveProperty("@object");
+    expect(builtinSchemas).toHaveProperty("@array");
+    expect(builtinSchemas).toHaveProperty("@bool");
+
+    for (const alias of OUTPUT_ALIASES) {
+      expect(builtinSchemas).toHaveProperty(alias);
+    }
+
+    expect(Object.keys(builtinSchemas)).toHaveLength(26);
+
+    // All values should be valid hashes
+    for (const [_alias, hash] of Object.entries(builtinSchemas)) {
+      expect(typeof hash).toBe("string");
+      expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    }
+  });
+
+  test("should register @schema as meta-schema alias", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    const metaHash = builtinSchemas["@schema"];
+    if (!metaHash) throw new Error("@schema not found");
+
+    const metaSchema = getSchema(store, metaHash);
+    expect(metaSchema).not.toBeNull();
+    expect(metaSchema?.type).toBe("object");
+    expect(metaSchema?.description).toBe("ocas JSON Schema meta-schema");
+  });
+
+  test("should register @string schema correctly", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    const stringHash = builtinSchemas["@string"];
+    if (!stringHash) throw new Error("@string not found");
+
+    const stringSchema = getSchema(store, stringHash);
+    expect(stringSchema).toEqual({ type: "string" });
+  });
+
+  test("should register @number schema correctly", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    const numberHash = builtinSchemas["@number"];
+    if (!numberHash) throw new Error("@number not found");
+
+    const numberSchema = getSchema(store, numberHash);
+    expect(numberSchema).toEqual({ type: "number" });
+  });
+
+  test("should register @object schema correctly", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    const objectHash = builtinSchemas["@object"];
+    if (!objectHash) throw new Error("@object not found");
+
+    const objectSchema = getSchema(store, objectHash);
+    expect(objectSchema).toEqual({ type: "object" });
+  });
+
+  test("should register @array schema correctly", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    const arrayHash = builtinSchemas["@array"];
+    if (!arrayHash) throw new Error("@array not found");
+
+    const arraySchema = getSchema(store, arrayHash);
+    expect(arraySchema).toEqual({ type: "array" });
+  });
+
+  test("should register @bool schema correctly", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    const boolHash = builtinSchemas["@bool"];
+    if (!boolHash) throw new Error("@bool not found");
+
+    const boolSchema = getSchema(store, boolHash);
+    expect(boolSchema).toEqual({ type: "boolean" });
+  });
+
+  test("should return same hashes on repeated bootstrap calls", async () => {
+    const store = createMemoryStore();
+    const first = await bootstrap(store);
+    const second = await bootstrap(store);
+
+    expect(first).toEqual(second);
+
+    // Verify each alias points to same hash
+    expect(first["@string"]).toBe(second["@string"]);
+    expect(first["@number"]).toBe(second["@number"]);
+    expect(first["@object"]).toBe(second["@object"]);
+    expect(first["@array"]).toBe(second["@array"]);
+    expect(first["@bool"]).toBe(second["@bool"]);
+    expect(first["@schema"]).toBe(second["@schema"]);
+  });
+
+  test("all built-in schemas should be typed by meta-schema", async () => {
+    const store = createMemoryStore();
+    const builtinSchemas = await bootstrap(store);
+
+    const metaHash = builtinSchemas["@schema"];
+    if (!metaHash) throw new Error("@schema not found");
+
+    for (const [alias, hash] of Object.entries(builtinSchemas)) {
+      if (alias === "@schema") continue; // meta-schema is self-typed
+
+      const node = store.get(hash);
+      expect(node).not.toBeNull();
+      expect(node?.type).toBe(metaHash);
+    }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// @output/* Schema Registration Tests
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("bootstrap - @output/* Schemas", () => {
+  test("each @output/* schema has a title", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+
+    for (const alias of OUTPUT_ALIASES) {
+      const hash = aliases[alias];
+      if (!hash) throw new Error(`${alias} not found`);
+
+      const schema = getSchema(store, hash) as JSONSchema;
+      expect(schema).not.toBeNull();
+      expect(typeof schema.title).toBe("string");
+      expect((schema.title as string).startsWith("ocas ")).toBe(true);
+    }
+  });
+
+  test("@output/put schema describes a cas_ref string", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/put"];
+    if (!hash) throw new Error("@output/put not found");
+
+    const schema = getSchema(store, hash);
+    expect(schema).toEqual({
+      type: "string",
+      format: "cas_ref",
+      title: "ocas put result",
+    });
+  });
+
+  test("@output/get schema describes object with type, payload, timestamp", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/get"];
+    if (!hash) throw new Error("@output/get not found");
+
+    const schema = getSchema(store, hash) as JSONSchema;
+    expect(schema.type).toBe("object");
+    expect(schema.title).toBe("ocas get result");
+
+    const props = schema.properties as Record<string, JSONSchema>;
+    expect(props.type).toEqual({ type: "string", format: "cas_ref" });
+    expect(props.payload).toEqual({});
+    expect(props.timestamp).toEqual({ type: "number" });
+  });
+
+  test("@output/has schema describes a boolean", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/has"];
+    if (!hash) throw new Error("@output/has not found");
+
+    expect(getSchema(store, hash)).toEqual({
+      type: "boolean",
+      title: "ocas has result",
+    });
+  });
+
+  test("@output/verify schema describes enum of ok|corrupted|invalid", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/verify"];
+    if (!hash) throw new Error("@output/verify not found");
+
+    const schema = getSchema(store, hash);
+    expect(schema).toEqual({
+      type: "string",
+      enum: ["ok", "corrupted", "invalid"],
+      title: "ocas verify result",
+    });
+  });
+
+  test("@output/refs schema describes array of cas_ref strings", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/refs"];
+    if (!hash) throw new Error("@output/refs not found");
+
+    expect(getSchema(store, hash)).toEqual({
+      type: "array",
+      items: { type: "string", format: "cas_ref" },
+      title: "ocas refs result",
+    });
+  });
+
+  test("@output/gc schema describes object with gc stats fields", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/gc"];
+    if (!hash) throw new Error("@output/gc not found");
+
+    const schema = getSchema(store, hash) as JSONSchema;
+    expect(schema.type).toBe("object");
+    expect(schema.title).toBe("ocas gc result");
+
+    const props = schema.properties as Record<string, JSONSchema>;
+    expect(props.total).toEqual({ type: "number" });
+    expect(props.reachable).toEqual({ type: "number" });
+    expect(props.collected).toEqual({ type: "number" });
+    expect(props.scanned).toEqual({ type: "number" });
+  });
+
+  test("@output/var-set schema describes a Variable object", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/var-set"];
+    if (!hash) throw new Error("@output/var-set not found");
+
+    const schema = getSchema(store, hash) as JSONSchema;
+    expect(schema.type).toBe("object");
+    expect(schema.title).toBe("ocas var set result");
+
+    const props = schema.properties as Record<string, JSONSchema>;
+    expect(props.name).toEqual({ type: "string" });
+    expect(props.schema).toEqual({ type: "string", format: "cas_ref" });
+    expect(props.value).toEqual({ type: "string", format: "cas_ref" });
+  });
+
+  test("@output/var-list schema describes array of Variable objects", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/var-list"];
+    if (!hash) throw new Error("@output/var-list not found");
+
+    const schema = getSchema(store, hash) as JSONSchema;
+    expect(schema.type).toBe("array");
+    expect(schema.title).toBe("ocas var list result");
+
+    const items = schema.items as JSONSchema;
+    expect(items.type).toBe("object");
+    const props = items.properties as Record<string, JSONSchema>;
+    expect(props.name).toEqual({ type: "string" });
+  });
+
+  test("@output/template-delete schema describes object with deleted boolean", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const hash = aliases["@output/template-delete"];
+    if (!hash) throw new Error("@output/template-delete not found");
+
+    expect(getSchema(store, hash)).toEqual({
+      type: "object",
+      properties: { deleted: { type: "boolean" } },
+      title: "ocas template delete result",
+    });
+  });
+
+  test("all @output/* schemas are distinct hashes", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+
+    const outputHashes = OUTPUT_ALIASES.map((alias) => aliases[alias]);
+    const uniqueHashes = new Set(outputHashes);
+    expect(uniqueHashes.size).toBe(OUTPUT_ALIASES.length);
+  });
+});
+
+describe("bootstrap - meta and schemas indexes (D1)", () => {
+  test("listMeta contains the bootstrap meta-schema hash", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const metaHash = aliases["@schema"];
+    expect(store.listMeta()).toContain(metaHash as string);
+  });
+
+  test("listSchemas contains meta-schema and all built-in schemas", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const schemas = store.listSchemas();
+
+    for (const [, hash] of Object.entries(aliases)) {
+      expect(schemas).toContain(hash);
+    }
+    expect(schemas.length).toBeGreaterThanOrEqual(6);
+  });
+});

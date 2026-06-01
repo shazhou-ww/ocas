@@ -11,8 +11,8 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "paths": {
-      "@uncaged/json-cas": ["./packages/json-cas/src/index.ts"],
-      "@uncaged/json-cas-fs": ["./packages/json-cas-fs/src/index.ts"]
+      "@ocas/core": ["./packages/core/src/index.ts"],
+      "@ocas/fs": ["./packages/fs/src/index.ts"]
     },
     "composite": true,
     "declaration": true,

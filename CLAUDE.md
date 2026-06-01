@@ -1,4 +1,4 @@
-# CLAUDE.md — json-cas
+# CLAUDE.md — ocas
 
 Self-describing content-addressable storage with JSON Schema typed nodes.
 
@@ -8,9 +8,9 @@ Monorepo with 4 packages under `packages/`:
 
 | Package | Description |
 |---------|-------------|
-| `json-cas` | Core CAS engine — hashing, schema, store, verify, bootstrap |
-| `json-cas-fs` | Filesystem-backed CAS store |
-| `cli-json-cas` | CLI tool |
+| `ocas` | Core CAS engine — hashing, schema, store, verify, bootstrap |
+| `ocas-fs` | Filesystem-backed CAS store |
+| `cli` | CLI tool |
 
 ## Tech Stack
 
@@ -19,7 +19,7 @@ Monorepo with 4 packages under `packages/`:
 - **Build:** `tsc --build` (composite project references)
 - **Test:** `bun test`
 - **Lint/Format:** Biome (`biome check .` / `biome format --write .`)
-- **Publish:** Changesets → npmjs (`@uncaged/*`)
+- **Publish:** Changesets → npmjs (`@ocas/*`)
 
 ## Commands
 
@@ -41,7 +41,7 @@ bun run format    # Biome format (auto-fix)
 
 ### Biome Rules
 
-- `noConsole: "error"` globally (except `cli-json-cas`)
+- `noConsole: "error"` globally (except `cli`)
 - Recommended ruleset enabled
 - Auto-organize imports via `assist.actions.source.organizeImports`
 - Indent: 2 spaces

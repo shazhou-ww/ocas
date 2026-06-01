@@ -1,0 +1,27 @@
+{
+  "name": "@ocas/core",
+  "version": "0.6.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "cborg": "^4.2.3",
+    "liquidjs": "^10.27.0",
+    "xxhash-wasm": "^1.1.0"
+  }
+}
