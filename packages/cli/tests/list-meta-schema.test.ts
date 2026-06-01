@@ -33,18 +33,22 @@ describe("list-meta CLI command", () => {
       ["list", "--type", "@ocas/schema"],
       storePath,
     );
-    const schemaList = envValue(schemaListOut) as string[];
+    const schemaList = envValue(schemaListOut) as Array<{ hash: string }>;
     expect(Array.isArray(schemaList)).toBe(true);
 
     const { stdout, stderr, exitCode } = await runCli(["list-meta"], storePath);
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
 
-    const parsed = JSON.parse(stdout) as { type: string; value: string[] };
+    const parsed = JSON.parse(stdout) as {
+      type: string;
+      value: Array<{ hash: string; created: number; updated: number }>;
+    };
     expect(parsed.type).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
     expect(Array.isArray(parsed.value)).toBe(true);
     expect(parsed.value).toHaveLength(1);
-    expect(parsed.value[0]).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    const first = parsed.value[0] as { hash: string };
+    expect(first.hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 
   test("E1. --json flag yields compact JSON", async () => {
@@ -136,10 +140,12 @@ describe("E4. list-schema vs list --type with multiple meta-schema versions", ()
       storePath,
     );
     expect(lsCode).toBe(0);
-    const lsValue = envValue(lsOut) as string[];
-    expect(lsValue).toContain(sM1);
-    expect(lsValue).toContain(m1);
-    expect(lsValue).toContain(m2);
+    const lsHashes = (envValue(lsOut) as Array<{ hash: string }>).map(
+      (e) => e.hash,
+    );
+    expect(lsHashes).toContain(sM1);
+    expect(lsHashes).toContain(m1);
+    expect(lsHashes).toContain(m2);
 
     // CLI: list --type <M2 hash> must NOT include sM1
     const { stdout: ltOut, exitCode: ltCode } = await runCli(
@@ -147,10 +153,12 @@ describe("E4. list-schema vs list --type with multiple meta-schema versions", ()
       storePath,
     );
     expect(ltCode).toBe(0);
-    const ltValue = envValue(ltOut) as string[];
-    expect(ltValue).not.toContain(sM1);
+    const ltHashes = (envValue(ltOut) as Array<{ hash: string }>).map(
+      (e) => e.hash,
+    );
+    expect(ltHashes).not.toContain(sM1);
 
     // list-schema.value.length > list --type <newest>.value.length
-    expect(lsValue.length).toBeGreaterThan(ltValue.length);
+    expect(lsHashes.length).toBeGreaterThan(ltHashes.length);
   });
 });

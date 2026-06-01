@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Hash, Store, VariableStore } from "@ocas/core";
+import type { Hash, ListOptions, Store, VariableStore } from "@ocas/core";
 import {
   bootstrap,
   CasNodeNotFoundError,
@@ -42,6 +42,9 @@ const VALUE_FLAGS = new Set([
   "epsilon",
   "inline",
   "type",
+  "sort",
+  "limit",
+  "offset",
 ]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
@@ -228,6 +231,62 @@ function parseTagsLabels(args: string[]): {
   }
 
   return { tags, labels, deleteNames };
+}
+
+/**
+ * Parse --sort/--limit/--offset/--desc into a ListOptions object.
+ * Validates each flag and dies with a clear error on invalid values.
+ */
+function parseListOptions(): ListOptions {
+  // Default limit applied at the CLI layer only; core treats undefined as
+  // "no limit" so internal callers (e.g. gc) can fetch full result sets.
+  const opts: ListOptions = { limit: 100 };
+  const sortFlag = flags.sort;
+  if (sortFlag !== undefined) {
+    if (typeof sortFlag !== "string") {
+      die("Error: --sort requires a value (created or updated)");
+    }
+    if (sortFlag !== "created" && sortFlag !== "updated") {
+      die(`Error: --sort must be 'created' or 'updated' (got '${sortFlag}')`);
+    }
+    opts.sort = sortFlag;
+  }
+  const limitFlag = flags.limit;
+  if (limitFlag !== undefined) {
+    if (typeof limitFlag !== "string") {
+      die("Error: --limit requires a numeric value");
+    }
+    const parsed = Number.parseInt(limitFlag, 10);
+    if (
+      !Number.isFinite(parsed) ||
+      parsed < 0 ||
+      String(parsed) !== limitFlag
+    ) {
+      die(`Error: --limit must be a non-negative integer (got '${limitFlag}')`);
+    }
+    opts.limit = parsed;
+  }
+  const offsetFlag = flags.offset;
+  if (offsetFlag !== undefined) {
+    if (typeof offsetFlag !== "string") {
+      die("Error: --offset requires a numeric value");
+    }
+    const parsed = Number.parseInt(offsetFlag, 10);
+    if (
+      !Number.isFinite(parsed) ||
+      parsed < 0 ||
+      String(parsed) !== offsetFlag
+    ) {
+      die(
+        `Error: --offset must be a non-negative integer (got '${offsetFlag}')`,
+      );
+    }
+    opts.offset = parsed;
+  }
+  if (flags.desc === true) {
+    opts.desc = true;
+  }
+  return opts;
 }
 
 // ---- Commands ----
@@ -769,6 +828,7 @@ async function cmdVarList(args: string[]): Promise<void> {
   const namePrefix = args[0] ?? "";
   const schemaInput = flags.schema as string | undefined;
   const tagFlags = flags.tag;
+  const listOpts = parseListOptions();
 
   const { store, varStore } = await openStoreAndVarStore();
 
@@ -792,9 +852,10 @@ async function cmdVarList(args: string[]): Promise<void> {
 
     const variables = varStore.list({
       namePrefix,
-      schema,
-      tags: Object.keys(tags).length > 0 ? tags : undefined,
-      labels: labels.length > 0 ? labels : undefined,
+      ...(schema !== undefined ? { schema } : {}),
+      ...(Object.keys(tags).length > 0 ? { tags } : {}),
+      ...(labels.length > 0 ? { labels } : {}),
+      ...listOpts,
     });
     await out(
       await wrapEnvelope(store, "@ocas/output/var-list", variables),
@@ -992,27 +1053,33 @@ async function cmdList(_args: string[]): Promise<void> {
   const typeFlag = flags.type;
   if (typeof typeFlag !== "string")
     die("Usage: ocas list --type <hash-or-name>");
+  const opts = parseListOptions();
   const { store, varStore } = await openStoreAndVarStore();
   try {
     const typeHash = resolveHash(typeFlag, varStore);
-    const hashes = Array.from(store.listByType(typeHash));
-    await out(await wrapEnvelope(store, "@ocas/output/list", hashes), store);
+    const entries = store.listByType(typeHash, opts);
+    await out(await wrapEnvelope(store, "@ocas/output/list", entries), store);
   } finally {
     varStore.close();
   }
 }
 
 async function cmdListMeta(_args: string[]): Promise<void> {
+  const opts = parseListOptions();
   const store = await openStore();
-  const hashes = store.listMeta();
-  await out(await wrapEnvelope(store, "@ocas/output/list-meta", hashes), store);
+  const entries = store.listMeta(opts);
+  await out(
+    await wrapEnvelope(store, "@ocas/output/list-meta", entries),
+    store,
+  );
 }
 
 async function cmdListSchema(_args: string[]): Promise<void> {
+  const opts = parseListOptions();
   const store = await openStore();
-  const hashes = store.listSchemas();
+  const entries = store.listSchemas(opts);
   await out(
-    await wrapEnvelope(store, "@ocas/output/list-schema", hashes),
+    await wrapEnvelope(store, "@ocas/output/list-schema", entries),
     store,
   );
 }

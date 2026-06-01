@@ -109,11 +109,11 @@ describe("Phase 8: Pipe Composition", () => {
     ]);
     expect(exitCode).toBe(0);
 
-    // Downstream consumers (jq, etc.) read the `value` array of hashes.
-    const value = envValue(stdout) as string[];
+    // Downstream consumers (jq, etc.) read the `value` array of {hash,...}.
+    const value = envValue(stdout) as Array<{ hash: string }>;
     expect(Array.isArray(value)).toBe(true);
-    for (const hash of value) {
-      expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    for (const entry of value) {
+      expect(entry.hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
     }
   });
 

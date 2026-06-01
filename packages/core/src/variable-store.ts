@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { Hash, Store } from "./types.js";
+import type { Hash, ListSort, Store } from "./types.js";
 import type { Variable } from "./variable.js";
 
 /**
@@ -605,7 +605,9 @@ export class VariableStore {
     }
 
     // Remove all schema variants for this name
-    const variants = this.list({ exactName: name });
+    const variants = this.list({
+      exactName: name,
+    });
 
     if (variants.length === 0) {
       return [];
@@ -629,6 +631,10 @@ export class VariableStore {
     schema?: Hash;
     tags?: Record<string, string>;
     labels?: string[];
+    sort?: ListSort;
+    desc?: boolean;
+    limit?: number;
+    offset?: number;
   }): Variable[] {
     // Validate mutually exclusive options
     if (options?.namePrefix !== undefined && options?.exactName !== undefined) {
@@ -642,6 +648,12 @@ export class VariableStore {
     const schema = options?.schema;
     const filterTags = options?.tags ?? {};
     const filterLabels = options?.labels ?? [];
+    const sort = options?.sort ?? "created";
+    const desc = options?.desc ?? false;
+    const limit = options?.limit;
+    const offset = options?.offset ?? 0;
+
+    if (limit !== undefined && limit <= 0) return [];
 
     // Build query with filters
     let query = `
@@ -695,7 +707,18 @@ export class VariableStore {
       query += ` WHERE ${whereClauses.join(" AND ")}`;
     }
 
-    query += " ORDER BY v.created ASC";
+    const sortColumn = sort === "updated" ? "v.updated" : "v.created";
+    const direction = desc ? "DESC" : "ASC";
+    // Tiebreaker: name ASC for stable ordering across same-ms timestamps
+    query += ` ORDER BY ${sortColumn} ${direction}, v.name ASC`;
+    if (limit !== undefined) {
+      query += " LIMIT ? OFFSET ?";
+      params.push(limit, offset);
+    } else if (offset > 0) {
+      // SQLite requires LIMIT when using OFFSET; use -1 to mean "no limit".
+      query += " LIMIT -1 OFFSET ?";
+      params.push(offset);
+    }
 
     const stmt = this.db.prepare(query);
     const rows = stmt.all(...params) as Array<{

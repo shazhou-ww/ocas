@@ -96,6 +96,7 @@ describe("Phase 1: CAS Core", () => {
   test("1.13 list --type returns nodes of that type", async () => {
     const { stdout, exitCode } = await runCli(["list", "--type", typeHash]);
     expect(exitCode).toBe(0);
-    expect(envValue(stdout)).toContain(nodeHash);
+    const value = envValue(stdout) as Array<{ hash: string }>;
+    expect(value.map((e) => e.hash)).toContain(nodeHash);
   });
 });

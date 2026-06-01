@@ -3,7 +3,8 @@ import {
   type BootstrapCapableStore,
 } from "./bootstrap-capable.js";
 import { computeHash, computeSelfHash } from "./hash.js";
-import type { CasNode, Hash } from "./types.js";
+import { applyListOptions, casListEntry } from "./list-utils.js";
+import type { CasNode, Hash, ListEntry, ListOptions } from "./types.js";
 
 export function createMemoryStore(): BootstrapCapableStore {
   const data = new Map<Hash, CasNode>();
@@ -29,6 +30,15 @@ export function createMemoryStore(): BootstrapCapableStore {
     return hash;
   }
 
+  function entriesForHashes(hashes: Iterable<Hash>): ListEntry[] {
+    const result: ListEntry[] = [];
+    for (const h of hashes) {
+      const node = data.get(h);
+      if (node) result.push(casListEntry(h, node.timestamp));
+    }
+    return result;
+  }
+
   const store: BootstrapCapableStore = {
     async put(typeHash: Hash, payload: unknown): Promise<Hash> {
       const hash = await computeHash(typeHash, payload);
@@ -49,20 +59,21 @@ export function createMemoryStore(): BootstrapCapableStore {
       return data.has(hash);
     },
 
-    listByType(typeHash: Hash): Hash[] {
+    listByType(typeHash: Hash, options?: ListOptions): ListEntry[] {
       const set = byType.get(typeHash);
-      return set ? [...set] : [];
+      if (!set) return [];
+      return applyListOptions(entriesForHashes(set), options);
     },
 
     listAll(): Hash[] {
       return Array.from(data.keys());
     },
 
-    listMeta(): Hash[] {
-      return Array.from(metaSet);
+    listMeta(options?: ListOptions): ListEntry[] {
+      return applyListOptions(entriesForHashes(metaSet), options);
     },
 
-    listSchemas(): Hash[] {
+    listSchemas(options?: ListOptions): ListEntry[] {
       const result = new Set<Hash>();
       for (const meta of metaSet) {
         result.add(meta);
@@ -71,7 +82,7 @@ export function createMemoryStore(): BootstrapCapableStore {
           for (const h of set) result.add(h);
         }
       }
-      return Array.from(result);
+      return applyListOptions(entriesForHashes(result), options);
     },
 
     delete(hash: Hash): void {

@@ -14,12 +14,16 @@ import type {
   BootstrapCapableStore,
   CasNode,
   Hash,
+  ListEntry,
+  ListOptions,
   VariableStore,
 } from "@ocas/core";
 
 import {
+  applyListOptions,
   BOOTSTRAP_STORE,
   bootstrap,
+  casListEntry,
   cborEncode,
   computeHash,
   computeSelfHash,
@@ -174,6 +178,18 @@ function appendToTypeIndex(
   typeIndex.set(type, list);
 }
 
+function hashesToEntries(
+  data: Map<Hash, CasNode>,
+  hashes: Iterable<Hash>,
+): ListEntry[] {
+  const result: ListEntry[] = [];
+  for (const h of hashes) {
+    const node = data.get(h);
+    if (node) result.push(casListEntry(h, node.timestamp));
+  }
+  return result;
+}
+
 export function createFsStore(dir: string): BootstrapCapableStore {
   const data = new Map<Hash, CasNode>();
   loadDir(dir, data);
@@ -237,19 +253,21 @@ export function createFsStore(dir: string): BootstrapCapableStore {
       return data.has(hash);
     },
 
-    listByType(typeHash: Hash): Hash[] {
-      return typeIndex.get(typeHash) ?? [];
+    listByType(typeHash: Hash, options?: ListOptions): ListEntry[] {
+      const list = typeIndex.get(typeHash);
+      if (!list) return [];
+      return applyListOptions(hashesToEntries(data, list), options);
     },
 
     listAll(): Hash[] {
       return Array.from(data.keys());
     },
 
-    listMeta(): Hash[] {
-      return Array.from(metaSet);
+    listMeta(options?: ListOptions): ListEntry[] {
+      return applyListOptions(hashesToEntries(data, metaSet), options);
     },
 
-    listSchemas(): Hash[] {
+    listSchemas(options?: ListOptions): ListEntry[] {
       const result = new Set<Hash>();
       for (const meta of metaSet) {
         result.add(meta);
@@ -258,7 +276,7 @@ export function createFsStore(dir: string): BootstrapCapableStore {
           for (const h of list) result.add(h);
         }
       }
-      return Array.from(result);
+      return applyListOptions(hashesToEntries(data, result), options);
     },
 
     delete(hash: Hash): void {

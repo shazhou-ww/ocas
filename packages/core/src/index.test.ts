@@ -148,7 +148,7 @@ describe("createMemoryStore – has", () => {
     const h2 = await store.put(typeHash, { a: 2 });
     const h3 = await store.put(typeHash, { a: 3 });
 
-    const all = store.listByType(typeHash);
+    const all = store.listByType(typeHash).map((e) => e.hash);
     expect(all).toHaveLength(3);
     expect(all).toContain(h1);
     expect(all).toContain(h2);
@@ -179,7 +179,7 @@ describe("createMemoryStore – listByType", () => {
     const h2 = await store.put(typeHash, { a: 2 });
     await store.put(otherType, { b: 1 });
 
-    const byType = store.listByType(typeHash);
+    const byType = store.listByType(typeHash).map((e) => e.hash);
     expect(byType).toHaveLength(2);
     expect(byType).toContain(h1);
     expect(byType).toContain(h2);
@@ -192,7 +192,7 @@ describe("createMemoryStore – listByType", () => {
     const h1 = await store.put(typeHash, { n: 1 });
     await store.put(typeHash, { n: 1 });
 
-    expect(store.listByType(typeHash)).toEqual([h1]);
+    expect(store.listByType(typeHash).map((e) => e.hash)).toEqual([h1]);
   });
 
   test("bootstrap node is listed under its self type", async () => {
@@ -201,7 +201,7 @@ describe("createMemoryStore – listByType", () => {
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     // All built-in schemas should be typed by the meta-schema
-    const allTypedByMeta = store.listByType(hash);
+    const allTypedByMeta = store.listByType(hash).map((e) => e.hash);
     expect(allTypedByMeta).toContain(hash); // meta-schema itself
     expect(allTypedByMeta).toContain(builtinSchemas["@ocas/string"] ?? "");
     expect(allTypedByMeta).toContain(builtinSchemas["@ocas/number"] ?? "");

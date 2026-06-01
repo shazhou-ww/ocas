@@ -169,7 +169,15 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     "@ocas/output/list",
     {
       type: "array",
-      items: { type: "string", format: "ocas_ref" },
+      items: {
+        type: "object",
+        properties: {
+          hash: { type: "string", format: "ocas_ref" },
+          created: { type: "number" },
+          updated: { type: "number" },
+        },
+        required: ["hash", "created", "updated"],
+      },
       title: "ocas list result",
     },
   ],
@@ -177,7 +185,15 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     "@ocas/output/list-meta",
     {
       type: "array",
-      items: { type: "string", format: "ocas_ref" },
+      items: {
+        type: "object",
+        properties: {
+          hash: { type: "string", format: "ocas_ref" },
+          created: { type: "number" },
+          updated: { type: "number" },
+        },
+        required: ["hash", "created", "updated"],
+      },
       title: "ocas list-meta result",
     },
   ],
@@ -185,7 +201,15 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     "@ocas/output/list-schema",
     {
       type: "array",
-      items: { type: "string", format: "ocas_ref" },
+      items: {
+        type: "object",
+        properties: {
+          hash: { type: "string", format: "ocas_ref" },
+          created: { type: "number" },
+          updated: { type: "number" },
+        },
+        required: ["hash", "created", "updated"],
+      },
       title: "ocas list-schema result",
     },
   ],

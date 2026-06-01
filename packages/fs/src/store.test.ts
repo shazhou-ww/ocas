@@ -169,7 +169,7 @@ describe("createFsStore – has and list", () => {
     const h2 = await store.put(typeHash, { a: 2 });
     const h3 = await store.put(typeHash, { a: 3 });
 
-    const all = store.listByType(typeHash);
+    const all = store.listByType(typeHash).map((e) => e.hash);
     expect(all).toHaveLength(3);
     expect(all).toContain(h1);
     expect(all).toContain(h2);
@@ -213,7 +213,7 @@ describe("createFsStore – listByType", () => {
     const h2 = await store.put(typeHash, { a: 2 });
     await store.put(otherType, { b: 1 });
 
-    const byType = store.listByType(typeHash);
+    const byType = store.listByType(typeHash).map((e) => e.hash);
     expect(byType).toHaveLength(2);
     expect(byType).toContain(h1);
     expect(byType).toContain(h2);
@@ -227,7 +227,7 @@ describe("createFsStore – listByType", () => {
     const h2 = await store1.put(typeHash, { x: 2 });
 
     const store2 = createFsStore(dir);
-    const byType = store2.listByType(typeHash);
+    const byType = store2.listByType(typeHash).map((e) => e.hash);
     expect(byType).toHaveLength(2);
     expect(byType).toContain(h1);
     expect(byType).toContain(h2);
@@ -241,7 +241,7 @@ describe("createFsStore – listByType", () => {
     await store1.put(typeHash, { n: 7 });
 
     const store2 = createFsStore(dir);
-    expect(store2.listByType(typeHash)).toEqual([hash]);
+    expect(store2.listByType(typeHash).map((e) => e.hash)).toEqual([hash]);
   });
 
   test("rebuilds _index from .bin files when index is missing", async () => {
@@ -254,7 +254,7 @@ describe("createFsStore – listByType", () => {
     rmSync(join(dir, "_index"), { recursive: true, force: true });
 
     const store2 = createFsStore(dir);
-    expect(store2.listByType(typeHash)).toEqual([h1, h2]);
+    expect(store2.listByType(typeHash).map((e) => e.hash)).toEqual([h1, h2]);
     expect(existsSync(join(dir, "_index", typeHash))).toBe(true);
     expect(readdirSync(join(dir, "_index"))).toContain(typeHash);
   });
@@ -265,7 +265,7 @@ describe("createFsStore – listByType", () => {
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     const store2 = createFsStore(dir);
-    expect(store2.listByType(hash)).toContain(hash);
+    expect(store2.listByType(hash).map((e) => e.hash)).toContain(hash);
   });
 });
 
@@ -474,7 +474,7 @@ describe("createFsStore – listMeta and listSchemas", () => {
     const h2 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "b" });
 
     const store2 = createFsStore(dir);
-    const meta = store2.listMeta();
+    const meta = store2.listMeta().map((e) => e.hash);
     expect(meta).toContain(h1);
     expect(meta).toContain(h2);
     expect(meta).toHaveLength(2);
@@ -492,13 +492,13 @@ describe("createFsStore – listMeta and listSchemas", () => {
     expect(existsSync(metaPath)).toBe(false);
 
     const store2 = createFsStore(dir);
-    expect(store2.listMeta()).toContain(h1);
+    expect(store2.listMeta().map((e) => e.hash)).toContain(h1);
     expect(existsSync(metaPath)).toBe(true);
     const content = readFileSync(metaPath, "utf8");
     expect(content).toContain(h1);
 
     // unrelated type hash not in meta
-    expect(store2.listMeta()).not.toContain(t);
+    expect(store2.listMeta().map((e) => e.hash)).not.toContain(t);
   });
 
   test("C5. existing _meta is not overwritten", async () => {
@@ -522,7 +522,7 @@ describe("createFsStore – listMeta and listSchemas", () => {
     const s2 = await store.put(m, { type: "number" });
     const s3 = await store.put(m, { type: "array" });
 
-    const schemas = store.listSchemas();
+    const schemas = store.listSchemas().map((e) => e.hash);
     expect(schemas).toHaveLength(4);
     expect(schemas).toContain(m);
     expect(schemas).toContain(s1);
@@ -543,8 +543,8 @@ describe("createFsStore – listMeta and listSchemas", () => {
     expect(content).toContain(h2);
 
     const store2 = createFsStore(dir);
-    expect(store2.listMeta()).not.toContain(h1);
-    expect(store2.listMeta()).toContain(h2);
+    expect(store2.listMeta().map((e) => e.hash)).not.toContain(h1);
+    expect(store2.listMeta().map((e) => e.hash)).toContain(h2);
   });
 
   test("C8. fresh store with no self-ref puts has empty listMeta", () => {

@@ -328,13 +328,13 @@ describe("bootstrap - meta and schemas indexes (D1)", () => {
     const store = createMemoryStore();
     const aliases = await bootstrap(store);
     const metaHash = aliases["@ocas/schema"];
-    expect(store.listMeta()).toContain(metaHash as string);
+    expect(store.listMeta().map((e) => e.hash)).toContain(metaHash as string);
   });
 
   test("listSchemas contains meta-schema and all built-in schemas", async () => {
     const store = createMemoryStore();
     const aliases = await bootstrap(store);
-    const schemas = store.listSchemas();
+    const schemas = store.listSchemas().map((e) => e.hash);
 
     for (const [, hash] of Object.entries(aliases)) {
       expect(schemas).toContain(hash);
