@@ -179,18 +179,15 @@ describe("Suite 6: CLI Integration with Templates", () => {
       );
       const nodeHash = envValue(nodeOut) as string;
 
-      // Create template file (JSON-encoded string)
-      const templateFile = join(tmpStore, "template.json");
-      writeFileSync(templateFile, JSON.stringify("Hello {{ payload.name }}!"));
-      const { stdout: tmplOut } = await runCli(
-        ["put", "@string", templateFile],
-        tmpStore,
-      );
-      const tmplHash = envValue(tmplOut) as string;
-
-      // Register template
+      // Register template via template set --inline
       await runCli(
-        ["var", "set", `@ocas/template/text/${schemaHash.trim()}`, tmplHash],
+        [
+          "template",
+          "set",
+          schemaHash.trim(),
+          "--inline",
+          "Hello {{ payload.name }}!",
+        ],
         tmpStore,
       );
 
@@ -221,7 +218,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
           properties: {
             value: { type: "string" },
             child: {
-              anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+              anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
             },
           },
         }),
@@ -249,21 +246,15 @@ describe("Suite 6: CLI Integration with Templates", () => {
       );
       const parentHash = envValue(parentOut) as string;
 
-      // Create template showing resolution (JSON-encoded string)
-      const templateFile = join(tmpStore, "template.json");
-      writeFileSync(
-        templateFile,
-        JSON.stringify("{{ payload.value }}(res={{ resolution }})"),
-      );
-      const { stdout: tmplOut } = await runCli(
-        ["put", "@string", templateFile],
-        tmpStore,
-      );
-      const tmplHash = envValue(tmplOut) as string;
-
-      // Register template
+      // Register template via template set --inline
       await runCli(
-        ["var", "set", `@ocas/template/text/${schemaHash.trim()}`, tmplHash],
+        [
+          "template",
+          "set",
+          schemaHash.trim(),
+          "--inline",
+          "{{ payload.value }}(res={{ resolution }})",
+        ],
         tmpStore,
       );
 
@@ -303,20 +294,15 @@ describe("Suite 6: CLI Integration with Templates", () => {
       );
       const nodeHash = envValue(nodeOut) as string;
 
-      // Create template (JSON-encoded string)
-      const templateFile = join(tmpStore, "template.json");
-      writeFileSync(
-        templateFile,
-        JSON.stringify("Greetings {{ payload.name }}!"),
-      );
-      const { stdout: tmplOut } = await runCli(
-        ["put", "@string", templateFile],
-        tmpStore,
-      );
-      const tmplHash = envValue(tmplOut) as string;
-
+      // Register template via template set --inline
       await runCli(
-        ["var", "set", `@ocas/template/text/${schemaHash.trim()}`, tmplHash],
+        [
+          "template",
+          "set",
+          schemaHash.trim(),
+          "--inline",
+          "Greetings {{ payload.name }}!",
+        ],
         tmpStore,
       );
 
@@ -438,7 +424,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
       // Get @string type hash via bootstrap
       const store = createFsStore(tmpStore);
       const types = await bootstrap(store);
-      const stringType = types["@string"];
+      const stringType = types["@ocas/string"];
 
       // Create and store a simple string node
       const nodeFile = join(tmpStore, "test.json");
@@ -473,7 +459,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
       // Get @string type hash via bootstrap
       const store = createFsStore(tmpStore);
       const types = await bootstrap(store);
-      const stringType = types["@string"];
+      const stringType = types["@ocas/string"];
 
       // Create envelope and pipe to render
       const envelope = JSON.stringify({ type: stringType, value: "test" });

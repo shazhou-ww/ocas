@@ -5,55 +5,55 @@ import type { VariableStore } from "./variable-store.js";
 const DEFAULT_TEMPLATES: ReadonlyArray<
   readonly [alias: string, template: string]
 > = [
-  ["@output/put", "{{ payload }}"],
+  ["@ocas/output/put", "{{ payload }}"],
   [
-    "@output/get",
+    "@ocas/output/get",
     "type: {{ payload.type }}\ntimestamp: {{ payload.timestamp }}",
   ],
-  ["@output/has", "{{ payload }}"],
-  ["@output/hash", "{{ payload }}"],
-  ["@output/verify", "{{ payload }}"],
-  ["@output/refs", "{% for ref in payload %}{{ ref }}\n{% endfor %}"],
-  ["@output/walk", "{% for item in payload %}{{ item }}\n{% endfor %}"],
-  ["@output/list", "{% for item in payload %}{{ item }}\n{% endfor %}"],
+  ["@ocas/output/has", "{{ payload }}"],
+  ["@ocas/output/hash", "{{ payload }}"],
+  ["@ocas/output/verify", "{{ payload }}"],
+  ["@ocas/output/refs", "{% for ref in payload %}{{ ref }}\n{% endfor %}"],
+  ["@ocas/output/walk", "{% for item in payload %}{{ item }}\n{% endfor %}"],
+  ["@ocas/output/list", "{% for item in payload %}{{ item }}\n{% endfor %}"],
   [
-    "@output/var-set",
+    "@ocas/output/var-set",
     "name: {{ payload.name }}\nschema: {{ payload.schema }}\nvalue: {{ payload.value }}",
   ],
   [
-    "@output/var-get",
+    "@ocas/output/var-get",
     "name: {{ payload.name }}\nschema: {{ payload.schema }}\nvalue: {{ payload.value }}",
   ],
   [
-    "@output/var-delete",
+    "@ocas/output/var-delete",
     "name: {{ payload.name }}\nschema: {{ payload.schema }}\nvalue: {{ payload.value }}",
   ],
   [
-    "@output/var-tag",
+    "@ocas/output/var-tag",
     "name: {{ payload.name }}\nschema: {{ payload.schema }}\nvalue: {{ payload.value }}",
   ],
   [
-    "@output/var-list",
+    "@ocas/output/var-list",
     "{% for v in payload %}name: {{ v.name }}\nschema: {{ v.schema }}\nvalue: {{ v.value }}\n{% endfor %}",
   ],
   [
-    "@output/template-set",
+    "@ocas/output/template-set",
     "schemaHash: {{ payload.schemaHash }}\ncontentHash: {{ payload.contentHash }}",
   ],
-  ["@output/template-get", "{{ payload }}"],
+  ["@ocas/output/template-get", "{{ payload }}"],
   [
-    "@output/template-list",
+    "@ocas/output/template-list",
     "{% for t in payload %}schemaHash: {{ t.schemaHash }}\ncontentHash: {{ t.contentHash }}\n{% endfor %}",
   ],
-  ["@output/template-delete", "deleted: {{ payload.deleted }}"],
+  ["@ocas/output/template-delete", "deleted: {{ payload.deleted }}"],
   [
-    "@output/gc",
+    "@ocas/output/gc",
     "total: {{ payload.total }}\nreachable: {{ payload.reachable }}\ncollected: {{ payload.collected }}\nscanned: {{ payload.scanned }}",
   ],
 ];
 
 /**
- * Register default LiquidJS templates for all @output/* schemas.
+ * Register default LiquidJS templates for all @ocas/output/* schemas.
  * Each template is stored as a @string CAS node and bound to
  * the variable `@ocas/template/text/<schema-hash>`.
  *
@@ -64,7 +64,7 @@ export async function registerOutputTemplates(
   varStore: VariableStore,
 ): Promise<Record<string, Hash>> {
   const aliases = await bootstrap(store);
-  const stringHash = aliases["@string"];
+  const stringHash = aliases["@ocas/string"];
   if (stringHash === undefined) {
     throw new Error("@string schema not found in bootstrap result");
   }

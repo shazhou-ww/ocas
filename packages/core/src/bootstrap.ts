@@ -108,8 +108,8 @@ const BOOTSTRAP_PAYLOAD = {
 
 const VARIABLE_PROPERTIES = {
   name: { type: "string" },
-  schema: { type: "string", format: "cas_ref" },
-  value: { type: "string", format: "cas_ref" },
+  schema: { type: "string", format: "ocas_ref" },
+  value: { type: "string", format: "ocas_ref" },
   created: { type: "number" },
   updated: { type: "number" },
   tags: { type: "object" },
@@ -120,28 +120,28 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
   readonly [alias: string, schema: Record<string, unknown>]
 > = [
   [
-    "@output/put",
-    { type: "string", format: "cas_ref", title: "ocas put result" },
+    "@ocas/output/put",
+    { type: "string", format: "ocas_ref", title: "ocas put result" },
   ],
   [
-    "@output/get",
+    "@ocas/output/get",
     {
       type: "object",
       properties: {
-        type: { type: "string", format: "cas_ref" },
+        type: { type: "string", format: "ocas_ref" },
         payload: {},
         timestamp: { type: "number" },
       },
       title: "ocas get result",
     },
   ],
-  ["@output/has", { type: "boolean", title: "ocas has result" }],
+  ["@ocas/output/has", { type: "boolean", title: "ocas has result" }],
   [
-    "@output/hash",
-    { type: "string", format: "cas_ref", title: "ocas hash result" },
+    "@ocas/output/hash",
+    { type: "string", format: "ocas_ref", title: "ocas hash result" },
   ],
   [
-    "@output/verify",
+    "@ocas/output/verify",
     {
       type: "string",
       enum: ["ok", "corrupted", "invalid"],
@@ -149,15 +149,15 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/refs",
+    "@ocas/output/refs",
     {
       type: "array",
-      items: { type: "string", format: "cas_ref" },
+      items: { type: "string", format: "ocas_ref" },
       title: "ocas refs result",
     },
   ],
   [
-    "@output/walk",
+    "@ocas/output/walk",
     {
       type: "array",
       items: { type: "string" },
@@ -165,31 +165,31 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/list",
+    "@ocas/output/list",
     {
       type: "array",
-      items: { type: "string", format: "cas_ref" },
+      items: { type: "string", format: "ocas_ref" },
       title: "ocas list result",
     },
   ],
   [
-    "@output/list-meta",
+    "@ocas/output/list-meta",
     {
       type: "array",
-      items: { type: "string", format: "cas_ref" },
+      items: { type: "string", format: "ocas_ref" },
       title: "ocas list-meta result",
     },
   ],
   [
-    "@output/list-schema",
+    "@ocas/output/list-schema",
     {
       type: "array",
-      items: { type: "string", format: "cas_ref" },
+      items: { type: "string", format: "ocas_ref" },
       title: "ocas list-schema result",
     },
   ],
   [
-    "@output/var-set",
+    "@ocas/output/var-set",
     {
       type: "object",
       properties: { ...VARIABLE_PROPERTIES },
@@ -197,7 +197,7 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/var-get",
+    "@ocas/output/var-get",
     {
       type: "object",
       properties: { ...VARIABLE_PROPERTIES },
@@ -205,7 +205,7 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/var-delete",
+    "@ocas/output/var-delete",
     {
       type: "object",
       properties: { ...VARIABLE_PROPERTIES },
@@ -213,7 +213,7 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/var-tag",
+    "@ocas/output/var-tag",
     {
       type: "object",
       properties: { ...VARIABLE_PROPERTIES },
@@ -221,7 +221,7 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/var-list",
+    "@ocas/output/var-list",
     {
       type: "array",
       items: { type: "object", properties: { ...VARIABLE_PROPERTIES } },
@@ -229,36 +229,36 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/template-set",
+    "@ocas/output/template-set",
     {
       type: "object",
       properties: {
-        schemaHash: { type: "string", format: "cas_ref" },
-        contentHash: { type: "string", format: "cas_ref" },
+        schemaHash: { type: "string", format: "ocas_ref" },
+        contentHash: { type: "string", format: "ocas_ref" },
       },
       title: "ocas template set result",
     },
   ],
   [
-    "@output/template-get",
+    "@ocas/output/template-get",
     { type: "string", title: "ocas template get result" },
   ],
   [
-    "@output/template-list",
+    "@ocas/output/template-list",
     {
       type: "array",
       items: {
         type: "object",
         properties: {
-          schemaHash: { type: "string", format: "cas_ref" },
-          contentHash: { type: "string", format: "cas_ref" },
+          schemaHash: { type: "string", format: "ocas_ref" },
+          contentHash: { type: "string", format: "ocas_ref" },
         },
       },
       title: "ocas template list result",
     },
   ],
   [
-    "@output/template-delete",
+    "@ocas/output/template-delete",
     {
       type: "object",
       properties: { deleted: { type: "boolean" } },
@@ -266,7 +266,7 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@output/gc",
+    "@ocas/output/gc",
     {
       type: "object",
       properties: {
@@ -283,7 +283,7 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
 /**
  * Write the meta-schema seed node into the store and register built-in schemas.
  * The returned object contains aliases for the meta-schema, 5 primitive schemas,
- * and 18 @output/* schemas (24 total).
+ * and 18 @ocas/output/* schemas (24 total).
  * Idempotent: calling bootstrap multiple times returns the same hashes.
  */
 export async function bootstrap(store: Store): Promise<Record<string, Hash>> {
@@ -301,14 +301,14 @@ export async function bootstrap(store: Store): Promise<Record<string, Hash>> {
   const arrayHash = await store.put(metaHash, { type: "array" });
   const boolHash = await store.put(metaHash, { type: "boolean" });
 
-  // 3. Register @output/* schemas
+  // 3. Register @ocas/output/* schemas
   const aliases: Record<string, Hash> = {
-    "@schema": metaHash,
-    "@string": stringHash,
-    "@number": numberHash,
-    "@object": objectHash,
-    "@array": arrayHash,
-    "@bool": boolHash,
+    "@ocas/schema": metaHash,
+    "@ocas/string": stringHash,
+    "@ocas/number": numberHash,
+    "@ocas/object": objectHash,
+    "@ocas/array": arrayHash,
+    "@ocas/bool": boolHash,
   };
 
   for (const [alias, schema] of OUTPUT_SCHEMAS) {

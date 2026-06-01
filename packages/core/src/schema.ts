@@ -20,7 +20,7 @@ export class SchemaValidationError extends Error {
 }
 
 const ajv = new Ajv();
-ajv.addFormat("cas_ref", /^[0-9A-HJKMNP-TV-Z]{13}$/);
+ajv.addFormat("ocas_ref", /^[0-9A-HJKMNP-TV-Z]{13}$/);
 
 const ALLOWED_SCHEMA_KEYS = new Set([
   "type",
@@ -253,7 +253,7 @@ export async function putSchema(
   jsonSchema: JSONSchema,
 ): Promise<Hash> {
   const builtinSchemas = await bootstrap(store);
-  const metaHash = builtinSchemas["@schema"];
+  const metaHash = builtinSchemas["@ocas/schema"];
   if (!metaHash) {
     throw new Error("Meta-schema not found in bootstrap result");
   }
@@ -292,7 +292,7 @@ export function validate(store: Store, node: CasNode): boolean {
 }
 
 /**
- * Recursively collect values of all properties whose schema has format: 'cas_ref'.
+ * Recursively collect values of all properties whose schema has format: 'ocas_ref'.
  * Handles: direct format, anyOf/allOf (combinators), oneOf, if/then/else (conditionals),
  * not, contains, items + prefixItems (arrays), properties (nested objects),
  * additionalProperties (record refs), and patternProperties (regex-keyed refs).
@@ -300,7 +300,7 @@ export function validate(store: Store, node: CasNode): boolean {
 export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
   const result: Hash[] = [];
 
-  if (schema.format === "cas_ref") {
+  if (schema.format === "ocas_ref") {
     if (typeof value === "string") {
       result.push(value as Hash);
     }
@@ -413,7 +413,7 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
 }
 
 /**
- * Return all hashes referenced by this node via cas_ref fields in its schema.
+ * Return all hashes referenced by this node via ocas_ref fields in its schema.
  * Null/undefined values are skipped.
  */
 export function refs(store: Store, node: CasNode): Hash[] {

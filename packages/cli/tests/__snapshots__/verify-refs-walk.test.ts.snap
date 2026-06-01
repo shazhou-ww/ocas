@@ -9,7 +9,7 @@ exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `
 
 exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `
 "{
-  "type": "35QJB2WESFFGQ",
+  "type": "2TKP4RGBJ4V43",
   "value": []
 }"
 `;

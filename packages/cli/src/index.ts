@@ -89,7 +89,9 @@ const { flags, positional } = parseArgs(process.argv.slice(2));
 
 const defaultStorePath = join(homedir(), ".ocas");
 const storePath =
-  typeof flags.store === "string" ? flags.store : defaultStorePath;
+  typeof flags.store === "string"
+    ? flags.store
+    : (process.env["OCAS_HOME"] ?? defaultStorePath);
 const compact = flags.json === true;
 
 const defaultVarDbPath = join(storePath, "variables.db");
@@ -214,11 +216,11 @@ async function cmdPut(args: string[]): Promise<void> {
   // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
   // instead of ajv against meta-schema (which can't express recursive constraints)
   const builtinSchemas = await bootstrap(store);
-  const metaHash = builtinSchemas["@schema"];
+  const metaHash = builtinSchemas["@ocas/schema"];
   if (typeHash === metaHash) {
     try {
       const hash = await putSchema(store, payload as Record<string, unknown>);
-      out(await wrapEnvelope(store, "@output/put", hash));
+      out(await wrapEnvelope(store, "@ocas/output/put", hash));
     } catch (_e) {
       console.error(
         `Validation failed: payload in ${file} does not match schema ${typeHash}`,
@@ -245,7 +247,7 @@ async function cmdPut(args: string[]): Promise<void> {
   }
 
   const hash = await store.put(typeHash, payload);
-  out(await wrapEnvelope(store, "@output/put", hash));
+  out(await wrapEnvelope(store, "@ocas/output/put", hash));
 }
 
 async function cmdGet(args: string[]): Promise<void> {
@@ -254,14 +256,14 @@ async function cmdGet(args: string[]): Promise<void> {
   const store = await openStore();
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
-  out(await wrapEnvelope(store, "@output/get", node));
+  out(await wrapEnvelope(store, "@ocas/output/get", node));
 }
 
 async function cmdHas(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: ocas has <hash>");
   const store = await openStore();
-  out(await wrapEnvelope(store, "@output/has", store.has(hash)));
+  out(await wrapEnvelope(store, "@ocas/output/has", store.has(hash)));
 }
 
 async function cmdVerify(args: string[]): Promise<void> {
@@ -277,7 +279,7 @@ async function cmdVerify(args: string[]): Promise<void> {
   } else {
     status = validate(store, node) ? "ok" : "invalid";
   }
-  out(await wrapEnvelope(store, "@output/verify", status));
+  out(await wrapEnvelope(store, "@ocas/output/verify", status));
 }
 
 async function cmdRefs(args: string[]): Promise<void> {
@@ -287,7 +289,7 @@ async function cmdRefs(args: string[]): Promise<void> {
   const node = store.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
   const refHashes = refs(store, node);
-  out(await wrapEnvelope(store, "@output/refs", refHashes));
+  out(await wrapEnvelope(store, "@ocas/output/refs", refHashes));
 }
 
 async function cmdWalk(args: string[]): Promise<void> {
@@ -323,13 +325,13 @@ async function cmdWalk(args: string[]): Promise<void> {
     }
 
     printNode(hash, "", true);
-    out(await wrapEnvelope(store, "@output/walk", lines.join("\n")));
+    out(await wrapEnvelope(store, "@ocas/output/walk", lines.join("\n")));
   } else {
     const hashes: Hash[] = [];
     walk(store, hash, (h) => {
       hashes.push(h);
     });
-    out(await wrapEnvelope(store, "@output/walk", hashes));
+    out(await wrapEnvelope(store, "@ocas/output/walk", hashes));
   }
 }
 
@@ -347,7 +349,7 @@ async function cmdHash(args: string[]): Promise<void> {
   const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
   const hash = await computeHash(typeHash, payload);
   const store = await openStore();
-  out(await wrapEnvelope(store, "@output/hash", hash));
+  out(await wrapEnvelope(store, "@ocas/output/hash", hash));
 }
 
 async function cmdRender(args: string[]): Promise<void> {
@@ -469,6 +471,10 @@ async function cmdVarSet(args: string[]): Promise<void> {
     die("Usage: ocas var set <name> <hash> [--tag <tag>...]");
   }
 
+  if (name.startsWith("@ocas/")) {
+    die("The @ocas/ namespace is reserved and cannot be modified directly.");
+  }
+
   const store = await openStore();
   const varStore = createVariableStore(resolve(varDbPath), store);
 
@@ -497,7 +503,7 @@ async function cmdVarSet(args: string[]): Promise<void> {
         : undefined;
 
     const variable = varStore.set(name, value, options);
-    out(await wrapEnvelope(store, "@output/var-set", variable));
+    out(await wrapEnvelope(store, "@ocas/output/var-set", variable));
   } catch (e) {
     if (
       e instanceof InvalidVariableNameError ||
@@ -528,7 +534,7 @@ async function cmdVarGet(args: string[]): Promise<void> {
     if (variable === null) {
       die(`Error: Variable not found: name=${name}, schema=${schema}`);
     }
-    out(await wrapEnvelope(store, "@output/var-get", variable));
+    out(await wrapEnvelope(store, "@ocas/output/var-get", variable));
   } finally {
     varStore.close();
   }
@@ -542,6 +548,10 @@ async function cmdVarDelete(args: string[]): Promise<void> {
     die("Usage: ocas var delete <name> [--schema <hash>]");
   }
 
+  if (name.startsWith("@ocas/")) {
+    die("The @ocas/ namespace is reserved and cannot be modified directly.");
+  }
+
   const store = await openStore();
   const varStore = createVariableStore(resolve(varDbPath), store);
 
@@ -549,11 +559,11 @@ async function cmdVarDelete(args: string[]): Promise<void> {
     if (schema !== undefined) {
       // Precise deletion: remove specific (name, schema) variant
       const variable = varStore.remove(name, schema);
-      out(await wrapEnvelope(store, "@output/var-delete", variable));
+      out(await wrapEnvelope(store, "@ocas/output/var-delete", variable));
     } else {
       // Batch deletion: remove all variants for this name
       const variables = varStore.remove(name);
-      out(await wrapEnvelope(store, "@output/var-delete", variables));
+      out(await wrapEnvelope(store, "@ocas/output/var-delete", variables));
     }
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
@@ -590,7 +600,7 @@ async function cmdVarTag(args: string[]): Promise<void> {
       delete: deleteNames.length > 0 ? deleteNames : undefined,
     });
 
-    out(await wrapEnvelope(store, "@output/var-tag", variable));
+    out(await wrapEnvelope(store, "@ocas/output/var-tag", variable));
   } catch (e) {
     if (
       e instanceof VariableNotFoundError ||
@@ -633,7 +643,7 @@ async function cmdVarList(args: string[]): Promise<void> {
       tags: Object.keys(tags).length > 0 ? tags : undefined,
       labels: labels.length > 0 ? labels : undefined,
     });
-    out(await wrapEnvelope(store, "@output/var-list", variables));
+    out(await wrapEnvelope(store, "@ocas/output/var-list", variables));
   } catch (e) {
     if (e instanceof InvalidVariableNameError) {
       die(`Error: ${e.message}`);
@@ -691,7 +701,7 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     }
 
     // Store content in CAS under @string schema
-    const stringHash = await resolveTypeHash("@string");
+    const stringHash = await resolveTypeHash("@ocas/string");
     const contentHash = await store.put(stringHash, content);
 
     // Create variable binding: @ocas/template/text/<schema-hash>
@@ -699,7 +709,7 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     varStore.set(varName, contentHash);
 
     out(
-      await wrapEnvelope(store, "@output/template-set", {
+      await wrapEnvelope(store, "@ocas/output/template-set", {
         schemaHash,
         contentHash,
       }),
@@ -726,7 +736,7 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
 
   try {
     const varName = `@ocas/template/text/${schemaHash}`;
-    const stringHash = await resolveTypeHash("@string");
+    const stringHash = await resolveTypeHash("@ocas/string");
     const variable = varStore.get(varName, stringHash);
 
     if (variable === null) {
@@ -740,7 +750,11 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
     }
 
     out(
-      await wrapEnvelope(store, "@output/template-get", node.payload as string),
+      await wrapEnvelope(
+        store,
+        "@ocas/output/template-get",
+        node.payload as string,
+      ),
     );
   } finally {
     varStore.close();
@@ -752,7 +766,7 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
   const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
-    const stringHash = await resolveTypeHash("@string");
+    const stringHash = await resolveTypeHash("@ocas/string");
     const variables = varStore.list({
       namePrefix: "@ocas/template/text/",
       schema: stringHash,
@@ -763,7 +777,7 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
       contentHash: v.value,
     }));
 
-    out(await wrapEnvelope(store, "@output/template-list", templates));
+    out(await wrapEnvelope(store, "@ocas/output/template-list", templates));
   } finally {
     varStore.close();
   }
@@ -781,11 +795,13 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
 
   try {
     const varName = `@ocas/template/text/${schemaHash}`;
-    const stringHash = await resolveTypeHash("@string");
+    const stringHash = await resolveTypeHash("@ocas/string");
     varStore.remove(varName, stringHash);
 
     out(
-      await wrapEnvelope(store, "@output/template-delete", { deleted: true }),
+      await wrapEnvelope(store, "@ocas/output/template-delete", {
+        deleted: true,
+      }),
     );
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
@@ -803,7 +819,7 @@ async function cmdGc(_args: string[]): Promise<void> {
 
   try {
     const stats = gc(store, varStore);
-    out(await wrapEnvelope(store, "@output/gc", stats));
+    out(await wrapEnvelope(store, "@ocas/output/gc", stats));
   } finally {
     varStore.close();
   }
@@ -816,19 +832,19 @@ async function cmdList(_args: string[]): Promise<void> {
   const typeHash = await resolveTypeHash(typeFlag);
   const store = await openStore();
   const hashes = Array.from(store.listByType(typeHash));
-  out(await wrapEnvelope(store, "@output/list", hashes));
+  out(await wrapEnvelope(store, "@ocas/output/list", hashes));
 }
 
 async function cmdListMeta(_args: string[]): Promise<void> {
   const store = await openStore();
   const hashes = store.listMeta();
-  out(await wrapEnvelope(store, "@output/list-meta", hashes));
+  out(await wrapEnvelope(store, "@ocas/output/list-meta", hashes));
 }
 
 async function cmdListSchema(_args: string[]): Promise<void> {
   const store = await openStore();
   const hashes = store.listSchemas();
-  out(await wrapEnvelope(store, "@output/list-schema", hashes));
+  out(await wrapEnvelope(store, "@ocas/output/list-schema", hashes));
 }
 
 function printUsage(): void {
@@ -836,35 +852,35 @@ function printUsage(): void {
 Usage: ocas [--store <path>] [--json] <command> [args]
 
 All JSON commands emit a { type, value } envelope. The type is the hash of the
-command's @output/* schema (shown in parentheses); pipe any envelope into
-\`render -p\` to render its value (cas_ref hashes are expanded).
+command's @ocas/output/* schema (shown in parentheses); pipe any envelope into
+\`render -p\` to render its value (ocas_ref hashes are expanded).
 
 Commands:
-  put <type-hash> <file.json|--pipe> Store node, print envelope (value=hash)            (@output/put)
-  get <hash>                        Print node as envelope                             (@output/get)
-  has <hash>                        Print envelope (value=boolean)                     (@output/has)
-  verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@output/verify)
-  refs <hash>                       List direct cas_ref edges                          (@output/refs)
-  walk <hash> [--format tree]       Recursive traversal                                (@output/walk)
-  hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@output/hash)
+  put <type-hash> <file.json|--pipe> Store node, print envelope (value=hash)            (@ocas/output/put)
+  get <hash>                        Print node as envelope                             (@ocas/output/get)
+  has <hash>                        Print envelope (value=boolean)                     (@ocas/output/has)
+  verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@ocas/output/verify)
+  refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
+  walk <hash> [--format tree]       Recursive traversal                                (@ocas/output/walk)
+  hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
-  list --type <hash-or-alias>       List hashes for a type (value=string[])            (@output/list)
-  list-meta                         List meta-schema hashes (value=string[])           (@output/list-meta)
-  list-schema                       List all schema hashes (value=string[])            (@output/list-schema)
-  var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@output/var-set)
-  var get <name> --schema <hash>    Get a variable by name + schema                    (@output/var-get)
-  var delete <name> [--schema <hash>] Delete variable(s)                               (@output/var-delete)
-  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@output/var-list)
-  var tag <name> --schema <hash> <operations...> Modify tags/labels                    (@output/var-tag)
-  template set <schema-hash> <file> | --inline <text> Set template for schema          (@output/template-set)
-  template get <schema-hash>        Get template content (value=string)                (@output/template-get)
-  template list                     List all templates                                 (@output/template-list)
-  template delete <schema-hash>     Delete template for schema                         (@output/template-delete)
-  gc                                Run garbage collection                             (@output/gc)
+  list --type <hash-or-alias>       List hashes for a type (value=string[])            (@ocas/output/list)
+  list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
+  list-schema                       List all schema hashes (value=string[])            (@ocas/output/list-schema)
+  var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
+  var get <name> --schema <hash>    Get a variable by name + schema                    (@ocas/output/var-get)
+  var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
+  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
+  var tag <name> --schema <hash> <operations...> Modify tags/labels                    (@ocas/output/var-tag)
+  template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
+  template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
+  template list                     List all templates                                 (@ocas/output/template-list)
+  template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
+  gc                                Run garbage collection                             (@ocas/output/gc)
 
 Flags:
-  --store <path>      Store directory (default: ~/.ocas)
+  --store <path>      Store directory (default: $OCAS_HOME or ~/.ocas)
   --var-db <path>     Variable database path (default: <store>/variables.db)
   --json              Compact JSON output
   --schema <hash>     Schema hash filter for var get/delete/tag/list

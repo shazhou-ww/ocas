@@ -10,24 +10,24 @@ import type { VariableStore } from "./variable-store.js";
 import { createVariableStore } from "./variable-store.js";
 
 const OUTPUT_ALIASES = [
-  "@output/put",
-  "@output/get",
-  "@output/has",
-  "@output/hash",
-  "@output/verify",
-  "@output/refs",
-  "@output/walk",
-  "@output/list",
-  "@output/var-set",
-  "@output/var-get",
-  "@output/var-delete",
-  "@output/var-tag",
-  "@output/var-list",
-  "@output/template-set",
-  "@output/template-get",
-  "@output/template-list",
-  "@output/template-delete",
-  "@output/gc",
+  "@ocas/output/put",
+  "@ocas/output/get",
+  "@ocas/output/has",
+  "@ocas/output/hash",
+  "@ocas/output/verify",
+  "@ocas/output/refs",
+  "@ocas/output/walk",
+  "@ocas/output/list",
+  "@ocas/output/var-set",
+  "@ocas/output/var-get",
+  "@ocas/output/var-delete",
+  "@ocas/output/var-tag",
+  "@ocas/output/var-list",
+  "@ocas/output/template-set",
+  "@ocas/output/template-get",
+  "@ocas/output/template-list",
+  "@ocas/output/template-delete",
+  "@ocas/output/gc",
 ] as const;
 
 describe("registerOutputTemplates", () => {
@@ -40,7 +40,7 @@ describe("registerOutputTemplates", () => {
     await rm(tempDir, { recursive: true });
   });
 
-  test("registers a template for every @output/* schema", async () => {
+  test("registers a template for every @ocas/output/* schema", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ocas-tmpl-"));
     store = createMemoryStore();
     await bootstrap(store);
@@ -63,7 +63,7 @@ describe("registerOutputTemplates", () => {
 
     await registerOutputTemplates(store, varStore);
 
-    const stringHash = aliases["@string"];
+    const stringHash = aliases["@ocas/string"];
     if (!stringHash) throw new Error("@string not found");
 
     for (const alias of OUTPUT_ALIASES) {
@@ -93,7 +93,7 @@ describe("registerOutputTemplates", () => {
     expect(first).toEqual(second);
   });
 
-  test("@output/put template contains payload reference", async () => {
+  test("@ocas/output/put template contains payload reference", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ocas-tmpl-"));
     store = createMemoryStore();
     const aliases = await bootstrap(store);
@@ -101,14 +101,14 @@ describe("registerOutputTemplates", () => {
 
     await registerOutputTemplates(store, varStore);
 
-    const putHash = aliases["@output/put"];
-    if (!putHash) throw new Error("@output/put not found");
-    const stringHash = aliases["@string"];
+    const putHash = aliases["@ocas/output/put"];
+    if (!putHash) throw new Error("@ocas/output/put not found");
+    const stringHash = aliases["@ocas/string"];
     if (!stringHash) throw new Error("@string not found");
 
     const variable = varStore.get(`@ocas/template/text/${putHash}`, stringHash);
     if (variable === null)
-      throw new Error("@output/put template variable not found");
+      throw new Error("@ocas/output/put template variable not found");
 
     const templateNode = store.get(variable.value);
     if (templateNode === null) throw new Error("Template node not found");

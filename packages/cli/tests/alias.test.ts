@@ -75,7 +75,7 @@ describe("@ Alias Resolution - put", () => {
 
     const { stdout, stderr, exitCode } = await runCliAlias(
       "put",
-      "@string",
+      "@ocas/string",
       payloadFile,
     );
 
@@ -93,7 +93,7 @@ describe("@ Alias Resolution - put", () => {
 
     const { stdout, exitCode } = await runCliAlias(
       "put",
-      "@number",
+      "@ocas/number",
       payloadFile,
     );
 
@@ -109,7 +109,7 @@ describe("@ Alias Resolution - put", () => {
 
     const { stdout, exitCode } = await runCliAlias(
       "put",
-      "@object",
+      "@ocas/object",
       payloadFile,
     );
 
@@ -157,7 +157,7 @@ describe("@ Alias Resolution - put", () => {
 
     const { stdout, stderr, exitCode } = await runCliAlias(
       "put",
-      "@schema",
+      "@ocas/schema",
       schemaFile,
     );
 
@@ -176,7 +176,7 @@ describe("@ Alias Resolution - hash", () => {
 
     const { stdout, stderr, exitCode } = await runCliAlias(
       "hash",
-      "@string",
+      "@ocas/string",
       payloadFile,
     );
 
