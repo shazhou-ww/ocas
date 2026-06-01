@@ -32,7 +32,7 @@ Use the in-memory store for tests and embedded apps, the filesystem store for pe
 |-------|---------|------|
 | Core | `@uncaged/json-cas` | Hashing, schemas, stores, verify, bootstrap |
 | Storage | `@uncaged/json-cas-fs` | Filesystem-backed `Store` |
-| CLI | `@uncaged/cli-json-cas` | `json-cas` command-line tool |
+| CLI | `@uncaged/cli-json-cas` | `ucas` command-line tool |
 
 ## Packages
 
@@ -40,7 +40,7 @@ Use the in-memory store for tests and embedded apps, the filesystem store for pe
 |---------|-------------|------|
 | [`@uncaged/json-cas`](packages/json-cas/README.md) | Core CAS engine — hashing, schema, store, verify, bootstrap | lib |
 | [`@uncaged/json-cas-fs`](packages/json-cas-fs/README.md) | Filesystem-backed CAS store | lib |
-| [`@uncaged/cli-json-cas`](packages/cli-json-cas/README.md) | CLI tool (`json-cas` binary) | cli |
+| [`@uncaged/cli-json-cas`](packages/cli-json-cas/README.md) | CLI tool (`ucas` binary) | cli |
 
 ## Quick Start
 
@@ -88,7 +88,7 @@ Or use the CLI (see [CLI Reference](#cli-reference) and [`packages/cli-json-cas/
 
 ## CLI Reference
 
-Binary: `json-cas` (also aliased `ucas`, from `@uncaged/cli-json-cas`). Default store:
+Binary: `ucas` (from `@uncaged/cli-json-cas`; legacy alias `json-cas` is deprecated). Default store:
 `~/.uncaged/json-cas`. The store is auto-created and bootstrapped on first use — there is
 no `init`/`bootstrap` command, and schemas are ordinary `@schema`-typed nodes (`ucas put
 @schema file.json`), so there is no `schema` subcommand.
@@ -107,7 +107,7 @@ raw (non-envelope) text.
 ```
 
 ```
-Usage: json-cas [--store <path>] [--json] <command> [args]
+Usage: ucas [--store <path>] [--json] <command> [args]
 
 Commands (all emit a { type, value } envelope unless noted):
   put <type-hash> <file.json>       Store node (value = hash)          (@output/put)
@@ -120,6 +120,8 @@ Commands (all emit a { type, value } envelope unless noted):
   render <hash> [options]           Render node as text (raw output)
   render --pipe/-p [options]        Render a piped envelope (raw output)
   list --type <hash-or-alias>       Hashes for a type (value = list)   (@output/list)
+  list-meta                         Meta-schema hashes                 (@output/list-meta)
+  list-schema                       All schema hashes                  (@output/list-schema)
   var set|get|delete|tag|list ...   Variable CRUD                      (@output/var-*)
   template set|get|list|delete ...  Output-template CRUD               (@output/template-*)
   gc                                Garbage collection                 (@output/gc)
