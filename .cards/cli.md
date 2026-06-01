@@ -72,6 +72,10 @@ ocas render --pipe/-p [options]
 | `--render`, `-r` | Render output inline (equivalent to piping to `ocas render -p`) |
 | `--inline <text>` | Inline text content for `template set` |
 | `--format tree` | Tree display for `walk` |
+| `--sort created\|updated` | Sort key for list commands (default: `created`; for CAS nodes both are equivalent) |
+| `--limit <n>` | Max results to return (default: 100) |
+| `--offset <n>` | Skip first N results (default: 0) |
+| `--desc` | Sort descending (default: ascending) |
 
 ## Variable Names
 
