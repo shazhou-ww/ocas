@@ -105,7 +105,7 @@ describe("var set", () => {
     const { stdout, stderr, exitCode } = await runCli(
       "var",
       "set",
-      "workflow/config/agent",
+      "@test/workflow/config/agent",
       hash,
     );
 
@@ -115,7 +115,7 @@ describe("var set", () => {
     const envelope = JSON.parse(stdout);
     expect(envelope).toHaveProperty("type");
     expect(envelope).toHaveProperty("value");
-    expect(envelope.value.name).toBe("workflow/config/agent");
+    expect(envelope.value.name).toBe("@test/workflow/config/agent");
     expect(envelope.value.schema).toBe(typeHash);
     expect(envelope.value.value).toBe(hash);
     expect(envelope.value.tags).toEqual({});
@@ -132,7 +132,7 @@ describe("var set", () => {
     const { stdout, exitCode } = await runCli(
       "var",
       "set",
-      "my/var",
+      "@test/my/var",
       hash,
       "--tag",
       "env:prod",
@@ -155,7 +155,7 @@ describe("var set", () => {
     const { stdout, exitCode } = await runCli(
       "var",
       "set",
-      "my/var",
+      "@test/my/var",
       hash,
       "--tag",
       "stable",
@@ -177,13 +177,13 @@ describe("var set", () => {
     const hash2 = await createTestNode(store, typeHash, { test: "data2" });
 
     // Create initial variable
-    await runCli("var", "set", "config", hash1);
+    await runCli("var", "set", "@test/config", hash1);
 
     // Wait a bit to ensure updated > created
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Update with hash2
-    const { stdout, exitCode } = await runCli("var", "set", "config", hash2);
+    const { stdout, exitCode } = await runCli("var", "set", "@test/config", hash2);
 
     expect(exitCode).toBe(0);
 
@@ -200,10 +200,10 @@ describe("var set", () => {
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
     // Create first variant
-    await runCli("var", "set", "config", hash1);
+    await runCli("var", "set", "@test/config", hash1);
 
     // Create second variant with different schema
-    const { stdout, exitCode } = await runCli("var", "set", "config", hash2);
+    const { stdout, exitCode } = await runCli("var", "set", "@test/config", hash2);
 
     expect(exitCode).toBe(0);
 
@@ -211,7 +211,7 @@ describe("var set", () => {
     expect(envelope.value.schema).toBe(typeHash2);
 
     // Verify both variants exist
-    const { stdout: listOut } = await runCli("var", "list", "config");
+    const { stdout: listOut } = await runCli("var", "list", "@test/config");
     const listEnvelope = JSON.parse(listOut);
     expect(listEnvelope.value.length).toBe(2);
   });
@@ -222,13 +222,13 @@ describe("var set", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create with initial tags/labels
-    await runCli("var", "set", "x", hash, "--tag", "a:1", "--tag", "b");
+    await runCli("var", "set", "@test/x", hash, "--tag", "a:1", "--tag", "b");
 
     // Update with new tags
     const { stdout, exitCode } = await runCli(
       "var",
       "set",
-      "x",
+      "@test/x",
       hash,
       "--tag",
       "c:2",
@@ -245,7 +245,7 @@ describe("var set", () => {
     const { stderr, exitCode } = await runCli(
       "var",
       "set",
-      "my/var",
+      "@test/my/var",
       "NONEXISTENT_HASH",
     );
 
@@ -287,7 +287,7 @@ describe("var set", () => {
     const { stderr, exitCode } = await runCli(
       "var",
       "set",
-      "x",
+      "@test/x",
       hash,
       "--tag",
       "env:prod",
@@ -307,13 +307,13 @@ describe("var get", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable first
-    await runCli("var", "set", "config", hash);
+    await runCli("var", "set", "@test/config", hash);
 
     // Get it back
     const { stdout, exitCode } = await runCli(
       "var",
       "get",
-      "config",
+      "@test/config",
       "--schema",
       typeHash,
     );
@@ -321,7 +321,7 @@ describe("var get", () => {
     expect(exitCode).toBe(0);
 
     const envelope = JSON.parse(stdout);
-    expect(envelope.value.name).toBe("config");
+    expect(envelope.value.name).toBe("@test/config");
     expect(envelope.value.schema).toBe(typeHash);
   });
 
@@ -332,19 +332,19 @@ describe("var get", () => {
     const { stderr, exitCode } = await runCli(
       "var",
       "get",
-      "nonexistent",
+      "@test/nonexistent",
       "--schema",
       typeHash,
     );
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      `Error: Variable not found: name=nonexistent, schema=${typeHash}`,
+      `Error: Variable not found: name=@test/nonexistent, schema=${typeHash}`,
     );
   });
 
   test("error when --schema missing", async () => {
-    const { stderr, exitCode } = await runCli("var", "get", "config");
+    const { stderr, exitCode } = await runCli("var", "get", "@test/config");
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
@@ -360,17 +360,17 @@ describe("var get", () => {
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
     // Create two variants
-    await runCli("var", "set", "config", hash1);
-    await runCli("var", "set", "config", hash2);
+    await runCli("var", "set", "@test/config", hash1);
+    await runCli("var", "set", "@test/config", hash2);
 
     // Get first variant
-    const result1 = await runCli("var", "get", "config", "--schema", typeHash1);
+    const result1 = await runCli("var", "get", "@test/config", "--schema", typeHash1);
     expect(result1.exitCode).toBe(0);
     const envelope1 = JSON.parse(result1.stdout);
     expect(envelope1.value.value).toBe(hash1);
 
     // Get second variant
-    const result2 = await runCli("var", "get", "config", "--schema", typeHash2);
+    const result2 = await runCli("var", "get", "@test/config", "--schema", typeHash2);
     expect(result2.exitCode).toBe(0);
     const envelope2 = JSON.parse(result2.stdout);
     expect(envelope2.value.value).toBe(hash2);
@@ -386,11 +386,11 @@ describe("var delete", () => {
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
     // Create two variants
-    await runCli("var", "set", "config", hash1);
-    await runCli("var", "set", "config", hash2);
+    await runCli("var", "set", "@test/config", hash1);
+    await runCli("var", "set", "@test/config", hash2);
 
     // Delete all
-    const { stdout, exitCode } = await runCli("var", "delete", "config");
+    const { stdout, exitCode } = await runCli("var", "delete", "@test/config");
 
     expect(exitCode).toBe(0);
 
@@ -399,10 +399,10 @@ describe("var delete", () => {
     expect(envelope.value.length).toBe(2);
 
     // Verify both are deleted
-    const result1 = await runCli("var", "get", "config", "--schema", typeHash1);
+    const result1 = await runCli("var", "get", "@test/config", "--schema", typeHash1);
     expect(result1.exitCode).toBe(1);
 
-    const result2 = await runCli("var", "get", "config", "--schema", typeHash2);
+    const result2 = await runCli("var", "get", "@test/config", "--schema", typeHash2);
     expect(result2.exitCode).toBe(1);
   });
 
@@ -414,14 +414,14 @@ describe("var delete", () => {
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
     // Create two variants
-    await runCli("var", "set", "config", hash1);
-    await runCli("var", "set", "config", hash2);
+    await runCli("var", "set", "@test/config", hash1);
+    await runCli("var", "set", "@test/config", hash2);
 
     // Delete only first variant
     const { stdout, exitCode } = await runCli(
       "var",
       "delete",
-      "config",
+      "@test/config",
       "--schema",
       typeHash1,
     );
@@ -432,16 +432,16 @@ describe("var delete", () => {
     expect(envelope.value.schema).toBe(typeHash1);
 
     // Verify first is deleted
-    const result1 = await runCli("var", "get", "config", "--schema", typeHash1);
+    const result1 = await runCli("var", "get", "@test/config", "--schema", typeHash1);
     expect(result1.exitCode).toBe(1);
 
     // Verify second still exists
-    const result2 = await runCli("var", "get", "config", "--schema", typeHash2);
+    const result2 = await runCli("var", "get", "@test/config", "--schema", typeHash2);
     expect(result2.exitCode).toBe(0);
   });
 
   test("return empty array when name not found", async () => {
-    const { stdout, exitCode } = await runCli("var", "delete", "nonexistent");
+    const { stdout, exitCode } = await runCli("var", "delete", "@test/nonexistent");
 
     expect(exitCode).toBe(0);
 
@@ -454,14 +454,14 @@ describe("var delete", () => {
     const { stderr, exitCode } = await runCli(
       "var",
       "delete",
-      "config",
+      "@test/config",
       "--schema",
       "00000000000ZZ",
     );
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      "Error: Variable not found: name=config, schema=00000000000ZZ",
+      "Error: Variable not found: name=@test/config, schema=00000000000ZZ",
     );
   });
 
@@ -471,13 +471,13 @@ describe("var delete", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable with tags and labels
-    await runCli("var", "set", "x", hash, "--tag", "a:1", "--tag", "b");
+    await runCli("var", "set", "@test/x", hash, "--tag", "a:1", "--tag", "b");
 
     // Delete it
     const { exitCode } = await runCli(
       "var",
       "delete",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
     );
@@ -485,7 +485,7 @@ describe("var delete", () => {
     expect(exitCode).toBe(0);
 
     // Verify it's gone
-    const result = await runCli("var", "get", "x", "--schema", typeHash);
+    const result = await runCli("var", "get", "@test/x", "--schema", typeHash);
     expect(result.exitCode).toBe(1);
   });
 });
@@ -500,12 +500,12 @@ describe("var list", () => {
 
     // Create three variables (use a prefix to filter out builtin @ocas/* vars
     // that bootstrap writes into the varStore)
-    await runCli("var", "set", "test/a", hash1);
-    await runCli("var", "set", "test/b", hash2);
-    await runCli("var", "set", "test/c", hash3);
+    await runCli("var", "set", "@test/test/a", hash1);
+    await runCli("var", "set", "@test/test/b", hash2);
+    await runCli("var", "set", "@test/test/c", hash3);
 
     // List all under our prefix
-    const { stdout, exitCode } = await runCli("var", "list", "test/");
+    const { stdout, exitCode } = await runCli("var", "list", "@test/test/");
 
     expect(exitCode).toBe(0);
 
@@ -522,19 +522,19 @@ describe("var list", () => {
     const hash3 = await createTestNode(store, typeHash, { test: "data3" });
 
     // Create variables with different prefixes
-    await runCli("var", "set", "workflow/config/agent", hash1);
-    await runCli("var", "set", "workflow/config/model", hash2);
-    await runCli("var", "set", "other/var", hash3);
+    await runCli("var", "set", "@test/workflow/config/agent", hash1);
+    await runCli("var", "set", "@test/workflow/config/model", hash2);
+    await runCli("var", "set", "@test/other/var", hash3);
 
     // List with prefix
-    const { stdout, exitCode } = await runCli("var", "list", "workflow/");
+    const { stdout, exitCode } = await runCli("var", "list", "@test/workflow/");
 
     expect(exitCode).toBe(0);
 
     const envelope = JSON.parse(stdout);
     expect(envelope.value.length).toBe(2);
-    expect(envelope.value[0].name).toContain("workflow/");
-    expect(envelope.value[1].name).toContain("workflow/");
+    expect(envelope.value[0].name).toContain("@test/workflow/");
+    expect(envelope.value[1].name).toContain("@test/workflow/");
   });
 
   test("filter by schema", async () => {
@@ -554,8 +554,8 @@ describe("var list", () => {
     void bootstrapHash;
 
     // Create variables with different schemas
-    await runCli("var", "set", "a", hash1);
-    await runCli("var", "set", "b", hash2);
+    await runCli("var", "set", "@test/a", hash1);
+    await runCli("var", "set", "@test/b", hash2);
 
     // List with schema filter
     const { stdout, exitCode } = await runCli(
@@ -583,7 +583,7 @@ describe("var list", () => {
     await runCli(
       "var",
       "set",
-      "a",
+      "@test/a",
       hash1,
       "--tag",
       "env:prod",
@@ -593,14 +593,14 @@ describe("var list", () => {
     await runCli(
       "var",
       "set",
-      "b",
+      "@test/b",
       hash2,
       "--tag",
       "env:prod",
       "--tag",
       "region:eu",
     );
-    await runCli("var", "set", "c", hash3, "--tag", "env:dev");
+    await runCli("var", "set", "@test/c", hash3, "--tag", "env:dev");
 
     // List with tag filter (AND logic)
     const { stdout, exitCode } = await runCli(
@@ -616,7 +616,7 @@ describe("var list", () => {
 
     const envelope = JSON.parse(stdout);
     expect(envelope.value.length).toBe(1);
-    expect(envelope.value[0].name).toBe("a");
+    expect(envelope.value[0].name).toBe("@test/a");
   });
 
   test("filter by labels", async () => {
@@ -629,14 +629,14 @@ describe("var list", () => {
     await runCli(
       "var",
       "set",
-      "a",
+      "@test/a",
       hash1,
       "--tag",
       "stable",
       "--tag",
       "production",
     );
-    await runCli("var", "set", "b", hash2, "--tag", "stable");
+    await runCli("var", "set", "@test/b", hash2, "--tag", "stable");
 
     // List with single label
     const result1 = await runCli("var", "list", "--tag", "stable");
@@ -656,7 +656,7 @@ describe("var list", () => {
     expect(result2.exitCode).toBe(0);
     envelope = JSON.parse(result2.stdout);
     expect(envelope.value.length).toBe(1);
-    expect(envelope.value[0].name).toBe("a");
+    expect(envelope.value[0].name).toBe("@test/a");
   });
 
   test("combined filters", async () => {
@@ -667,15 +667,15 @@ describe("var list", () => {
     const hash3 = await createTestNode(store, typeHash1, { test: "data3" });
 
     // Create variables
-    await runCli("var", "set", "workflow/a", hash1, "--tag", "env:prod");
-    await runCli("var", "set", "workflow/b", hash2, "--tag", "env:dev");
-    await runCli("var", "set", "other/c", hash3, "--tag", "env:prod");
+    await runCli("var", "set", "@test/workflow/a", hash1, "--tag", "env:prod");
+    await runCli("var", "set", "@test/workflow/b", hash2, "--tag", "env:dev");
+    await runCli("var", "set", "@test/other/c", hash3, "--tag", "env:prod");
 
     // List with combined filters
     const { stdout, exitCode } = await runCli(
       "var",
       "list",
-      "workflow/",
+      "@test/workflow/",
       "--schema",
       typeHash1,
       "--tag",
@@ -686,14 +686,14 @@ describe("var list", () => {
 
     const envelope = JSON.parse(stdout);
     expect(envelope.value.length).toBe(1);
-    expect(envelope.value[0].name).toBe("workflow/a");
+    expect(envelope.value[0].name).toBe("@test/workflow/a");
   });
 
   test("empty result when no matches", async () => {
     const { stdout, exitCode } = await runCli(
       "var",
       "list",
-      "nonexistent/prefix/",
+      "@test/nonexistent/prefix/",
     );
 
     expect(exitCode).toBe(0);
@@ -720,13 +720,13 @@ describe("var tag", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable without tags
-    await runCli("var", "set", "x", hash);
+    await runCli("var", "set", "@test/x", hash);
 
     // Add tag
     const { stdout, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
       "env:prod",
@@ -744,13 +744,13 @@ describe("var tag", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable with tag
-    await runCli("var", "set", "x", hash, "--tag", "env:dev");
+    await runCli("var", "set", "@test/x", hash, "--tag", "env:dev");
 
     // Update tag
     const { stdout, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
       "env:prod",
@@ -768,13 +768,13 @@ describe("var tag", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable without labels
-    await runCli("var", "set", "x", hash);
+    await runCli("var", "set", "@test/x", hash);
 
     // Add label
     const { stdout, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
       "stable",
@@ -795,7 +795,7 @@ describe("var tag", () => {
     await runCli(
       "var",
       "set",
-      "x",
+      "@test/x",
       hash,
       "--tag",
       "env:prod",
@@ -807,7 +807,7 @@ describe("var tag", () => {
     const { stdout, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
       ":env",
@@ -825,13 +825,13 @@ describe("var tag", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable with labels
-    await runCli("var", "set", "x", hash, "--tag", "stable", "--tag", "beta");
+    await runCli("var", "set", "@test/x", hash, "--tag", "stable", "--tag", "beta");
 
     // Delete label
     const { stdout, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
       ":stable",
@@ -849,13 +849,13 @@ describe("var tag", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable with tags and labels
-    await runCli("var", "set", "x", hash, "--tag", "a:1", "--tag", "b");
+    await runCli("var", "set", "@test/x", hash, "--tag", "a:1", "--tag", "b");
 
     // Mixed operations
     const { stdout, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
       "c:3",
@@ -876,13 +876,13 @@ describe("var tag", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable with tag
-    await runCli("var", "set", "x", hash, "--tag", "env:prod");
+    await runCli("var", "set", "@test/x", hash, "--tag", "env:prod");
 
     // Try to add same name as label
     const { stderr, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
       "env",
@@ -899,7 +899,7 @@ describe("var tag", () => {
     const { stderr, exitCode } = await runCli(
       "var",
       "tag",
-      "nonexistent",
+      "@test/nonexistent",
       "--schema",
       typeHash,
       "env:prod",
@@ -907,12 +907,12 @@ describe("var tag", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      `Error: Variable not found: name=nonexistent, schema=${typeHash}`,
+      `Error: Variable not found: name=@test/nonexistent, schema=${typeHash}`,
     );
   });
 
   test("error when --schema missing", async () => {
-    const { stderr, exitCode } = await runCli("var", "tag", "x", "env:prod");
+    const { stderr, exitCode } = await runCli("var", "tag", "@test/x", "env:prod");
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
@@ -927,7 +927,7 @@ describe("var tag", () => {
     const { stderr, exitCode } = await runCli(
       "var",
       "tag",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
     );
@@ -945,13 +945,13 @@ describe("global options", () => {
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
-    await runCli("var", "set", "x", hash);
+    await runCli("var", "set", "@test/x", hash);
 
     const { stdout } = await runCli(
       "--json",
       "var",
       "get",
-      "x",
+      "@test/x",
       "--schema",
       typeHash,
     );
@@ -981,7 +981,7 @@ describe("global options", () => {
         varDbPath,
         "var",
         "set",
-        "x",
+        "@test/x",
         hash,
       ],
       {
@@ -1012,7 +1012,7 @@ describe("global options", () => {
         customDbPath,
         "var",
         "set",
-        "x",
+        "@test/x",
         hash,
       ],
       {

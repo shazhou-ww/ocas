@@ -190,55 +190,55 @@ describe("CLI var list pagination", () => {
   test("G1./G2. --limit and --offset on var list", async () => {
     for (let i = 0; i < 4; i++) {
       const h = await putString(`tval-${i}`);
-      await runCli(["var", "set", `myvar-${i}`, h], storePath);
+      await runCli(["var", "set", `@test/myvar-${i}`, h], storePath);
       await new Promise((r) => setTimeout(r, 2));
     }
     const { stdout: lim } = await runCli(
-      ["var", "list", "myvar-", "--limit", "2"],
+      ["var", "list", "@test/myvar-", "--limit", "2"],
       storePath,
     );
     expect((envValue(lim) as unknown[]).length).toBe(2);
 
     const { stdout: off } = await runCli(
-      ["var", "list", "myvar-", "--offset", "1", "--limit", "10"],
+      ["var", "list", "@test/myvar-", "--offset", "1", "--limit", "10"],
       storePath,
     );
     const offList = envValue(off) as Array<{ name: string }>;
     expect(offList.length).toBe(3);
-    expect(offList[0]?.name).toBe("myvar-1");
+    expect(offList[0]?.name).toBe("@test/myvar-1");
   });
 
   test("G3. --desc reverses var list order", async () => {
     for (let i = 0; i < 3; i++) {
       const h = await putString(`dval-${i}`);
-      await runCli(["var", "set", `dv-${i}`, h], storePath);
+      await runCli(["var", "set", `@test/dv-${i}`, h], storePath);
       await new Promise((r) => setTimeout(r, 2));
     }
     const { stdout } = await runCli(
-      ["var", "list", "dv-", "--desc"],
+      ["var", "list", "@test/dv-", "--desc"],
       storePath,
     );
     const list = envValue(stdout) as Array<{ name: string }>;
-    expect(list[0]?.name).toBe("dv-2");
+    expect(list[0]?.name).toBe("@test/dv-2");
   });
 
   test("G4. --sort updated", async () => {
     for (let i = 0; i < 3; i++) {
       const h = await putString(`sval-${i}`);
-      await runCli(["var", "set", `sv-${i}`, h], storePath);
+      await runCli(["var", "set", `@test/sv-${i}`, h], storePath);
       await new Promise((r) => setTimeout(r, 2));
     }
     // Re-set sv-0 with NEW value to bump updated
     await new Promise((r) => setTimeout(r, 2));
     const newH = await putString("sval-0-new");
-    await runCli(["var", "set", "sv-0", newH], storePath);
+    await runCli(["var", "set", "@test/sv-0", newH], storePath);
 
     const { stdout } = await runCli(
-      ["var", "list", "sv-", "--sort", "updated"],
+      ["var", "list", "@test/sv-", "--sort", "updated"],
       storePath,
     );
     const list = envValue(stdout) as Array<{ name: string }>;
-    expect(list[list.length - 1]?.name).toBe("sv-0");
+    expect(list[list.length - 1]?.name).toBe("@test/sv-0");
   });
 
   test("G6. invalid --sort exits non-zero", async () => {
