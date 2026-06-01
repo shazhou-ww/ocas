@@ -41,6 +41,7 @@ Flags:
   --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
   --var-db <path>     Variable database path (default: <store>/variables.db)
   --json              Compact JSON output
+  --render, -r        Render output inline (equivalent to | ocas render -p)
   --schema <hash>     Schema hash filter for var get/delete/tag/list
   --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
   --inline <text>     Inline text content for template set
