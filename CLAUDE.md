@@ -59,6 +59,14 @@ bun run format    # Biome format (auto-fix)
 - `Hash` — 13-character uppercase Crockford Base32 string (XXH64)
 - `CasNode` — content-addressed node with schema
 - `Store` — abstract storage interface (get/put)
+- `VariableStore` — SQLite-backed mutable bindings (name → hash)
+
+### Architecture Notes
+
+- **No "alias" concept** — every name resolution flows through the `VariableStore`. Builtin schemas (`@ocas/schema`, `@ocas/string`, `@ocas/output/*`, …) are registered as variables during `bootstrap(store, varStore)`, alongside user-defined variables created via `ocas var set`.
+- **`bootstrap(store, varStore?)`** writes builtin name → hash bindings into the varStore when one is provided; called automatically by `openStore()` and `openStoreAndVarStore()`.
+- **`resolveHash(input, varStore)`** is the unified hash/name resolver in the CLI. If `input` matches the 13-char hash format it is returned as-is; otherwise the varStore is queried by exact name. This means every CLI command that accepts a hash argument also accepts a variable name (schema names, user vars, etc.).
+- **`openStoreAndVarStore()`** in the CLI opens both stores and bootstraps once; prefer it over separate `openStore()` + `createVariableStore()` to avoid double bootstrap.
 
 ### Internal Dependencies
 

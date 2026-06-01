@@ -31,15 +31,15 @@ bun packages/cli-ocas/src/index.ts <command> [args]
 ## CLI Usage
 
 ```
-Usage: ocas [--store <path>] [--json] <command> [args]
+Usage: ocas [--home <path>] [--json] <command> [args]
 ```
 
 ### Global flags
 
 | Flag | Description |
 |------|-------------|
-| `--store <path>` | Store directory (default: `~/.uncaged/ocas`) |
-| `--var-db <path>` | Variable database path (default: `<store>/variables.db`) |
+| `--home <path>` | Store directory (default: `$OCAS_HOME` or `~/.ocas`) |
+| `--var-db <path>` | Variable database path (default: `<home>/variables.db`) |
 | `--json` | Compact (single-line) JSON output |
 
 ### Envelope format
@@ -71,7 +71,7 @@ raw, non-envelope text.
 | `hash <type-hash> <file.json>` | computed hash (string) | `@output/hash` |
 | `render <hash> [options]` | raw text (no envelope) | — |
 | `render --pipe/-p [options]` | raw text from piped envelope | — |
-| `list --type <hash-or-alias>` | hashes (string[]) | `@output/list` |
+| `list --type <hash-or-name>` | hashes (string[]) | `@output/list` |
 | `var set <name> <hash> [--tag ...]` | variable object | `@output/var-set` |
 | `var get <name> --schema <hash>` | variable object | `@output/var-get` |
 | `var delete <name> [--schema <hash>]` | variable or variable[] | `@output/var-delete` |
@@ -117,6 +117,19 @@ ocas gc | ocas render -p
 ocas list --type @schema | ocas render -p
 ```
 
+### Variable names as hash arguments
+
+Every command that takes a hash also accepts a variable name. Builtin schema names like `@ocas/schema`, `@ocas/string`, `@ocas/output/*` are registered in the variable store during bootstrap; user variables created via `ocas var set <name> <hash>` resolve the same way:
+
+```bash
+ocas put @ocas/object data.json     # @ocas/object → builtin schema hash
+ocas list --type @ocas/schema       # filter by builtin schema
+ocas var set myapp/config <hash>
+ocas get myapp/config                # resolves to the user-bound hash
+```
+
+There is no separate alias system — names are just variables.
+
 ### Templates
 
 `template` commands manage the LiquidJS template bound to a schema (stored as a
@@ -142,6 +155,6 @@ There is no separate `src/` module tree; the CLI is a single entry file. Tests (
 
 | Setting | Default | Override |
 |---------|---------|----------|
-| Store directory | `~/.uncaged/ocas` | `--store <path>` |
+| Store directory | `~/.ocas` | `--home <path>` or `OCAS_HOME` env var |
 
 No config file is read; all behavior is controlled via flags and command arguments.

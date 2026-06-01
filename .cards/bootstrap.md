@@ -24,13 +24,13 @@ This is the only node in the entire store where `type === hash`. It is the root 
 
 ## What Bootstrap Registers
 
-`bootstrap(store)` is called once when a [[Store]] is opened (and is idempotent). It registers:
+`bootstrap(store, varStore?)` is called once when a [[Store]] is opened (and is idempotent). It registers:
 
 1. **The meta-schema** — defines the structure of all schemas (allowed JSON Schema keywords)
 2. **Primitive type schemas** — `@ocas/string`, `@ocas/number`, `@ocas/object`, `@ocas/array`, `@ocas/bool`
 3. **Output schemas** — 18 `@ocas/output/*` schemas for [[Render System|CLI envelope]] types
 
-All of these are stored as regular CAS nodes, addressable by hash. The `@ocas/*` aliases are convenience names resolved at runtime.
+All of these are stored as regular CAS nodes, addressable by hash. When a [[Variable|varStore]] is provided, bootstrap also writes each `@ocas/*` builtin name → hash binding into the variable store, making them resolvable like any other variable.
 
 ## Idempotency
 

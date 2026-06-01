@@ -23,7 +23,7 @@ Commands:
   hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
-  list --type <hash-or-alias>       List hashes for a type (value=string[])            (@ocas/output/list)
+  list --type <hash-or-name>        List hashes for a type (value=string[])            (@ocas/output/list)
   list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
   list-schema                       List all schema hashes (value=string[])            (@ocas/output/list-schema)
   var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
