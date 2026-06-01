@@ -823,6 +823,18 @@ async function cmdList(_args: string[]): Promise<void> {
   out(await wrapEnvelope(store, "@output/list", hashes));
 }
 
+async function cmdListMeta(_args: string[]): Promise<void> {
+  const store = await openStore();
+  const hashes = store.listMeta();
+  out(await wrapEnvelope(store, "@output/list-meta", hashes));
+}
+
+async function cmdListSchema(_args: string[]): Promise<void> {
+  const store = await openStore();
+  const hashes = store.listSchemas();
+  out(await wrapEnvelope(store, "@output/list-schema", hashes));
+}
+
 function printUsage(): void {
   console.log(`\
 Usage: json-cas [--store <path>] [--json] <command> [args]
@@ -842,6 +854,8 @@ Commands:
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
   list --type <hash-or-alias>       List hashes for a type (value=string[])            (@output/list)
+  list-meta                         List meta-schema hashes (value=string[])           (@output/list-meta)
+  list-schema                       List all schema hashes (value=string[])            (@output/list-schema)
   var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@output/var-set)
   var get <name> --schema <hash>    Get a variable by name + schema                    (@output/var-get)
   var delete <name> [--schema <hash>] Delete variable(s)                               (@output/var-delete)
@@ -910,6 +924,14 @@ switch (cmd) {
 
   case "list":
     await cmdList(rest);
+    break;
+
+  case "list-meta":
+    await cmdListMeta(rest);
+    break;
+
+  case "list-schema":
+    await cmdListSchema(rest);
     break;
 
   case "var": {

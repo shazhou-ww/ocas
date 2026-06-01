@@ -22,6 +22,7 @@ import {
 import { decode } from "cborg";
 
 const INDEX_DIR = "_index";
+const META_FILE = "_meta";
 
 function loadDir(dir: string, data: Map<Hash, CasNode>): void {
   let entries: string[];
@@ -100,6 +101,61 @@ function loadOrMigrateTypeIndex(
   return loadTypeIndex(indexDir);
 }
 
+function loadOrMigrateMetaSet(
+  dir: string,
+  data: Map<Hash, CasNode>,
+): Set<Hash> {
+  const indexDir = join(dir, INDEX_DIR);
+  const metaPath = join(indexDir, META_FILE);
+  if (existsSync(metaPath)) {
+    try {
+      const content = readFileSync(metaPath, "utf8");
+      return new Set(parseIndexFile(content));
+    } catch {
+      return new Set();
+    }
+  }
+  // Migration: scan loaded nodes for self-referencing nodes (type === hash)
+  const metaSet = new Set<Hash>();
+  for (const [hash, node] of data) {
+    if (node.type === hash) {
+      metaSet.add(hash);
+    }
+  }
+  if (metaSet.size > 0) {
+    mkdirSync(indexDir, { recursive: true });
+    const body = `${[...metaSet].join("\n")}\n`;
+    writeFileSync(metaPath, body, "utf8");
+  }
+  return metaSet;
+}
+
+function appendToMetaSet(
+  indexDir: string,
+  metaSet: Set<Hash>,
+  hash: Hash,
+): void {
+  if (metaSet.has(hash)) return;
+  metaSet.add(hash);
+  mkdirSync(indexDir, { recursive: true });
+  appendFileSync(join(indexDir, META_FILE), `${hash}\n`, "utf8");
+}
+
+function rewriteMetaSet(indexDir: string, metaSet: Set<Hash>): void {
+  const metaPath = join(indexDir, META_FILE);
+  if (metaSet.size === 0) {
+    try {
+      unlinkSync(metaPath);
+    } catch {
+      // ignore
+    }
+    return;
+  }
+  mkdirSync(indexDir, { recursive: true });
+  const body = `${[...metaSet].join("\n")}\n`;
+  writeFileSync(metaPath, body, "utf8");
+}
+
 function appendToTypeIndex(
   indexDir: string,
   typeIndex: Map<Hash, Hash[]>,
@@ -118,6 +174,7 @@ export function createFsStore(dir: string): BootstrapCapableStore {
   loadDir(dir, data);
   const indexDir = join(dir, INDEX_DIR);
   const typeIndex = loadOrMigrateTypeIndex(dir, data);
+  const metaSet = loadOrMigrateMetaSet(dir, data);
 
   async function putSelfReferencing(payload: unknown): Promise<Hash> {
     const hash = await computeSelfHash(payload);
@@ -136,6 +193,7 @@ export function createFsStore(dir: string): BootstrapCapableStore {
 
       appendToTypeIndex(indexDir, typeIndex, hash, hash);
     }
+    appendToMetaSet(indexDir, metaSet, hash);
     return hash;
   }
 
@@ -182,6 +240,22 @@ export function createFsStore(dir: string): BootstrapCapableStore {
       return Array.from(data.keys());
     },
 
+    listMeta(): Hash[] {
+      return Array.from(metaSet);
+    },
+
+    listSchemas(): Hash[] {
+      const result = new Set<Hash>();
+      for (const meta of metaSet) {
+        result.add(meta);
+        const list = typeIndex.get(meta);
+        if (list) {
+          for (const h of list) result.add(h);
+        }
+      }
+      return Array.from(result);
+    },
+
     delete(hash: Hash): void {
       const node = data.get(hash);
       if (node) {
@@ -212,6 +286,11 @@ export function createFsStore(dir: string): BootstrapCapableStore {
             const body = `${list.join("\n")}\n`;
             writeFileSync(join(indexDir, node.type), body, "utf8");
           }
+        }
+        // Remove from meta set if applicable
+        if (metaSet.has(hash)) {
+          metaSet.delete(hash);
+          rewriteMetaSet(indexDir, metaSet);
         }
       }
     },

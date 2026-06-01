@@ -1,13 +1,26 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { JSONSchema } from "@uncaged/json-cas";
 import { putSchema } from "@uncaged/json-cas";
 import { openStore as openFsStore } from "@uncaged/json-cas-fs";
 
-export { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync };
-export { tmpdir };
-export { join, resolve };
+export {
+  join,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  resolve,
+  rmSync,
+  tmpdir,
+  writeFileSync,
+};
 
 export const entrypoint = resolve(import.meta.dir, "../src/index.ts");
 export const pkgPath = resolve(import.meta.dir, "../package.json");

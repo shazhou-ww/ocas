@@ -13,6 +13,8 @@ const OUTPUT_ALIASES = [
   "@output/refs",
   "@output/walk",
   "@output/list",
+  "@output/list-meta",
+  "@output/list-schema",
   "@output/var-set",
   "@output/var-get",
   "@output/var-delete",
@@ -30,11 +32,11 @@ const OUTPUT_ALIASES = [
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe("bootstrap - Built-in Schemas", () => {
-  test("should return map of 24 built-in schema aliases to hashes", async () => {
+  test("should return map of 26 built-in schema aliases to hashes", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
-    // Should return object with 6 primitive + 18 output aliases = 24
+    // Should return object with 6 primitive + 20 output aliases = 26
     expect(builtinSchemas).toHaveProperty("@schema");
     expect(builtinSchemas).toHaveProperty("@string");
     expect(builtinSchemas).toHaveProperty("@number");
@@ -46,7 +48,7 @@ describe("bootstrap - Built-in Schemas", () => {
       expect(builtinSchemas).toHaveProperty(alias);
     }
 
-    expect(Object.keys(builtinSchemas)).toHaveLength(24);
+    expect(Object.keys(builtinSchemas)).toHaveLength(26);
 
     // All values should be valid hashes
     for (const [_alias, hash] of Object.entries(builtinSchemas)) {
@@ -314,5 +316,25 @@ describe("bootstrap - @output/* Schemas", () => {
     const outputHashes = OUTPUT_ALIASES.map((alias) => aliases[alias]);
     const uniqueHashes = new Set(outputHashes);
     expect(uniqueHashes.size).toBe(OUTPUT_ALIASES.length);
+  });
+});
+
+describe("bootstrap - meta and schemas indexes (D1)", () => {
+  test("listMeta contains the bootstrap meta-schema hash", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const metaHash = aliases["@schema"];
+    expect(store.listMeta()).toContain(metaHash as string);
+  });
+
+  test("listSchemas contains meta-schema and all built-in schemas", async () => {
+    const store = createMemoryStore();
+    const aliases = await bootstrap(store);
+    const schemas = store.listSchemas();
+
+    for (const [, hash] of Object.entries(aliases)) {
+      expect(schemas).toContain(hash);
+    }
+    expect(schemas.length).toBeGreaterThanOrEqual(6);
   });
 });

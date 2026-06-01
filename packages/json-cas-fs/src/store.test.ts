@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -10,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CasNode } from "@uncaged/json-cas";
 import {
+  BOOTSTRAP_STORE,
   bootstrap,
   computeHash,
   computeSelfHash,
@@ -65,7 +67,7 @@ describe("createFsStore – init and bootstrap", () => {
     const h2 = await bootstrap(store);
 
     expect(h1).toEqual(h2);
-    expect(store.listByType(h1["@schema"] ?? "")).toHaveLength(24);
+    expect(store.listByType(h1["@schema"] ?? "")).toHaveLength(26);
   });
 });
 
@@ -427,5 +429,132 @@ describe("openStore – async with auto-bootstrap", () => {
     expect(store2.has(schemas["@schema"] as string)).toBe(true);
     // Old data still exists
     expect(store2.listByType(typeHash)).toHaveLength(1);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// listMeta and listSchemas (FS persistence)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("createFsStore – listMeta and listSchemas", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "json-cas-fs-meta-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("C1. _index/_meta exists and contains hash after self-referencing put", async () => {
+    const store = createFsStore(dir);
+    const hash = await store[BOOTSTRAP_STORE]({ type: "object" });
+
+    const metaPath = join(dir, "_index", "_meta");
+    expect(existsSync(metaPath)).toBe(true);
+    const content = readFileSync(metaPath, "utf8");
+    expect(content).toBe(`${hash}\n`);
+  });
+
+  test("C2. multiple meta puts append, no duplicates", async () => {
+    const store = createFsStore(dir);
+    const h1 = await store[BOOTSTRAP_STORE]({ type: "object", v: 1 });
+    const h2 = await store[BOOTSTRAP_STORE]({ type: "object", v: 2 });
+    // re-put first (idempotent)
+    await store[BOOTSTRAP_STORE]({ type: "object", v: 1 });
+
+    const content = readFileSync(join(dir, "_index", "_meta"), "utf8");
+    const lines = content.split("\n").filter((l) => l.length > 0);
+    expect(lines).toHaveLength(2);
+    expect(lines).toContain(h1);
+    expect(lines).toContain(h2);
+  });
+
+  test("C3. reload from disk preserves listMeta", async () => {
+    const store1 = createFsStore(dir);
+    const h1 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "a" });
+    const h2 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "b" });
+
+    const store2 = createFsStore(dir);
+    const meta = store2.listMeta();
+    expect(meta).toContain(h1);
+    expect(meta).toContain(h2);
+    expect(meta).toHaveLength(2);
+  });
+
+  test("C4. migrates from existing nodes when _meta is missing", async () => {
+    const store1 = createFsStore(dir);
+    const h1 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "mig" });
+    const t = await computeSelfHash({ name: "regular" });
+    await store1.put(h1, { type: "string" });
+
+    // Remove _index/_meta but keep _index/* and .bin files
+    const metaPath = join(dir, "_index", "_meta");
+    rmSync(metaPath, { force: true });
+    expect(existsSync(metaPath)).toBe(false);
+
+    const store2 = createFsStore(dir);
+    expect(store2.listMeta()).toContain(h1);
+    expect(existsSync(metaPath)).toBe(true);
+    const content = readFileSync(metaPath, "utf8");
+    expect(content).toContain(h1);
+
+    // unrelated type hash not in meta
+    expect(store2.listMeta()).not.toContain(t);
+  });
+
+  test("C5. existing _meta is not overwritten", async () => {
+    const store1 = createFsStore(dir);
+    const h1 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "keep" });
+
+    const metaPath = join(dir, "_index", "_meta");
+    const before = readFileSync(metaPath, "utf8");
+
+    // Reopen and confirm content unchanged
+    const _store2 = createFsStore(dir);
+    const after = readFileSync(metaPath, "utf8");
+    expect(after).toBe(before);
+    expect(after).toContain(h1);
+  });
+
+  test("C6. listSchemas returns union of typeIndex[m] for m in metaSet", async () => {
+    const store = createFsStore(dir);
+    const m = await store[BOOTSTRAP_STORE]({ type: "object" });
+    const s1 = await store.put(m, { type: "string" });
+    const s2 = await store.put(m, { type: "number" });
+    const s3 = await store.put(m, { type: "array" });
+
+    const schemas = store.listSchemas();
+    expect(schemas).toHaveLength(4);
+    expect(schemas).toContain(m);
+    expect(schemas).toContain(s1);
+    expect(schemas).toContain(s2);
+    expect(schemas).toContain(s3);
+  });
+
+  test("C7. delete persists removal from _meta", async () => {
+    const store1 = createFsStore(dir);
+    const h1 = await store1[BOOTSTRAP_STORE]({ type: "object", v: 1 });
+    const h2 = await store1[BOOTSTRAP_STORE]({ type: "object", v: 2 });
+
+    store1.delete(h1);
+
+    const metaPath = join(dir, "_index", "_meta");
+    const content = readFileSync(metaPath, "utf8");
+    expect(content).not.toContain(h1);
+    expect(content).toContain(h2);
+
+    const store2 = createFsStore(dir);
+    expect(store2.listMeta()).not.toContain(h1);
+    expect(store2.listMeta()).toContain(h2);
+  });
+
+  test("C8. fresh store with no self-ref puts has empty listMeta", () => {
+    const store = createFsStore(dir);
+    expect(store.listMeta()).toEqual([]);
+    // _meta may be absent; that's fine
+    const metaPath = join(dir, "_index", "_meta");
+    if (existsSync(metaPath)) {
+      const content = readFileSync(metaPath, "utf8");
+      expect(content).toBe("");
+    }
   });
 });
