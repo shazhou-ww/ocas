@@ -65,10 +65,6 @@ for pkg in core fs cli; do
   PKG_NAME=$(python3 -c "import json; print(json.load(open('packages/$pkg/package.json'))['name'])")
   echo "  $PKG_NAME@$VERSION"
 done
-echo ""
-read -rp "Publish to npm? [y/N] " confirm
-[[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
-
 # --- Publish (order matters: core → fs → cli) ---
 
 for pkg in core fs cli; do
