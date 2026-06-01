@@ -7,7 +7,7 @@ exports[`Phase 7: Edge Cases 7.3 var set empty name errors 1`] = `"Usage: ocas v
 exports[`Phase 7: Edge Cases 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Segment "invalid name!" contains invalid characters (only @, a-z, A-Z, 0-9, ., _, - allowed)"`;
 
 exports[`Phase 7: Edge Cases 7.5 no subcommand shows help text 1`] = `
-"Usage: ocas [--store <path>] [--json] <command> [args]
+"Usage: ocas [--home <path>] [--json] <command> [args]
 
 All JSON commands emit a { type, value } envelope. The type is the hash of the
 command's @ocas/output/* schema (shown in parentheses); pipe any envelope into
@@ -38,7 +38,7 @@ Commands:
   gc                                Run garbage collection                             (@ocas/output/gc)
 
 Flags:
-  --store <path>      Store directory (default: ~/.ocas)
+  --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
   --var-db <path>     Variable database path (default: <store>/variables.db)
   --json              Compact JSON output
   --schema <hash>     Schema hash filter for var get/delete/tag/list

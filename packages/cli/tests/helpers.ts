@@ -55,7 +55,7 @@ export async function runCli(
   storePath?: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const finalArgs = storePath
-    ? ["bun", entrypoint, "--store", storePath, ...args]
+    ? ["bun", entrypoint, "--home", storePath, ...args]
     : ["bun", entrypoint, ...args];
   const proc = Bun.spawn(finalArgs, {
     stdout: "pipe",
@@ -72,7 +72,7 @@ export async function runCliWithStdin(
   storePath: string,
   stdin: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const finalArgs = ["bun", entrypoint, "--store", storePath, ...args];
+  const finalArgs = ["bun", entrypoint, "--home", storePath, ...args];
   const proc = Bun.spawn(finalArgs, {
     stdout: "pipe",
     stderr: "pipe",

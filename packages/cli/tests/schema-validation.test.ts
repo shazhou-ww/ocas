@@ -590,7 +590,7 @@ describe("Phase 2: Schema Validation", () => {
       [
         "bun",
         entrypoint,
-        "--store",
+        "--home",
         tmpStore,
         "--var-db",
         varDbPath,
@@ -616,7 +616,7 @@ describe("Phase 2: Schema Validation", () => {
       [
         "bun",
         entrypoint,
-        "--store",
+        "--home",
         tmpStore,
         "--var-db",
         varDbPath,
@@ -641,7 +641,7 @@ describe("Phase 2: Schema Validation", () => {
       [
         "bun",
         entrypoint,
-        "--store",
+        "--home",
         tmpStore,
         "--var-db",
         varDbPath,

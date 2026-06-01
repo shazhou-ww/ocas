@@ -47,7 +47,7 @@ async function runCli(
   args: string[],
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const proc = Bun.spawn(
-    ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, ...args],
+    ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
     { stdout: "pipe", stderr: "pipe" },
   );
   const exitCode = await proc.exited;

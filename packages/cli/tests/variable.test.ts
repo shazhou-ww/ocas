@@ -49,7 +49,7 @@ async function runCli(...args: string[]): Promise<{
       "bun",
       "run",
       cliPath,
-      "--store",
+      "--home",
       storePath,
       "--var-db",
       varDbPath,
@@ -949,7 +949,7 @@ describe("global options", () => {
     expect(lines.length).toBe(1);
   });
 
-  test("--store flag for custom store path", async () => {
+  test("--home flag for custom store path", async () => {
     const customStorePath = join(testDir, "custom-store");
     mkdirSync(customStorePath, { recursive: true });
 
@@ -963,7 +963,7 @@ describe("global options", () => {
         "bun",
         "run",
         cliPath,
-        "--store",
+        "--home",
         customStorePath,
         "--var-db",
         varDbPath,
@@ -994,7 +994,7 @@ describe("global options", () => {
         "bun",
         "run",
         cliPath,
-        "--store",
+        "--home",
         storePath,
         "--var-db",
         customDbPath,
