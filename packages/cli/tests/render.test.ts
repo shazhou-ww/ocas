@@ -62,7 +62,7 @@ describe("Phase 5: Render", () => {
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, ...args],
+      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;
@@ -76,7 +76,7 @@ describe("Phase 5: Render", () => {
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, ...args],
+      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
       { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
     );
     proc.stdin.write(stdin);

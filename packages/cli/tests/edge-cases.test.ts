@@ -46,7 +46,7 @@ describe("Phase 7: Edge Cases", () => {
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, ...args],
+      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;
@@ -130,14 +130,14 @@ describe("Phase 7: Edge Cases", () => {
     expect(combined.toLowerCase()).toContain("usage");
   });
 
-  test("7.6 --store path is a file errors", async () => {
+  test("7.6 --home path is a file errors", async () => {
     const fileAsStore = join(tmpStore, "not-a-directory");
     writeFileSync(fileAsStore, "test");
     const proc = Bun.spawn(
       [
         "bun",
         entrypoint,
-        "--store",
+        "--home",
         fileAsStore,
         "--var-db",
         varDbPath,
@@ -165,7 +165,7 @@ describe("Phase 3: Variable System", () => {
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, ...args],
+      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;
@@ -354,7 +354,7 @@ describe("Phase 4: Template System", () => {
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, ...args],
+      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;

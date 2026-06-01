@@ -32,7 +32,7 @@ type Flags = Record<string, string | boolean | string[]>;
 
 /** Flags that consume the next token as their value. All others are boolean. */
 const VALUE_FLAGS = new Set([
-  "store",
+  "home",
   "format",
   "var-db",
   "tag",
@@ -89,8 +89,8 @@ const { flags, positional } = parseArgs(process.argv.slice(2));
 
 const defaultStorePath = join(homedir(), ".ocas");
 const storePath =
-  typeof flags.store === "string"
-    ? flags.store
+  typeof flags.home === "string"
+    ? flags.home
     : (process.env["OCAS_HOME"] ?? defaultStorePath);
 const compact = flags.json === true;
 
@@ -849,7 +849,7 @@ async function cmdListSchema(_args: string[]): Promise<void> {
 
 function printUsage(): void {
   console.log(`\
-Usage: ocas [--store <path>] [--json] <command> [args]
+Usage: ocas [--home <path>] [--json] <command> [args]
 
 All JSON commands emit a { type, value } envelope. The type is the hash of the
 command's @ocas/output/* schema (shown in parentheses); pipe any envelope into
@@ -880,7 +880,7 @@ Commands:
   gc                                Run garbage collection                             (@ocas/output/gc)
 
 Flags:
-  --store <path>      Store directory (default: $OCAS_HOME or ~/.ocas)
+  --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
   --var-db <path>     Variable database path (default: <store>/variables.db)
   --json              Compact JSON output
   --schema <hash>     Schema hash filter for var get/delete/tag/list

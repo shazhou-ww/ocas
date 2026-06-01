@@ -40,7 +40,7 @@ async function runCliAlias(...args: string[]): Promise<{
   exitCode: number;
 }> {
   const proc = Bun.spawn(
-    ["bun", "run", cliPath, "--store", storePath, ...args],
+    ["bun", "run", cliPath, "--home", storePath, ...args],
     {
       stdout: "pipe",
       stderr: "pipe",

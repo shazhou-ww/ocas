@@ -49,7 +49,7 @@ async function runCli(...args: string[]): Promise<{
       "bun",
       "run",
       cliPath,
-      "--store",
+      "--home",
       storePath,
       "--var-db",
       varDbPath,
