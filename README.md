@@ -2,62 +2,208 @@
 
 **Object Content Addressable Store** — self-describing CAS with JSON Schema typed nodes.
 
-## Overview
+Every node has a typed payload: its `type` field is the hash of a JSON Schema that describes the payload shape. Hashes are 13-character Crockford Base32 strings derived from XXH64 over deterministic CBOR encoding. Payloads can reference other nodes via `format: "cas_ref"` fields, forming a traversable DAG.
 
-OCAS is a monorepo for storing and validating JSON data in a content-addressable store (CAS). Each node has a typed payload: its `type` field is the hash of a JSON Schema node that describes the payload shape. Hashes are 13-character Crockford Base32 strings derived from XXH64 over deterministic CBOR encoding.
+## Install
 
-A bootstrap meta-schema is stored as a self-referencing seed node (`type === hash`). All other schemas are registered as nodes typed by that meta-schema. Payloads can reference other nodes via `format: "cas_ref"` fields; the library provides traversal, reference extraction, and integrity verification.
+```bash
+bun add -g @ocas/cli
+```
 
-Use the in-memory store for tests and embedded apps, the filesystem store for persistence, and the CLI for local store management.
+The store is auto-created and bootstrapped on first use — no `init` command needed.
+
+## Quick Start
+
+```bash
+# Define a schema
+cat > todo.schema.json << 'EOF'
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string" },
+    "done": { "type": "boolean" }
+  },
+  "required": ["title", "done"],
+  "additionalProperties": false
+}
+EOF
+
+# Register the schema (schemas are just nodes typed by the meta-schema)
+ocas put @ocas/schema todo.schema.json
+# → { "type": "...", "value": "1ABC2DEF34567" }
+
+# Give it a friendly name
+ocas var set todo/schema 1ABC2DEF34567
+
+# Store a todo item
+echo '{ "title": "Buy milk", "done": false }' | ocas put todo/schema -p
+# → { "type": "...", "value": "9XYZ8WVU76543" }
+
+# Retrieve it
+ocas get 9XYZ8WVU76543
+
+# Verify integrity + schema validation
+ocas verify 9XYZ8WVU76543
+```
+
+## Envelope Format
+
+Every command outputs a `{ type, value }` JSON envelope. `type` is the hash of the result schema, `value` is the payload. This makes output self-describing and composable:
+
+```bash
+# Pipe any command's output into render
+ocas put @ocas/schema schema.json | ocas render -p
+
+# Or use the shorthand -r flag
+ocas get 9XYZ8WVU76543 -r
+
+# Extract values with jq
+ocas list --type @ocas/schema | jq -r '.value[].hash'
+```
+
+`render` is the only command that emits raw text instead of an envelope.
+
+## Commands
+
+### Store & Retrieve
+
+```bash
+ocas put <type> <file>          # store a node, returns its hash
+ocas put <type> -p              # read payload from stdin
+ocas get <hash>                 # retrieve a node
+ocas has <hash>                 # check if a node exists
+ocas hash <type> <file>         # compute hash without storing
+ocas verify <hash>              # integrity check + schema validation
+```
+
+### Graph Traversal
+
+```bash
+ocas refs <hash>                # list direct cas_ref edges
+ocas walk <hash>                # recursive DAG traversal
+ocas walk <hash> --format tree  # tree-view output
+```
+
+### Listing & Querying
+
+```bash
+ocas list --type <hash|name>    # list nodes by type
+ocas list-schema                # list all schemas
+ocas list-meta                  # list meta-schema hashes
+```
+
+All list commands support sorting and pagination:
+
+```bash
+ocas list --type todo/schema --sort updated --desc --limit 20
+ocas list --type todo/schema --offset 20 --limit 20   # page 2
+ocas list-schema --sort created --limit 50
+```
+
+### Variables
+
+Variables are mutable pointers to immutable data — like git branches pointing to commits.
+
+```bash
+ocas var set <name> <hash>                # bind a name to a hash
+ocas var get <name>                       # look up current binding
+ocas var delete <name>                    # remove binding
+ocas var list [prefix]                    # list variables (prefix filter)
+ocas var list --schema <hash> --tag env:prod  # filter by schema and tag
+ocas var history <name>                   # show last 10 values (LRU)
+```
+
+**Tags & labels** — attach metadata to variables:
+
+```bash
+ocas var set myapp/config <hash> --tag env:prod --tag pinned
+ocas var tag myapp/config --schema <hash> status:active   # add tag
+ocas var tag myapp/config --schema <hash> :status          # remove tag
+```
+
+Any command that takes a hash also accepts a variable name:
+
+```bash
+ocas get myapp/config          # resolves to the bound hash
+ocas put @ocas/schema s.json   # @ocas/schema is a builtin variable
+```
+
+Names starting with `@ocas/` are reserved for internal use.
+
+### Templates & Rendering
+
+Bind a [LiquidJS](https://liquidjs.com/) template to a schema, then render nodes of that type:
+
+```bash
+# Set a template
+ocas template set <schema-hash> --inline "Todo: {{ payload.title }} [{{ payload.done }}]"
+
+# Render a node (uses the template for its type, falls back to YAML)
+ocas render <hash>
+
+# Render from a pipe (any envelope)
+ocas gc | ocas render -p
+
+# Inline render shorthand
+ocas get <hash> -r
+```
+
+Render options for recursive reference expansion:
+
+```bash
+ocas render <hash> --resolution 3    # max recursion depth
+ocas render <hash> --decay 0.5       # depth decay factor
+ocas render <hash> --epsilon 0.01    # cutoff threshold
+```
+
+### Garbage Collection
+
+```bash
+ocas gc                # collect unreachable nodes
+ocas gc | ocas render -p   # human-readable stats
+```
+
+Nodes reachable from any variable binding are kept; everything else is swept.
+
+## Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `--home <path>` | Store directory (default: `$OCAS_HOME` or `~/.ocas`) |
+| `--var-db <path>` | Variable database path |
+| `--json` | Compact single-line JSON output |
+| `--pipe`, `-p` | Read from stdin |
+| `--render`, `-r` | Render output inline |
+| `--sort created\|updated` | Sort key for list commands (default: `created`) |
+| `--limit <n>` | Max results (default: 100) |
+| `--offset <n>` | Skip first N results (default: 0) |
+| `--desc` | Sort descending |
 
 ## Architecture
 
 ```
   ┌───────────┐
-  │ @ocas/cli │
+  │ @ocas/cli │    CLI interface
   └─────┬─────┘
         │
-        ▼
   ┌───────────┐
-  │ @ocas/fs  │
+  │ @ocas/fs  │    Filesystem store (CBOR + SQLite)
   └─────┬─────┘
         │
-        ▼
   ┌────────────┐
-  │ @ocas/core │
+  │ @ocas/core │   Hashing, schemas, validation, bootstrap
   └────────────┘
 ```
 
-| Layer | Package | Role |
-|-------|---------|------|
-| Core | `@ocas/core` | Hashing, schemas, stores, verify, bootstrap |
-| Storage | `@ocas/fs` | Filesystem-backed `Store` |
-| CLI | `@ocas/cli` | `ocas` command-line tool |
-
-## Packages
-
-| Package | Description | Type |
-|---------|-------------|------|
-| [`@ocas/core`](packages/core/README.md) | Core CAS engine — hashing, schema, store, verify, bootstrap | lib |
-| [`@ocas/fs`](packages/fs/README.md) | Filesystem-backed CAS store | lib |
-| [`@ocas/cli`](packages/cli/README.md) | CLI tool (`ocas` binary) | cli |
-
-## Quick Start
+## Using as a Library
 
 ```bash
-git clone <repo-url>
-cd ocas
-bun install --no-cache
-bun run build
+bun add @ocas/core              # in-memory store
+bun add @ocas/core @ocas/fs     # + filesystem persistence
 ```
 
 ```typescript
-import {
-  bootstrap,
-  createMemoryStore,
-  putSchema,
-  validate,
-} from "@ocas/core";
+import { bootstrap, createMemoryStore, putSchema } from "@ocas/core";
 
 const store = createMemoryStore();
 await bootstrap(store);
@@ -71,113 +217,31 @@ const typeHash = await putSchema(store, {
 
 const hash = await store.put(typeHash, { message: "hello" });
 const node = store.get(hash);
-console.log(validate(store, node!)); // true
 ```
 
-For a persistent store:
+For filesystem persistence, use `@ocas/fs`:
 
 ```typescript
-import { createFsStore } from "@ocas/fs";
-import { bootstrap } from "@ocas/core";
+import { openStoreAndVarStore } from "@ocas/fs";
 
-const store = createFsStore("/path/to/store");
-await bootstrap(store);
+const { store, varStore } = await openStoreAndVarStore("/path/to/store");
 ```
 
-Or use the CLI (see [CLI Reference](#cli-reference) and [`packages/cli/README.md`](packages/cli/README.md)).
-
-## CLI Reference
-
-Binary: `ocas` (from `@ocas/cli`). Default store: `~/.ocas`.
-
-The store is auto-created and bootstrapped on first use — there is no `init`/`bootstrap`
-command, and schemas are ordinary `@schema`-typed nodes (`ocas put @schema file.json`),
-so there is no `schema` subcommand.
-
-### Envelope format
-
-Every JSON-emitting command prints a uniform `{ type, value }` envelope. `type` is the hash
-of the command's `@output/*` result schema and `value` is the command payload. This makes
-output self-describing and pipeable: feed any envelope into `render -p` to render its
-`value` (embedded `cas_ref` hashes are expanded). `render` is the only command that emits
-raw (non-envelope) text.
-
-```jsonc
-// ocas has <hash>
-{ "type": "AYHQD2YA9G667", "value": true }
-```
-
-```
-Usage: ocas [--home <path>] [--json] <command> [args]
-
-Commands (all emit a { type, value } envelope unless noted):
-  put <type-hash> <file.json>       Store node (value = hash)          (@output/put)
-  get <hash>                        Node payload + metadata            (@output/get)
-  has <hash>                        Existence boolean                  (@output/has)
-  verify <hash>                     ok / corrupted / invalid           (@output/verify)
-  refs <hash>                       Direct cas_ref edges               (@output/refs)
-  walk <hash> [--format tree]       Recursive traversal                (@output/walk)
-  hash <type-hash> <file.json>      Compute hash without storing       (@output/hash)
-  render <hash> [options]           Render node as text (raw output)
-  render --pipe/-p [options]        Render a piped envelope (raw output)
-  list --type <hash-or-name>        Hashes for a type (value = list)   (@output/list)
-  list-meta                         Meta-schema hashes                 (@output/list-meta)
-  list-schema                       All schema hashes                  (@output/list-schema)
-  var set|get|delete|tag|list ...   Variable CRUD                      (@output/var-*)
-  template set|get|list|delete ...  Output-template CRUD               (@output/template-*)
-  gc                                Garbage collection                 (@output/gc)
-
-Flags:
-  --home <path>   Store directory (default: $OCAS_HOME or ~/.ocas)
-  --json          Compact JSON output
-  --pipe, -p      Read a { type, value } envelope from stdin for render
-  --sort <key>    Sort key: created|updated (default: created)
-  --limit <n>     Max results (default: 100)
-  --offset <n>    Skip first N results (default: 0)
-  --desc          Sort descending (default: ascending)
-```
-
-### Variable names
-
-Any command that takes a hash also accepts a variable name. Builtin schemas
-(`@ocas/schema`, `@ocas/string`, `@ocas/object`, `@ocas/output/*`, …) are
-registered in the variable store during bootstrap; user variables created via
-`ocas var set <name> <hash>` resolve the same way. There is no separate alias
-concept — every name lookup queries the variable store.
-
-### Pipe examples
-
-```bash
-# Store a node, then render the stored content (the put envelope's hash is
-# a cas_ref, so render -p dereferences and renders it):
-ocas put @schema ./schemas/item.json | ocas render -p
-
-# Render garbage-collection stats:
-ocas gc | ocas render -p
-
-# List every schema, then consume the envelope's value array with jq:
-ocas list --type @schema | jq -r '.value[]'
-```
+See individual package READMEs for full API docs:
+[`@ocas/core`](packages/core/README.md) ·
+[`@ocas/fs`](packages/fs/README.md) ·
+[`@ocas/cli`](packages/cli/README.md)
 
 ## Development
 
 ```bash
-bun install --no-cache   # install workspace dependencies
-bun run build            # tsc --build (libs)
-bun run check            # biome check
-bun run format           # biome format --write
-bun test                 # run all package tests
+git clone <repo-url> && cd ocas
+bun install --no-cache
+bun run build     # tsc --build
+bun test          # run all tests
+bun run check     # biome lint
+bun run format    # biome format
 ```
-
-## Publishing
-
-Releases use [Changesets](https://github.com/changesets/changesets). From the repo root:
-
-```bash
-bun run release   # changeset version → build → publish to npm (@ocas/*)
-```
-
-Individual packages block `prepublishOnly` and expect releases via the workspace `release` script.
 
 ## License
 
