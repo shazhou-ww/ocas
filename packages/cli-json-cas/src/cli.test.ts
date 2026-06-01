@@ -224,6 +224,39 @@ describe("@ Alias Resolution - put", () => {
     expect(exitCode).not.toBe(0);
     expect(stderr.length).toBeGreaterThan(0);
   });
+
+  test("ucas put @schema with nested type constraints should succeed", async () => {
+    await runCliAlias("init");
+
+    const schemaFile = join(testDir, "constrained-schema.json");
+    writeFileSync(
+      schemaFile,
+      JSON.stringify({
+        type: "object",
+        properties: {
+          name: { type: "string", minLength: 1, maxLength: 50 },
+          age: { type: "number", minimum: 0, maximum: 150 },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 1,
+            uniqueItems: true,
+          },
+        },
+        required: ["name"],
+      }),
+    );
+
+    const { stdout, stderr, exitCode } = await runCliAlias(
+      "put",
+      "@schema",
+      schemaFile,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+  });
 });
 
 describe("@ Alias Resolution - hash", () => {

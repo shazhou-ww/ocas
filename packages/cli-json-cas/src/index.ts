@@ -13,6 +13,7 @@ import {
   getSchema,
   InvalidTagFormatError,
   InvalidVariableNameError,
+  putSchema,
   refs,
   renderAsync,
   renderDirect,
@@ -186,6 +187,23 @@ async function cmdPut(args: string[]): Promise<void> {
   const typeHash = await resolveTypeHash(typeHashOrAlias);
   const payload = readJsonFile(file);
   const store = await openStore();
+
+  // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
+  // instead of ajv against meta-schema (which can't express recursive constraints)
+  const builtinSchemas = await bootstrap(store);
+  const metaHash = builtinSchemas["@schema"];
+  if (typeHash === metaHash) {
+    try {
+      const hash = await putSchema(store, payload as Record<string, unknown>);
+      out(await wrapEnvelope(store, "@output/put", hash));
+    } catch (e) {
+      console.error(
+        `Validation failed: payload in ${file} does not match schema ${typeHash}`,
+      );
+      process.exit(1);
+    }
+    return;
+  }
 
   // Check if schema exists
   const schema = getSchema(store, typeHash);
