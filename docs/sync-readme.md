@@ -16,7 +16,7 @@ The root README should have these sections in order:
 3. **Architecture** — dependency layer diagram (text-based)
 4. **Packages** — table with ALL packages from packages/ directory, columns: Package, Description, Type (cli/lib)
 5. **Quick Start** — install, build, basic usage
-6. **CLI Reference** — brief command list, detailed usage in cli-json-cas README
+6. **CLI Reference** — brief command list, detailed usage in cli README
 7. **Development** — bun install / build / check / test
 8. **Publishing** — changeset workflow (bun run release)
 

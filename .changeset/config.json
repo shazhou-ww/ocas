@@ -1,8 +1,8 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "uncaged/json-cas" }],
+  "changelog": ["@changesets/changelog-github", { "repo": "shazhou-ww/ocas" }],
   "commit": false,
-  "fixed": [["@uncaged/*"]],
+  "fixed": [["@ocas/*"]],
   "linked": [],
   "access": "public",
   "baseBranch": "main",

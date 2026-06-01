@@ -1,0 +1,14 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Phase 1: CAS Core 1.6 get returns node JSON (snapshot) 1`] = `
+{
+  "type": "CCVN1ECY8JKQ0",
+  "value": {
+    "payload": {
+      "age": 30,
+      "name": "Alice",
+    },
+    "type": "FRBAB1BF0ZBCS",
+  },
+}
+`;

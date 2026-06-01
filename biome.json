@@ -15,7 +15,7 @@
   },
   "overrides": [
     {
-      "includes": ["packages/cli-json-cas/**"],
+      "includes": ["packages/cli/**"],
       "linter": {
         "rules": {
           "suspicious": { "noConsole": "off" }
