@@ -1241,6 +1241,31 @@ switch (cmd) {
     await cmdGc(rest);
     break;
 
+  case "prompt": {
+    const [sub] = rest;
+    switch (sub) {
+      case "usage": {
+        const content = readFileSync(
+          join(import.meta.dir, "prompts", "usage.md"),
+          "utf-8",
+        );
+        process.stdout.write(content);
+        break;
+      }
+      case "setup": {
+        const content = readFileSync(
+          join(import.meta.dir, "prompts", "setup.md"),
+          "utf-8",
+        );
+        process.stdout.write(content);
+        break;
+      }
+      default:
+        die(`Unknown prompt subcommand: ${sub ?? "(none)"}. Available: usage, setup`);
+    }
+    break;
+  }
+
   default:
     die(`Unknown command: ${cmd}`);
 }
