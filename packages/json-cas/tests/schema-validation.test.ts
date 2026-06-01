@@ -72,8 +72,19 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
     expect(properties).not.toHaveProperty("$ref");
     expect(properties).not.toHaveProperty("$id");
     expect(properties).not.toHaveProperty("$defs");
-    expect(properties).not.toHaveProperty("allOf");
     expect(properties).not.toHaveProperty("not");
+
+    // P2 keywords should be present
+    expect(properties).toHaveProperty("allOf");
+    expect(properties).toHaveProperty("if");
+    expect(properties).toHaveProperty("then");
+    expect(properties).toHaveProperty("else");
+    expect(properties).toHaveProperty("patternProperties");
+    expect(properties).toHaveProperty("prefixItems");
+    expect(properties).toHaveProperty("multipleOf");
+    expect(properties).toHaveProperty("minProperties");
+    expect(properties).toHaveProperty("maxProperties");
+    expect(properties).toHaveProperty("default");
   });
 
   test("1.5: Meta-schema node type equals its own hash", async () => {
