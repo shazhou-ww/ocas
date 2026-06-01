@@ -35,6 +35,17 @@ const ALLOWED_SCHEMA_KEYS = new Set([
   "enum",
   "const",
   "description",
+  // P1 leaf constraints (no collectRefs impact)
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "minLength",
+  "maxLength",
+  "pattern",
+  "minItems",
+  "maxItems",
+  "uniqueItems",
 ]);
 
 const JSON_SCHEMA_TYPES = new Set([
@@ -125,6 +136,29 @@ function isValidSchema(value: unknown): boolean {
   if ("enum" in schema) {
     if (!Array.isArray(schema.enum) || schema.enum.length === 0) return false;
   }
+
+  // P1 leaf constraints — type checks only
+  if ("minimum" in schema && typeof schema.minimum !== "number") return false;
+  if ("maximum" in schema && typeof schema.maximum !== "number") return false;
+  if (
+    "exclusiveMinimum" in schema &&
+    typeof schema.exclusiveMinimum !== "number"
+  )
+    return false;
+  if (
+    "exclusiveMaximum" in schema &&
+    typeof schema.exclusiveMaximum !== "number"
+  )
+    return false;
+  if ("minLength" in schema && typeof schema.minLength !== "number")
+    return false;
+  if ("maxLength" in schema && typeof schema.maxLength !== "number")
+    return false;
+  if ("pattern" in schema && typeof schema.pattern !== "string") return false;
+  if ("minItems" in schema && typeof schema.minItems !== "number") return false;
+  if ("maxItems" in schema && typeof schema.maxItems !== "number") return false;
+  if ("uniqueItems" in schema && typeof schema.uniqueItems !== "boolean")
+    return false;
 
   return true;
 }
