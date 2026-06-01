@@ -18,5 +18,13 @@
     "check": "biome check .",
     "format": "biome format --write .",
     "release": "changeset version && bun run build && changeset publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shazhou-ww/ocas.git"
+  },
+  "homepage": "https://github.com/shazhou-ww/ocas",
+  "bugs": {
+    "url": "https://github.com/shazhou-ww/ocas/issues"
   }
 }
