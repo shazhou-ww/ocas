@@ -87,13 +87,13 @@ describe("var history", () => {
     const { schema, values } = await setupSchemaAndValues();
     const v1 = values[0] as Hash;
 
-    let r = await runCli("var", "set", "x", v1);
+    let r = await runCli("var", "set", "@test/x", v1);
     expect(r.exitCode).toBe(0);
 
-    r = await runCli("var", "history", "x", "--schema", schema);
+    r = await runCli("var", "history", "@test/x", "--schema", schema);
     expect(r.exitCode).toBe(0);
     const envelope = JSON.parse(r.stdout);
-    expect(envelope.value.name).toBe("x");
+    expect(envelope.value.name).toBe("@test/x");
     expect(envelope.value.schema).toBe(schema);
     expect(envelope.value.values).toEqual([v1]);
   });
@@ -102,11 +102,11 @@ describe("var history", () => {
     const { schema, values } = await setupSchemaAndValues();
     const [v1, v2, v3] = values as [Hash, Hash, Hash, Hash];
 
-    await runCli("var", "set", "x", v1);
-    await runCli("var", "set", "x", v2);
-    await runCli("var", "set", "x", v3);
+    await runCli("var", "set", "@test/x", v1);
+    await runCli("var", "set", "@test/x", v2);
+    await runCli("var", "set", "@test/x", v3);
 
-    const r = await runCli("var", "history", "x", "--schema", schema);
+    const r = await runCli("var", "history", "@test/x", "--schema", schema);
     expect(r.exitCode).toBe(0);
     const envelope = JSON.parse(r.stdout);
     expect(envelope.value.values).toEqual([v3, v2, v1]);
@@ -116,10 +116,10 @@ describe("var history", () => {
     const { schema: _schema, values } = await setupSchemaAndValues();
     const [v1, v2] = values as [Hash, Hash, Hash, Hash];
 
-    await runCli("var", "set", "x", v1);
-    await runCli("var", "set", "x", v2);
+    await runCli("var", "set", "@test/x", v1);
+    await runCli("var", "set", "@test/x", v2);
 
-    const r = await runCli("var", "history", "x");
+    const r = await runCli("var", "history", "@test/x");
     expect(r.exitCode).toBe(0);
     const envelope = JSON.parse(r.stdout);
     expect(envelope.value.values).toEqual([v2, v1]);

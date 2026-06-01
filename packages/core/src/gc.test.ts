@@ -39,7 +39,7 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashRef);
+    varStore.set("@test/config", hashRef);
 
     const stats = gc(store, varStore);
 
@@ -66,8 +66,8 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashA);
-    varStore.set("config", hashB);
+    varStore.set("@test/config", hashA);
+    varStore.set("@test/config", hashB);
 
     const stats = gc(store, varStore);
 
@@ -90,8 +90,8 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashRef);
-    varStore.remove("config", schemaHash);
+    varStore.set("@test/config", hashRef);
+    varStore.remove("@test/config", schemaHash);
 
     const stats = gc(store, varStore);
 
@@ -117,9 +117,9 @@ describe("GC - Variable Model Refactoring", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("uwf.thread", hash1);
-    varStore.set("uwf.workflow", hash2);
-    varStore.set("app.config", hash3);
+    varStore.set("@test/uwf.thread", hash1);
+    varStore.set("@test/uwf.workflow", hash2);
+    varStore.set("@test/app.config", hash3);
 
     const stats = gc(store, varStore);
 
@@ -151,9 +151,9 @@ describe("GC - Variable Model Refactoring", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create variables
-    varStore.set("var1", hashA1);
-    varStore.set("var2", hashA2);
-    varStore.set("var3", hashB);
+    varStore.set("@test/var1", hashA1);
+    varStore.set("@test/var2", hashA2);
+    varStore.set("@test/var3", hashB);
 
     // First GC: orphans removed
     let stats = gc(store, varStore);
@@ -165,7 +165,7 @@ describe("GC - Variable Model Refactoring", () => {
     expect(stats.scanned).toBe(3);
 
     // Delete one variable
-    varStore.remove("var2", schemaAHash);
+    varStore.remove("@test/var2", schemaAHash);
 
     // Second GC: hashA2 removed
     stats = gc(store, varStore);

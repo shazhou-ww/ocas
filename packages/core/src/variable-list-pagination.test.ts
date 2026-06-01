@@ -31,7 +31,7 @@ async function setN(prefix: string, n: number, delayMs = 2): Promise<Hash[]> {
   const hashes: Hash[] = [];
   for (let i = 0; i < n; i++) {
     const h = await casStore.put(stringHash, `${prefix}-${i}`);
-    varStore.set(`${prefix}-${i}`, h);
+    varStore.set(`@test/${prefix}-${i}`, h);
     hashes.push(h);
     if (delayMs > 0 && i < n - 1) {
       await new Promise((r) => setTimeout(r, delayMs));
@@ -43,7 +43,7 @@ async function setN(prefix: string, n: number, delayMs = 2): Promise<Hash[]> {
 describe("VariableStore.list - pagination + sort", () => {
   test("D1. default sort = created ASC", async () => {
     await setN("v", 3);
-    const list = varStore.list({ namePrefix: "v-" });
+    const list = varStore.list({ namePrefix: "@test/v-" });
     for (let i = 1; i < list.length; i++) {
       expect((list[i] as { created: number }).created).toBeGreaterThanOrEqual(
         (list[i - 1] as { created: number }).created,
@@ -56,53 +56,53 @@ describe("VariableStore.list - pagination + sort", () => {
     await new Promise((r) => setTimeout(r, 5));
     // Re-set u-0 with a NEW value so updated changes
     const newHash = await casStore.put(stringHash, "u-0-new");
-    varStore.set("u-0", newHash);
+    varStore.set("@test/u-0", newHash);
 
     const byUpdated = varStore.list({
-      namePrefix: "u-",
+      namePrefix: "@test/u-",
       sort: "updated",
     });
     // u-0 should be last when sorted updated ASC
     const last = byUpdated[byUpdated.length - 1] as { name: string };
-    expect(last.name).toBe("u-0");
+    expect(last.name).toBe("@test/u-0");
   });
 
   test("D3. desc reverses both sort modes", async () => {
     await setN("d", 3);
-    const asc = varStore.list({ namePrefix: "d-" });
-    const desc = varStore.list({ namePrefix: "d-", desc: true });
+    const asc = varStore.list({ namePrefix: "@test/d-" });
+    const desc = varStore.list({ namePrefix: "@test/d-", desc: true });
     expect(desc[0]).toEqual(asc[asc.length - 1] as (typeof asc)[number]);
   });
 
   test("D4. limit/offset honored", async () => {
     await setN("p", 5);
-    expect(varStore.list({ namePrefix: "p-", limit: 2 })).toHaveLength(2);
+    expect(varStore.list({ namePrefix: "@test/p-", limit: 2 })).toHaveLength(2);
     expect(
-      varStore.list({ namePrefix: "p-", offset: 2, limit: 10 }),
+      varStore.list({ namePrefix: "@test/p-", offset: 2, limit: 10 }),
     ).toHaveLength(3);
   });
 
   test("D5. core has no default limit (returns all)", async () => {
     await setN("big", 105, 0);
-    const list = varStore.list({ namePrefix: "big-" });
+    const list = varStore.list({ namePrefix: "@test/big-" });
     expect(list).toHaveLength(105);
   });
 
   test("D6. pagination applied AFTER namePrefix/schema filters", async () => {
     await setN("filt", 5);
     const list = varStore.list({
-      namePrefix: "filt-",
+      namePrefix: "@test/filt-",
       schema: stringHash,
       limit: 2,
     });
     expect(list).toHaveLength(2);
     for (const v of list) {
-      expect((v as { name: string }).name.startsWith("filt-")).toBe(true);
+      expect((v as { name: string }).name.startsWith("@test/filt-")).toBe(true);
     }
   });
 
   test("limit: 0 returns empty array", async () => {
     await setN("z", 3, 0);
-    expect(varStore.list({ namePrefix: "z-", limit: 0 })).toEqual([]);
+    expect(varStore.list({ namePrefix: "@test/z-", limit: 0 })).toEqual([]);
   });
 });

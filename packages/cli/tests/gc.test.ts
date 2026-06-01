@@ -39,7 +39,7 @@ beforeAll(async () => {
   nodeHash = envValue(stdout) as string;
 
   // Set a var referencing the node so it survives GC
-  await runCli(["var", "set", "gc-test/ref", nodeHash]);
+  await runCli(["var", "set", "@test/gc-test/ref", nodeHash]);
 });
 
 afterAll(() => {

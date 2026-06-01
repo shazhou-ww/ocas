@@ -621,7 +621,9 @@ async function cmdVarSet(args: string[]): Promise<void> {
   }
 
   if (name.startsWith("@ocas/")) {
-    die("The @ocas/ namespace is reserved and cannot be modified directly.");
+    die(
+      "The @ocas/ namespace is reserved and cannot be modified directly. Use a different scope, e.g. @myapp/name (variable names must follow @scope/name format).",
+    );
   }
 
   const store = await openStore();
@@ -704,7 +706,9 @@ async function cmdVarDelete(args: string[]): Promise<void> {
   }
 
   if (name.startsWith("@ocas/")) {
-    die("The @ocas/ namespace is reserved and cannot be modified directly.");
+    die(
+      "The @ocas/ namespace is reserved and cannot be modified directly. Use a different scope, e.g. @myapp/name (variable names must follow @scope/name format).",
+    );
   }
 
   const { store, varStore } = await openStoreAndVarStore();

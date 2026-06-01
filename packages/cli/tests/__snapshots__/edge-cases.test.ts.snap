@@ -4,7 +4,7 @@ exports[`Phase 7: Edge Cases 7.1 get non-existent hash errors gracefully 1`] = `
 
 exports[`Phase 7: Edge Cases 7.3 var set empty name errors 1`] = `"Usage: ocas var set <name> <hash> [--tag <tag>...]"`;
 
-exports[`Phase 7: Edge Cases 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Segment "invalid name!" contains invalid characters (only @, a-z, A-Z, 0-9, ., _, - allowed)"`;
+exports[`Phase 7: Edge Cases 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Name must follow @scope/name format (e.g. @myapp/config)"`;
 
 exports[`Phase 7: Edge Cases 7.5 no subcommand shows help text 1`] = `
 "Usage: ocas [--home <path>] [--json] <command> [args]
@@ -57,7 +57,7 @@ exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
   "type": "0Q5EMYK4SYSS9",
   "value": {
     "labels": [],
-    "name": "myapp/config",
+    "name": "@myapp/config",
     "schema": "FRBAB1BF0ZBCS",
     "tags": {},
     "value": "9W3MGR3184QYE",
@@ -70,7 +70,7 @@ exports[`Phase 3: Variable System 3.2 var get returns variable 1`] = `
   "type": "7C75FQT98KKQD",
   "value": {
     "labels": [],
-    "name": "myapp/config",
+    "name": "@myapp/config",
     "schema": "FRBAB1BF0ZBCS",
     "tags": {},
     "value": "9W3MGR3184QYE",
@@ -294,7 +294,7 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
     },
     {
       "labels": [],
-      "name": "myapp/config",
+      "name": "@myapp/config",
       "schema": "FRBAB1BF0ZBCS",
       "tags": {},
       "value": "9W3MGR3184QYE",
@@ -309,7 +309,7 @@ exports[`Phase 3: Variable System 3.4 var list prefix filters by prefix 1`] = `
   "value": [
     {
       "labels": [],
-      "name": "myapp/config",
+      "name": "@myapp/config",
       "schema": "FRBAB1BF0ZBCS",
       "tags": {},
       "value": "9W3MGR3184QYE",
@@ -323,7 +323,7 @@ exports[`Phase 3: Variable System 3.5 var set upsert updates existing variable 1
   "type": "0Q5EMYK4SYSS9",
   "value": {
     "labels": [],
-    "name": "myapp/config",
+    "name": "@myapp/config",
     "schema": "FRBAB1BF0ZBCS",
     "tags": {},
     "value": "A6QPKJAFR68NP",
@@ -338,7 +338,7 @@ exports[`Phase 3: Variable System 3.6 var tag adds kv tag and label 1`] = `
     "labels": [
       "important",
     ],
-    "name": "myapp/config",
+    "name": "@myapp/config",
     "schema": "FRBAB1BF0ZBCS",
     "tags": {
       "env": "prod",
@@ -356,7 +356,7 @@ exports[`Phase 3: Variable System 3.7 var list --tag env:prod filters by kv tag 
       "labels": [
         "important",
       ],
-      "name": "myapp/config",
+      "name": "@myapp/config",
       "schema": "FRBAB1BF0ZBCS",
       "tags": {
         "env": "prod",
@@ -375,7 +375,7 @@ exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 
       "labels": [
         "important",
       ],
-      "name": "myapp/config",
+      "name": "@myapp/config",
       "schema": "FRBAB1BF0ZBCS",
       "tags": {
         "env": "prod",
@@ -391,7 +391,7 @@ exports[`Phase 3: Variable System 3.9 var tag remove deletes label 1`] = `
   "type": "9103EYRMM949A",
   "value": {
     "labels": [],
-    "name": "myapp/config",
+    "name": "@myapp/config",
     "schema": "FRBAB1BF0ZBCS",
     "tags": {
       "env": "prod",
@@ -407,7 +407,7 @@ exports[`Phase 3: Variable System 3.10 var delete removes variable 1`] = `
   "value": [
     {
       "labels": [],
-      "name": "myapp/config",
+      "name": "@myapp/config",
       "schema": "FRBAB1BF0ZBCS",
       "tags": {
         "env": "prod",
@@ -418,7 +418,7 @@ exports[`Phase 3: Variable System 3.10 var delete removes variable 1`] = `
 }
 `;
 
-exports[`Phase 3: Variable System 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=myapp/config, schema=FRBAB1BF0ZBCS"`;
+exports[`Phase 3: Variable System 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=@myapp/config, schema=FRBAB1BF0ZBCS"`;
 
 exports[`Phase 4: Template System 4.1 template set registers template 1`] = `
 {

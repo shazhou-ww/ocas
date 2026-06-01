@@ -141,10 +141,10 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Action: set() for new variable
-    const variable = varStore.set("config", dataHash);
+    const variable = varStore.set("@test/config", dataHash);
 
     // Assertions
-    expect(variable.name).toBe("config");
+    expect(variable.name).toBe("@test/config");
     expect(variable.schema).toBe(schemaHash);
     expect(variable.value).toBe(dataHash);
     expect(variable.created).toBeGreaterThan(0);
@@ -153,7 +153,7 @@ describe("VariableStore - set() Upsert Method", () => {
     expect(variable.labels).toEqual([]);
 
     // Verify in database
-    const retrieved = varStore.get("config", schemaHash);
+    const retrieved = varStore.get("@test/config", schemaHash);
     expect(retrieved).not.toBeNull();
     expect((retrieved as Variable).value).toBe(dataHash);
 
@@ -174,23 +174,23 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create initial variable
-    const created = varStore.set("config", hash1);
+    const created = varStore.set("@test/config", hash1);
     const createdTime = created.created;
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Update via set()
-    const updated = varStore.set("config", hash2);
+    const updated = varStore.set("@test/config", hash2);
 
     // Assertions
-    expect(updated.name).toBe("config");
+    expect(updated.name).toBe("@test/config");
     expect(updated.schema).toBe(schemaHash);
     expect(updated.value).toBe(hash2); // Updated value
     expect(updated.created).toBe(createdTime); // Created time unchanged
     expect(updated.updated).toBeGreaterThan(createdTime); // Updated time changed
 
     // Verify in database
-    const retrieved = varStore.get("config", schemaHash);
+    const retrieved = varStore.get("@test/config", schemaHash);
     expect((retrieved as Variable).value).toBe(hash2);
 
     varStore.close();
@@ -205,7 +205,7 @@ describe("VariableStore - set() Upsert Method", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    const variable = varStore.set("config", dataHash, {
+    const variable = varStore.set("@test/config", dataHash, {
       tags: { env: "prod", region: "us-east" },
       labels: ["critical", "monitored"],
     });
@@ -230,13 +230,13 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create with tags/labels
-    varStore.set("config", hash1, {
+    varStore.set("@test/config", hash1, {
       tags: { env: "prod" },
       labels: ["critical"],
     });
 
     // Update value only (no options)
-    const updated = varStore.set("config", hash2);
+    const updated = varStore.set("@test/config", hash2);
 
     // Tags/labels should be preserved
     expect(updated.value).toBe(hash2);
@@ -264,18 +264,18 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create two variables with same name, different schemas
-    const varA = varStore.set("config", hashA);
-    const varB = varStore.set("config", hashB);
+    const varA = varStore.set("@test/config", hashA);
+    const varB = varStore.set("@test/config", hashB);
 
-    expect(varA.name).toBe("config");
+    expect(varA.name).toBe("@test/config");
     expect(varA.schema).toBe(schemaA);
-    expect(varB.name).toBe("config");
+    expect(varB.name).toBe("@test/config");
     expect(varB.schema).toBe(schemaB);
     expect(varA.value).not.toBe(varB.value);
 
     // Verify both exist independently
-    expect((varStore.get("config", schemaA) as Variable).value).toBe(hashA);
-    expect((varStore.get("config", schemaB) as Variable).value).toBe(hashB);
+    expect((varStore.get("@test/config", schemaA) as Variable).value).toBe(hashA);
+    expect((varStore.get("@test/config", schemaB) as Variable).value).toBe(hashB);
 
     varStore.close();
   });
@@ -327,16 +327,16 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // When: set() with same name but different value schemas
-    const varA = varStore.set("config", valueA);
-    const varB = varStore.set("config", valueB);
+    const varA = varStore.set("@test/config", valueA);
+    const varB = varStore.set("@test/config", valueB);
 
     // Then: Both variables created with correct extracted schemas
     expect(varA.schema).toBe(schemaA);
     expect(varB.schema).toBe(schemaB);
 
     // Verify they coexist independently
-    const retrievedA = varStore.get("config", schemaA);
-    const retrievedB = varStore.get("config", schemaB);
+    const retrievedA = varStore.get("@test/config", schemaA);
+    const retrievedB = varStore.get("@test/config", schemaB);
     expect((retrievedA as Variable).value).toBe(valueA);
     expect((retrievedB as Variable).value).toBe(valueB);
 
@@ -354,10 +354,10 @@ describe("VariableStore - set() Upsert Method", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", value1);
+    varStore.set("@test/config", value1);
 
     // When: set() with same name and same schema (extracted)
-    const updated = varStore.set("config", value2);
+    const updated = varStore.set("@test/config", value2);
 
     // Then: Updates existing variable, not creates new
     expect(updated.value).toBe(value2);
@@ -373,10 +373,10 @@ describe("VariableStore - set() Upsert Method", () => {
 
     const fakeHash = "FAKEHASH00000";
 
-    expect(() => varStore.set("config", fakeHash)).toThrow(
+    expect(() => varStore.set("@test/config", fakeHash)).toThrow(
       CasNodeNotFoundError,
     );
-    expect(() => varStore.set("config", fakeHash)).toThrow(
+    expect(() => varStore.set("@test/config", fakeHash)).toThrow(
       `CAS node not found: ${fakeHash}`,
     );
 
@@ -395,11 +395,11 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create with tags
-    varStore.set("config", hash1, { tags: { env: "prod" } });
+    varStore.set("@test/config", hash1, { tags: { env: "prod" } });
 
     // Try to update with conflicting tag/label
     expect(() => {
-      varStore.set("config", hash2, {
+      varStore.set("@test/config", hash2, {
         tags: { region: "us" },
         labels: ["region"], // conflicts with tag key
       });
@@ -420,11 +420,11 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create with labels
-    varStore.set("config", hash1, { labels: ["production"] });
+    varStore.set("@test/config", hash1, { labels: ["production"] });
 
     // Try to update with conflicting label/tag
     expect(() => {
-      varStore.set("config", hash2, {
+      varStore.set("@test/config", hash2, {
         tags: { production: "true" }, // conflicts with existing label "production"
         // labels not provided - existing ["production"] preserved, causing conflict
       });
@@ -445,13 +445,13 @@ describe("VariableStore - set() Upsert Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Create with tags and labels
-    varStore.set("config", hash1, {
+    varStore.set("@test/config", hash1, {
       tags: { env: "dev" },
       labels: ["experimental"],
     });
 
     // Update with different tags/labels (no conflicts)
-    const updated = varStore.set("config", hash2, {
+    const updated = varStore.set("@test/config", hash2, {
       tags: { region: "us", version: "2" },
       labels: ["stable", "reviewed"],
     });
@@ -486,14 +486,14 @@ describe("VariableStore - get() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", value);
+    varStore.set("@test/config", value);
 
     // When: get() with exact (name, schema)
-    const result = varStore.get("config", schema);
+    const result = varStore.get("@test/config", schema);
 
     // Then: Returns Variable object
     expect(result).not.toBeNull();
-    expect((result as Variable).name).toBe("config");
+    expect((result as Variable).name).toBe("@test/config");
     expect((result as Variable).schema).toBe(schema);
     expect((result as Variable).value).toBe(value);
 
@@ -509,7 +509,7 @@ describe("VariableStore - get() with Optional Schema", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // When: Query non-existent name
-    const result = varStore.get("nonexistent", schema);
+    const result = varStore.get("@test/nonexistent", schema);
 
     // Then: Returns null
     expect(result).toBeNull();
@@ -528,10 +528,10 @@ describe("VariableStore - get() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", value);
+    varStore.set("@test/config", value);
 
     // When: Query with wrong schema
-    const result = varStore.get("config", schemaB);
+    const result = varStore.get("@test/config", schemaB);
 
     // Then: Returns null (schema mismatch)
     expect(result).toBeNull();
@@ -551,12 +551,12 @@ describe("VariableStore - get() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", valueA);
-    varStore.set("config", valueB);
+    varStore.set("@test/config", valueA);
+    varStore.set("@test/config", valueB);
 
     // When: Query each schema explicitly
-    const resultA = varStore.get("config", schemaA);
-    const resultB = varStore.get("config", schemaB);
+    const resultA = varStore.get("@test/config", schemaA);
+    const resultB = varStore.get("@test/config", schemaB);
 
     // Then: Returns correct variant for each schema
     expect(resultA).not.toBeNull();
@@ -579,12 +579,12 @@ describe("VariableStore - get() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", value, {
+    varStore.set("@test/config", value, {
       tags: { env: "prod" },
       labels: ["critical"],
     });
 
-    const result = varStore.get("config", schema);
+    const result = varStore.get("@test/config", schema);
 
     expect(result).not.toBeNull();
     expect((result as Variable).tags).toEqual({ env: "prod" });
@@ -610,11 +610,11 @@ describe("VariableStore - get() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashA);
-    varStore.set("config", hashB);
+    varStore.set("@test/config", hashA);
+    varStore.set("@test/config", hashB);
 
-    const resultA = varStore.get("config", schemaA);
-    const resultB = varStore.get("config", schemaB);
+    const resultA = varStore.get("@test/config", schemaA);
+    const resultB = varStore.get("@test/config", schemaB);
 
     // Should return exact matches, not arrays
     expect(resultA).not.toBeNull();
@@ -646,10 +646,10 @@ describe("VariableStore - get() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashA);
+    varStore.set("@test/config", hashA);
 
     // Query with wrong schema
-    const result = varStore.get("config", schemaB);
+    const result = varStore.get("@test/config", schemaB);
 
     expect(result).toBeNull();
 
@@ -686,11 +686,11 @@ describe("VariableStore - remove() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashA);
-    varStore.set("config", hashB);
+    varStore.set("@test/config", hashA);
+    varStore.set("@test/config", hashB);
 
     // Remove all variants
-    const deleted = varStore.remove("config");
+    const deleted = varStore.remove("@test/config");
 
     // Should return array of 2 deleted variables
     expect(Array.isArray(deleted)).toBe(true);
@@ -701,8 +701,8 @@ describe("VariableStore - remove() with Optional Schema", () => {
     expect(deletedSchemas).toContain(schemaB);
 
     // Verify both are gone
-    expect(varStore.get("config", schemaA)).toBeNull();
-    expect(varStore.get("config", schemaB)).toBeNull();
+    expect(varStore.get("@test/config", schemaA)).toBeNull();
+    expect(varStore.get("@test/config", schemaB)).toBeNull();
 
     varStore.close();
   });
@@ -712,7 +712,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    const deleted = varStore.remove("nonexistent");
+    const deleted = varStore.remove("@test/nonexistent");
 
     expect(Array.isArray(deleted)).toBe(true);
     expect(deleted.length).toBe(0);
@@ -737,22 +737,22 @@ describe("VariableStore - remove() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", hashA);
-    varStore.set("config", hashB);
+    varStore.set("@test/config", hashA);
+    varStore.set("@test/config", hashB);
 
     // Remove only schemaA variant
-    const deleted = varStore.remove("config", schemaA);
+    const deleted = varStore.remove("@test/config", schemaA);
 
     // Should return single deleted Variable (not array)
     expect(deleted).not.toBeNull();
     expect(Array.isArray(deleted)).toBe(false);
-    expect((deleted as Variable).name).toBe("config");
+    expect((deleted as Variable).name).toBe("@test/config");
     expect((deleted as Variable).schema).toBe(schemaA);
     expect((deleted as Variable).value).toBe(hashA);
 
     // Verify schemaA is gone but schemaB remains
-    expect(varStore.get("config", schemaA)).toBeNull();
-    expect(varStore.get("config", schemaB)).not.toBeNull();
+    expect(varStore.get("@test/config", schemaA)).toBeNull();
+    expect(varStore.get("@test/config", schemaB)).not.toBeNull();
 
     varStore.close();
   });
@@ -765,7 +765,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    expect(() => varStore.remove("nonexistent", schemaHash)).toThrow(
+    expect(() => varStore.remove("@test/nonexistent", schemaHash)).toThrow(
       VariableNotFoundError,
     );
 
@@ -781,13 +781,13 @@ describe("VariableStore - remove() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", dataHash, {
+    varStore.set("@test/config", dataHash, {
       tags: { env: "prod" },
       labels: ["critical"],
     });
 
     // Remove variable
-    varStore.remove("config");
+    varStore.remove("@test/config");
 
     // Verify tags/labels are also deleted
     const db = (varStore as unknown as { db: unknown }).db as {
@@ -799,12 +799,12 @@ describe("VariableStore - remove() with Optional Schema", () => {
       .prepare(
         "SELECT * FROM variable_tags WHERE variable_name = ? AND variable_schema = ?",
       )
-      .all("config", schemaHash);
+      .all("@test/config", schemaHash);
     const labels = db
       .prepare(
         "SELECT * FROM variable_labels WHERE variable_name = ? AND variable_schema = ?",
       )
-      .all("config", schemaHash);
+      .all("@test/config", schemaHash);
 
     expect(tags).toHaveLength(0);
     expect(labels).toHaveLength(0);
@@ -821,15 +821,15 @@ describe("VariableStore - remove() with Optional Schema", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", dataHash);
+    varStore.set("@test/config", dataHash);
 
     // Remove with name only (no schema)
-    const deleted = varStore.remove("config");
+    const deleted = varStore.remove("@test/config");
 
     // Should return array with 1 element
     expect(Array.isArray(deleted)).toBe(true);
     expect(deleted.length).toBe(1);
-    expect(deleted[0]?.name).toBe("config");
+    expect(deleted[0]?.name).toBe("@test/config");
 
     varStore.close();
   });
@@ -857,16 +857,16 @@ describe("VariableStore - Name Validation", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // All these should succeed
-    expect(() => varStore.set("simple", dataHash)).not.toThrow();
-    expect(() => varStore.set("with_underscore", dataHash)).not.toThrow();
-    expect(() => varStore.set("with-dash", dataHash)).not.toThrow();
-    expect(() => varStore.set("with.dot", dataHash)).not.toThrow();
-    expect(() => varStore.set("number123", dataHash)).not.toThrow();
-    expect(() => varStore.set("path/to/var", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/simple", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/with_underscore", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/with-dash", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/with.dot", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/number123", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/path/to/var", dataHash)).not.toThrow();
     expect(() =>
-      varStore.set("deeply/nested/path/to/var", dataHash),
+      varStore.set("@test/deeply/nested/path/to/var", dataHash),
     ).not.toThrow();
-    expect(() => varStore.set("uwf.thread.id_123", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/uwf.thread.id_123", dataHash)).not.toThrow();
 
     varStore.close();
   });
@@ -900,7 +900,7 @@ describe("VariableStore - Name Validation", () => {
       InvalidVariableNameError,
     );
     expect(() => varStore.set("hello world", dataHash)).toThrow(
-      /invalid character/i,
+      /must follow @scope\/name|invalid character/i,
     );
 
     // Special characters
@@ -939,7 +939,7 @@ describe("VariableStore - Name Validation", () => {
     expect(() => varStore.set("a//b", dataHash)).toThrow(
       InvalidVariableNameError,
     );
-    expect(() => varStore.set("a//b", dataHash)).toThrow(/empty segment/i);
+    expect(() => varStore.set("a//b", dataHash)).toThrow(/must follow @scope\/name|empty segment/i);
 
     // Triple slash
     expect(() => varStore.set("a///b", dataHash)).toThrow(
@@ -962,13 +962,13 @@ describe("VariableStore - Name Validation", () => {
     expect(() => varStore.set("/abc", dataHash)).toThrow(
       InvalidVariableNameError,
     );
-    expect(() => varStore.set("/abc", dataHash)).toThrow(/leading slash/i);
+    expect(() => varStore.set("/abc", dataHash)).toThrow(/must follow @scope\/name|leading slash/i);
 
     // Trailing slash
     expect(() => varStore.set("abc/", dataHash)).toThrow(
       InvalidVariableNameError,
     );
-    expect(() => varStore.set("abc/", dataHash)).toThrow(/trailing slash/i);
+    expect(() => varStore.set("abc/", dataHash)).toThrow(/must follow @scope\/name|trailing slash/i);
 
     // Both
     expect(() => varStore.set("/abc/", dataHash)).toThrow(
@@ -1050,7 +1050,7 @@ describe("VariableStore - validateName() Error Messages", () => {
     varStore = new VariableStore(dbPath, store);
 
     try {
-      varStore.set("valid/segment/bad@segment/more", dataHash);
+      varStore.set("@test/valid/segment/bad@segment/more", dataHash);
       throw new Error("Expected InvalidVariableNameError");
     } catch (e) {
       expect(e).toBeInstanceOf(InvalidVariableNameError);
@@ -1070,7 +1070,7 @@ describe("VariableStore - validateName() Error Messages", () => {
     varStore = new VariableStore(dbPath, store);
 
     try {
-      varStore.set("a//b", dataHash);
+      varStore.set("@test/a//b", dataHash);
       throw new Error("Expected InvalidVariableNameError");
     } catch (e) {
       expect(e).toBeInstanceOf(InvalidVariableNameError);
@@ -1090,18 +1090,18 @@ describe("VariableStore - validateName() Error Messages", () => {
 
     // Leading slash
     try {
-      varStore.set("/abc", dataHash);
+      varStore.set("@test//foo", dataHash);
       throw new Error("Expected InvalidVariableNameError");
     } catch (e) {
       expect(e).toBeInstanceOf(InvalidVariableNameError);
       const error = e as InvalidVariableNameError;
-      expect(error.reason).toMatch(/leading|start|begins/i);
+      expect(error.reason).toMatch(/empty segment|consecutive|leading|start|begins/i);
       expect(error.reason).not.toMatch(/trailing|end/i);
     }
 
     // Trailing slash
     try {
-      varStore.set("abc/", dataHash);
+      varStore.set("@test/abc/", dataHash);
       throw new Error("Expected InvalidVariableNameError");
     } catch (e) {
       expect(e).toBeInstanceOf(InvalidVariableNameError);
@@ -1121,11 +1121,11 @@ describe("VariableStore - validateName() Error Messages", () => {
     varStore = new VariableStore(dbPath, store);
 
     // All these should succeed
-    expect(() => varStore.set("app.config", dataHash)).not.toThrow();
-    expect(() => varStore.set("my_variable", dataHash)).not.toThrow();
-    expect(() => varStore.set("test-name", dataHash)).not.toThrow();
-    expect(() => varStore.set("path/to/config.json", dataHash)).not.toThrow();
-    expect(() => varStore.set("v1.2.3-alpha_001", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/app.config", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/my_variable", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/test-name", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/path/to/config.json", dataHash)).not.toThrow();
+    expect(() => varStore.set("@test/v1.2.3-alpha_001", dataHash)).not.toThrow();
   });
 });
 
@@ -1169,45 +1169,45 @@ describe("VariableStore - Integration Tests", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // 1. Set initial config
-    const var1 = varStore.set("app/server", configHash1);
+    const var1 = varStore.set("@test/app/server", configHash1);
     expect(var1.value).toBe(configHash1);
 
     // 2. Set state with same name, different schema
-    const var2 = varStore.set("app/server", stateHash1);
+    const var2 = varStore.set("@test/app/server", stateHash1);
     expect(var2.schema).toBe(schemaState);
 
     // 3. List all variants with exactName
-    const result = varStore.list({ exactName: "app/server" });
+    const result = varStore.list({ exactName: "@test/app/server" });
     expect(result.length).toBe(2);
 
     // 4. Get with schema returns single variable
-    const config = varStore.get("app/server", schemaConfig);
+    const config = varStore.get("@test/app/server", schemaConfig);
     expect(config).not.toBeNull();
     expect((config as Variable).value).toBe(configHash1);
 
     // 5. Update config via set
-    const updated = varStore.set("app/server", configHash2);
+    const updated = varStore.set("@test/app/server", configHash2);
     expect(updated.value).toBe(configHash2);
 
     // 6. Update state via set
-    varStore.set("app/server", stateHash2);
+    varStore.set("@test/app/server", stateHash2);
 
     // 7. Remove specific schema
-    const deletedState = varStore.remove("app/server", schemaState);
+    const deletedState = varStore.remove("@test/app/server", schemaState);
     expect((deletedState as Variable).schema).toBe(schemaState);
 
     // 8. Verify only config remains
-    const remaining = varStore.list({ exactName: "app/server" });
+    const remaining = varStore.list({ exactName: "@test/app/server" });
     expect(remaining.length).toBe(1);
     expect(remaining[0]?.schema).toBe(schemaConfig);
 
     // 9. Remove all remaining
-    const deletedAll = varStore.remove("app/server");
+    const deletedAll = varStore.remove("@test/app/server");
     expect(Array.isArray(deletedAll)).toBe(true);
     expect(deletedAll.length).toBe(1);
 
     // 10. Verify all gone
-    expect(varStore.get("app/server", schemaConfig)).toBeNull();
+    expect(varStore.get("@test/app/server", schemaConfig)).toBeNull();
 
     varStore.close();
   });
@@ -1226,19 +1226,19 @@ describe("VariableStore - Integration Tests", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Initial set with tags
-    varStore.set("app/version", v1, {
+    varStore.set("@test/app/version", v1, {
       tags: { env: "dev", region: "us" },
       labels: ["beta"],
     });
 
     // Upsert without options preserves tags
-    const updated1 = varStore.set("app/version", v2);
+    const updated1 = varStore.set("@test/app/version", v2);
     expect(updated1.value).toBe(v2);
     expect(updated1.tags).toEqual({ env: "dev", region: "us" });
     expect(updated1.labels).toEqual(["beta"]);
 
     // Upsert with new tags replaces them
-    const updated2 = varStore.set("app/version", v2, {
+    const updated2 = varStore.set("@test/app/version", v2, {
       tags: { env: "prod" },
       labels: ["stable"],
     });
@@ -1271,16 +1271,16 @@ describe("VariableStore - Legacy Update Method", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // update() should fail when variable doesn't exist
-    expect(() => varStore.update("config", schemaHash, dataHash)).toThrow(
+    expect(() => varStore.update("@test/config", schemaHash, dataHash)).toThrow(
       VariableNotFoundError,
     );
 
     // set() creates it
-    varStore.set("config", dataHash);
+    varStore.set("@test/config", dataHash);
 
     // Now update() should work
     const newHash = await store.put(schemaHash, {});
-    const updated = varStore.update("config", schemaHash, newHash);
+    const updated = varStore.update("@test/config", schemaHash, newHash);
     expect(updated.value).toBe(newHash);
 
     varStore.close();
@@ -1297,9 +1297,9 @@ describe("VariableStore - Legacy Update Method", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", dataA);
+    varStore.set("@test/config", dataA);
 
-    expect(() => varStore.update("config", schemaA, dataB)).toThrow(
+    expect(() => varStore.update("@test/config", schemaA, dataB)).toThrow(
       SchemaMismatchError,
     );
 
@@ -1329,13 +1329,13 @@ describe("VariableStore - List Operation", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("var1", data1);
-    varStore.set("var2", data2);
+    varStore.set("@test/var1", data1);
+    varStore.set("@test/var2", data2);
 
     const vars = varStore.list();
 
     expect(vars.length).toBe(2);
-    expect(vars.map((v) => v.name).sort()).toEqual(["var1", "var2"]);
+    expect(vars.map((v) => v.name).sort()).toEqual(["@test/var1", "@test/var2"]);
 
     varStore.close();
   });
@@ -1349,14 +1349,14 @@ describe("VariableStore - List Operation", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("app/config", data);
-    varStore.set("app/state", data);
-    varStore.set("sys/config", data);
+    varStore.set("@test/app/config", data);
+    varStore.set("@test/app/state", data);
+    varStore.set("@test/sys/config", data);
 
-    const vars = varStore.list({ namePrefix: "app/" });
+    const vars = varStore.list({ namePrefix: "@test/app/" });
 
     expect(vars.length).toBe(2);
-    expect(vars.every((v) => v.name.startsWith("app/"))).toBe(true);
+    expect(vars.every((v) => v.name.startsWith("@test/app/"))).toBe(true);
 
     varStore.close();
   });
@@ -1388,21 +1388,21 @@ describe("VariableStore - list() with exactName", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", valueA);
-    varStore.set("config", valueB);
-    varStore.set("config", valueC);
-    varStore.set("other", valueA); // Different name, same schema
+    varStore.set("@test/config", valueA);
+    varStore.set("@test/config", valueB);
+    varStore.set("@test/config", valueC);
+    varStore.set("@test/other", valueA); // Different name, same schema
 
     // When: list with exactName
-    const results = varStore.list({ exactName: "config" });
+    const results = varStore.list({ exactName: "@test/config" });
 
-    // Then: Returns all 3 schema variants, not "other"
+    // Then: Returns all 3 schema variants, not "@test/other"
     expect(results.length).toBe(3);
     const schemas = results.map((v) => v.schema).sort();
     expect(schemas).toContain(schemaA);
     expect(schemas).toContain(schemaB);
     expect(schemas).toContain(schemaC);
-    expect(results.every((v) => v.name === "config")).toBe(true);
+    expect(results.every((v) => v.name === "@test/config")).toBe(true);
 
     varStore.close();
   });
@@ -1414,7 +1414,7 @@ describe("VariableStore - list() with exactName", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    const results = varStore.list({ exactName: "nonexistent" });
+    const results = varStore.list({ exactName: "@test/nonexistent" });
     expect(results).toEqual([]);
 
     varStore.close();
@@ -1432,11 +1432,11 @@ describe("VariableStore - list() with exactName", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", valueA);
-    varStore.set("config", valueB);
+    varStore.set("@test/config", valueA);
+    varStore.set("@test/config", valueB);
 
     // When: Filter by both exactName and schema
-    const results = varStore.list({ exactName: "config", schema: schemaA });
+    const results = varStore.list({ exactName: "@test/config", schema: schemaA });
 
     // Then: Returns only schemaA variant
     expect(results.length).toBe(1);
@@ -1456,12 +1456,12 @@ describe("VariableStore - list() with exactName", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", valueA, { tags: { env: "dev" } });
-    varStore.set("config", valueB, { tags: { env: "prod" } });
+    varStore.set("@test/config", valueA, { tags: { env: "dev" } });
+    varStore.set("@test/config", valueB, { tags: { env: "prod" } });
 
     // When: Filter by exactName + tags
     const results = varStore.list({
-      exactName: "config",
+      exactName: "@test/config",
       tags: { env: "prod" },
     });
 
@@ -1481,7 +1481,7 @@ describe("VariableStore - list() with exactName", () => {
 
     // When: Both provided
     expect(() => {
-      varStore.list({ exactName: "config", namePrefix: "app/" });
+      varStore.list({ exactName: "@test/config", namePrefix: "app/" });
     }).toThrow(/mutually exclusive|cannot specify both/i);
 
     varStore.close();
@@ -1496,19 +1496,19 @@ describe("VariableStore - list() with exactName", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("app", value);
-    varStore.set("app/config", value);
-    varStore.set("application", value);
+    varStore.set("@test/app", value);
+    varStore.set("@test/app/config", value);
+    varStore.set("@test/application", value);
 
     // When: namePrefix without trailing slash
-    const results = varStore.list({ namePrefix: "app" });
+    const results = varStore.list({ namePrefix: "@test/app" });
 
     // Then: Matches all three (prefix match)
     expect(results.length).toBe(3);
     expect(results.map((v) => v.name).sort()).toEqual([
-      "app",
-      "app/config",
-      "application",
+      "@test/app",
+      "@test/app/config",
+      "@test/application",
     ]);
 
     varStore.close();
@@ -1528,15 +1528,15 @@ describe("VariableStore - list() with exactName", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", valueA);
-    varStore.set("config", valueB);
+    varStore.set("@test/config", valueA);
+    varStore.set("@test/config", valueB);
 
-    // Old way: get("config") → Variable | Variable[]
-    // New way: list({ exactName: "config" }) → Variable[]
-    const results = varStore.list({ exactName: "config" });
+    // Old way: get("@test/config") → Variable | Variable[]
+    // New way: list({ exactName: "@test/config" }) → Variable[]
+    const results = varStore.list({ exactName: "@test/config" });
 
     expect(results.length).toBe(2);
-    expect(results.every((v) => v.name === "config")).toBe(true);
+    expect(results.every((v) => v.name === "@test/config")).toBe(true);
 
     varStore.close();
   });
@@ -1563,9 +1563,9 @@ describe("VariableStore - Tag/Label Management", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", dataHash);
+    varStore.set("@test/config", dataHash);
 
-    const updated = varStore.tag("config", schemaHash, {
+    const updated = varStore.tag("@test/config", schemaHash, {
       add: { env: "prod", region: "us" },
     });
 
@@ -1583,10 +1583,10 @@ describe("VariableStore - Tag/Label Management", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
-    varStore.set("config", dataHash, { labels: ["critical"] });
+    varStore.set("@test/config", dataHash, { labels: ["critical"] });
 
     expect(() =>
-      varStore.tag("config", schemaHash, {
+      varStore.tag("@test/config", schemaHash, {
         add: { critical: "yes" },
       }),
     ).toThrow(TagLabelConflictError);
@@ -1644,10 +1644,10 @@ describe("VariableStore - @ Prefix Variable Names", () => {
     const varStore = new VariableStore(dbPath, store);
 
     // Single segment with @
-    varStore.set("@config", hash);
-    const result = varStore.get("@config", schemaHash);
+    varStore.set("@test/config", hash);
+    const result = varStore.get("@test/config", schemaHash);
     expect(result).not.toBeNull();
-    expect(result?.name).toBe("@config");
+    expect(result?.name).toBe("@test/config");
 
     varStore.close();
   });
@@ -1665,8 +1665,8 @@ describe("VariableStore - @ Prefix Variable Names", () => {
     const validNames = [
       "@ocas/render/template",
       "@system/config",
-      "@foo.bar/baz",
-      "@app-1/test_2",
+      "@foo/bar.baz",
+      "@app1/test_2",
     ];
 
     for (const name of validNames) {
@@ -1737,12 +1737,12 @@ describe("VariableStore - @ Prefix Variable Names", () => {
 
     // All non-@ names should continue to work
     const validNames = [
-      "simple",
-      "with.dots",
-      "with-dashes",
-      "with_underscores",
-      "path/to/var",
-      "foo.bar/baz-qux/test_123",
+      "@test/simple",
+      "@test/with.dots",
+      "@test/with-dashes",
+      "@test/with_underscores",
+      "@test/path/to/var",
+      "@test/foo.bar/baz-qux/test_123",
     ];
 
     for (const name of validNames) {
@@ -1802,9 +1802,9 @@ describe("VariableStore - History (LRU)", () => {
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
-    varStore.set("x", v1);
+    varStore.set("@test/x", v1);
 
-    const hist = varStore.history("x", schema);
+    const hist = varStore.history("@test/x", schema);
     expect(hist).toEqual([v1]);
     varStore.close();
   });
@@ -1819,11 +1819,11 @@ describe("VariableStore - History (LRU)", () => {
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
-    varStore.set("x", v1);
-    varStore.set("x", v2);
-    varStore.set("x", v3);
+    varStore.set("@test/x", v1);
+    varStore.set("@test/x", v2);
+    varStore.set("@test/x", v3);
 
-    expect(varStore.history("x", schema)).toEqual([v3, v2, v1]);
+    expect(varStore.history("@test/x", schema)).toEqual([v3, v2, v1]);
     varStore.close();
   });
 
@@ -1835,13 +1835,13 @@ describe("VariableStore - History (LRU)", () => {
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
-    const created = varStore.set("x", v1);
+    const created = varStore.set("@test/x", v1);
     const updatedTime = created.updated;
     await new Promise((r) => setTimeout(r, 5));
-    const second = varStore.set("x", v1);
+    const second = varStore.set("@test/x", v1);
 
     expect(second.updated).toBe(updatedTime);
-    expect(varStore.history("x", schema)).toEqual([v1]);
+    expect(varStore.history("@test/x", schema)).toEqual([v1]);
     varStore.close();
   });
 
@@ -1855,13 +1855,13 @@ describe("VariableStore - History (LRU)", () => {
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
-    varStore.set("x", v1);
-    varStore.set("x", v2);
-    varStore.set("x", v3);
+    varStore.set("@test/x", v1);
+    varStore.set("@test/x", v2);
+    varStore.set("@test/x", v3);
     // History: [v3, v2, v1]; setting v1 should yield [v1, v3, v2]
-    varStore.set("x", v1);
+    varStore.set("@test/x", v1);
 
-    expect(varStore.history("x", schema)).toEqual([v1, v3, v2]);
+    expect(varStore.history("@test/x", schema)).toEqual([v1, v3, v2]);
     varStore.close();
   });
 
@@ -1877,10 +1877,10 @@ describe("VariableStore - History (LRU)", () => {
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
     for (const v of values) {
-      varStore.set("x", v);
+      varStore.set("@test/x", v);
     }
 
-    const hist = varStore.history("x", schema);
+    const hist = varStore.history("@test/x", schema);
     expect(hist).toHaveLength(MAX_HISTORY);
     expect(hist).toEqual(values.slice(-MAX_HISTORY).reverse());
     varStore.close();
@@ -1896,15 +1896,15 @@ describe("VariableStore - History (LRU)", () => {
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
-    varStore.set("x", v1);
-    varStore.set("x", v2);
-    varStore.set("x", v3);
+    varStore.set("@test/x", v1);
+    varStore.set("@test/x", v2);
+    varStore.set("@test/x", v3);
     // History: [v3, v2, v1]; rolling back is just calling set() with v1
-    const result = varStore.set("x", v1);
+    const result = varStore.set("@test/x", v1);
 
     expect(result.value).toBe(v1);
-    expect(varStore.history("x", schema)).toEqual([v1, v3, v2]);
-    expect((varStore.get("x", schema) as Variable).value).toBe(v1);
+    expect(varStore.history("@test/x", schema)).toEqual([v1, v3, v2]);
+    expect((varStore.get("@test/x", schema) as Variable).value).toBe(v1);
     varStore.close();
   });
 
@@ -1917,12 +1917,12 @@ describe("VariableStore - History (LRU)", () => {
 
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
-    varStore.set("x", v1);
-    varStore.set("x", v2);
-    expect(varStore.history("x", schema)).toHaveLength(2);
+    varStore.set("@test/x", v1);
+    varStore.set("@test/x", v2);
+    expect(varStore.history("@test/x", schema)).toHaveLength(2);
 
-    varStore.remove("x", schema);
-    expect(varStore.history("x", schema)).toEqual([]);
+    varStore.remove("@test/x", schema);
+    expect(varStore.history("@test/x", schema)).toEqual([]);
     varStore.close();
   });
 

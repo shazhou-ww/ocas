@@ -136,49 +136,48 @@ export class VariableStore {
   }
 
   /**
-   * Validate variable name format
-   * @ is allowed at the start of the first segment (system-reserved)
+   * Validate variable name format.
+   * All names must follow @scope/name pattern:
+   *   - scope: @[a-zA-Z][a-zA-Z0-9]* (e.g. @myapp, @ocas)
+   *   - name: one or more segments of [a-zA-Z0-9._-]+ separated by /
+   * Examples: @myapp/config, @todo/schema, @ocas/schema
    */
   private validateName(name: string): void {
-    // Rule 1: Cannot be empty
     if (name === "") {
       throw new InvalidVariableNameError(name, "Name cannot be empty");
     }
 
-    // Rule 2: No leading slash
-    if (name.startsWith("/")) {
+    // Must match @scope/name where scope starts with a letter
+    const match = name.match(/^@([a-zA-Z][a-zA-Z0-9]*)\/(.+)$/);
+    if (!match) {
       throw new InvalidVariableNameError(
         name,
-        "Name cannot start with leading slash",
+        "Name must follow @scope/name format (e.g. @myapp/config)",
       );
     }
 
-    // Rule 3: No trailing slash
-    if (name.endsWith("/")) {
+    const rest = match[2] as string;
+
+    // Validate remaining segments
+    if (rest.endsWith("/")) {
       throw new InvalidVariableNameError(
         name,
         "Name cannot end with trailing slash",
       );
     }
 
-    // Rule 4: Each segment must match [a-zA-Z0-9._-]+ (with @ allowed at start of first segment)
-    const segments = name.split("/");
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i] as string;
+    const segments = rest.split("/");
+    for (const segment of segments) {
       if (segment === "") {
         throw new InvalidVariableNameError(
           name,
           "Name contains empty segment (consecutive slashes //)",
         );
       }
-
-      // Check for invalid characters
-      // First segment can start with @, all segments can contain [a-zA-Z0-9._-]
-      const regex = i === 0 ? /^@?[a-zA-Z0-9._-]+$/ : /^[a-zA-Z0-9._-]+$/;
-      if (!regex.test(segment)) {
+      if (!/^[a-zA-Z0-9._-]+$/.test(segment)) {
         throw new InvalidVariableNameError(
           name,
-          `Segment "${segment}" contains invalid characters (only ${i === 0 ? "@, " : ""}a-z, A-Z, 0-9, ., _, - allowed)`,
+          `Segment "${segment}" contains invalid characters (only a-z, A-Z, 0-9, ., _, - allowed)`,
         );
       }
     }

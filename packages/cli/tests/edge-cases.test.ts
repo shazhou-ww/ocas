@@ -210,7 +210,7 @@ describe("Phase 3: Variable System", () => {
     const { exitCode, stdout } = await runCli([
       "var",
       "set",
-      "myapp/config",
+      "@myapp/config",
       nodeHash,
     ]);
     expect(exitCode).toBe(0);
@@ -221,7 +221,7 @@ describe("Phase 3: Variable System", () => {
     const { stdout, exitCode } = await runCli([
       "var",
       "get",
-      "myapp/config",
+      "@myapp/config",
       "--schema",
       typeHash,
     ]);
@@ -234,14 +234,14 @@ describe("Phase 3: Variable System", () => {
     const { stdout, exitCode } = await runCli(["var", "list"]);
     expect(exitCode).toBe(0);
     expect(stripVolatile(stdout)).toMatchSnapshot();
-    expect(stdout).toContain("myapp/config");
+    expect(stdout).toContain("@myapp/config");
   });
 
   test("3.4 var list prefix filters by prefix", async () => {
-    const { stdout, exitCode } = await runCli(["var", "list", "myapp/"]);
+    const { stdout, exitCode } = await runCli(["var", "list", "@myapp/"]);
     expect(exitCode).toBe(0);
     expect(stripVolatile(stdout)).toMatchSnapshot();
-    expect(stdout).toContain("myapp/config");
+    expect(stdout).toContain("@myapp/config");
   });
 
   test("3.5 var set upsert updates existing variable", async () => {
@@ -252,20 +252,20 @@ describe("Phase 3: Variable System", () => {
     const { exitCode, stdout } = await runCli([
       "var",
       "set",
-      "myapp/config",
+      "@myapp/config",
       node2Hash,
     ]);
     expect(exitCode).toBe(0);
     expect(stripVolatile(stdout)).toMatchSnapshot();
     // Restore original value
-    await runCli(["var", "set", "myapp/config", nodeHash]);
+    await runCli(["var", "set", "@myapp/config", nodeHash]);
   });
 
   test("3.6 var tag adds kv tag and label", async () => {
     const { exitCode, stdout } = await runCli([
       "var",
       "tag",
-      "myapp/config",
+      "@myapp/config",
       "--schema",
       typeHash,
       "env:prod",
@@ -283,7 +283,7 @@ describe("Phase 3: Variable System", () => {
       "env:prod",
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("myapp/config");
+    expect(stdout).toContain("@myapp/config");
     expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
@@ -295,7 +295,7 @@ describe("Phase 3: Variable System", () => {
       "important",
     ]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("myapp/config");
+    expect(stdout).toContain("@myapp/config");
     expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
@@ -303,7 +303,7 @@ describe("Phase 3: Variable System", () => {
     const { exitCode, stdout } = await runCli([
       "var",
       "tag",
-      "myapp/config",
+      "@myapp/config",
       "--schema",
       typeHash,
       ":important",
@@ -317,14 +317,14 @@ describe("Phase 3: Variable System", () => {
       "--tag",
       "important",
     ]);
-    expect(listOut).not.toContain("myapp/config");
+    expect(listOut).not.toContain("@myapp/config");
   });
 
   test("3.10 var delete removes variable", async () => {
     const { exitCode, stdout } = await runCli([
       "var",
       "delete",
-      "myapp/config",
+      "@myapp/config",
     ]);
     expect(exitCode).toBe(0);
     expect(stripVolatile(stdout)).toMatchSnapshot();
@@ -334,7 +334,7 @@ describe("Phase 3: Variable System", () => {
     const { stderr, exitCode } = await runCli([
       "var",
       "get",
-      "myapp/config",
+      "@myapp/config",
       "--schema",
       typeHash,
     ]);
