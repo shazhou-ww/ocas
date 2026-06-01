@@ -10,7 +10,7 @@
     "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
-    "@ocas/core": "^0.6.0",
-    "@ocas/fs": "^0.6.0"
+    "@ocas/core": "workspace:*",
+    "@ocas/fs": "workspace:*"
   }
 }
