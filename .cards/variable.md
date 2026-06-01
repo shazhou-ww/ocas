@@ -27,6 +27,17 @@ type Variable = {
 
 The primary key is `(name, schema)` — the same name can point to nodes of different types. When using `var set`, the schema is automatically inferred from the node the hash points to, so you don't need to specify it explicitly.
 
+## Naming Convention
+
+All variable names must follow `@scope/name` format:
+
+- **Pattern**: `@[a-zA-Z][a-zA-Z0-9]*/` followed by one or more segments of `[a-zA-Z0-9._-]+`
+- **`@ocas/*`** is reserved for internal use (builtin schemas, templates)
+- **Examples**: `@myapp/config`, `@todo/schema`, `@data/users.prod`
+- **Rejected**: `config` (no scope), `foo/bar` (no `@`), `@/foo` (empty scope), `@123/foo` (digit scope)
+
+The `@scope` prefix ensures variable names are visually distinct from 13-character hashes.
+
 ## Operations
 
 ```bash

@@ -25,10 +25,10 @@ echo '{
 # → { "type": "...", "value": "1ABC2DEF34567" }
 
 # Give it a friendly name
-ocas var set todo/schema 1ABC2DEF34567
+ocas var set @todo/schema 1ABC2DEF34567
 
 # Store a todo item
-echo '{ "title": "Buy milk", "done": false }' | ocas put todo/schema -p
+echo '{ "title": "Buy milk", "done": false }' | ocas put @todo/schema -p
 # → { "type": "...", "value": "9XYZ8WVU76543" }
 
 # Retrieve it
@@ -96,31 +96,31 @@ ocas list-schema --sort created --limit 50
 
 Variables are mutable pointers to immutable data — like git branches pointing to commits.
 
+Names must follow `@scope/name` format (e.g. `@myapp/config`). The `@ocas/*` scope is reserved.
+
 ```bash
-ocas var set <name> <hash>                # bind a name to a hash
-ocas var get <name>                       # look up current binding
-ocas var delete <name>                    # remove binding
+ocas var set @myapp/config <hash>         # bind a name to a hash
+ocas var get @myapp/config                # look up current binding
+ocas var delete @myapp/config             # remove binding
 ocas var list [prefix]                    # list variables (prefix filter)
-ocas var list --schema <hash> --tag env:prod  # filter by schema and tag
-ocas var history <name>                   # show last 10 values (LRU)
+ocas var list @myapp/ --tag env:prod      # filter by scope prefix and tag
+ocas var history @myapp/config            # show last 10 values (LRU)
 ```
 
 **Tags & labels** — attach metadata to variables:
 
 ```bash
-ocas var set myapp/config <hash> --tag env:prod --tag pinned
-ocas var tag myapp/config --schema <hash> status:active   # add tag
-ocas var tag myapp/config --schema <hash> :status          # remove tag
+ocas var set @myapp/config <hash> --tag env:prod --tag pinned
+ocas var tag @myapp/config --schema <hash> status:active   # add tag
+ocas var tag @myapp/config --schema <hash> :status          # remove tag
 ```
 
 Any command that takes a hash also accepts a variable name:
 
 ```bash
-ocas get myapp/config          # resolves to the bound hash
+ocas get @myapp/config         # resolves to the bound hash
 ocas put @ocas/schema s.json   # @ocas/schema is a builtin variable
 ```
-
-Names starting with `@ocas/` are reserved for internal use.
 
 ### Templates & Rendering
 

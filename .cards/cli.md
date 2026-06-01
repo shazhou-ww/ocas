@@ -87,4 +87,4 @@ ocas put @ocas/schema schema.json  # auto-routes to putSchema()
 ocas list --type @ocas/schema      # list all schemas
 ```
 
-User-defined variable names work the same way — once `ocas var set myapp/config <hash>` is registered, `ocas get myapp/config` resolves to that hash.
+All variable names must follow `@scope/name` format. User-defined names work just like builtins — once `ocas var set @myapp/config <hash>` is registered, `ocas get @myapp/config` resolves to that hash.

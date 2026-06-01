@@ -72,6 +72,7 @@ bun run format    # Biome format (auto-fix)
 - **No "alias" concept** — every name resolution flows through the `VariableStore`. Builtin schemas (`@ocas/schema`, `@ocas/string`, `@ocas/output/*`, …) are registered as variables during `bootstrap(store, varStore)`, alongside user-defined variables created via `ocas var set`.
 - **`bootstrap(store, varStore?)`** writes builtin name → hash bindings into the varStore when one is provided; called automatically by `openStore()` and `openStoreAndVarStore()`.
 - **`resolveHash(input, varStore)`** is the unified hash/name resolver in the CLI. If `input` matches the 13-char hash format it is returned as-is; otherwise the varStore is queried by exact name. This means every CLI command that accepts a hash argument also accepts a variable name (schema names, user vars, etc.).
+- **Variable naming**: all names must follow `@scope/name` format (`@[a-zA-Z][a-zA-Z0-9]*/segments`). `@ocas/*` is reserved for builtins. The `@` prefix ensures names are visually distinct from hashes.
 - **`openStoreAndVarStore()`** in the CLI opens both stores and bootstraps once; prefer it over separate `openStore()` + `createVariableStore()` to avoid double bootstrap.
 
 ### Internal Dependencies
