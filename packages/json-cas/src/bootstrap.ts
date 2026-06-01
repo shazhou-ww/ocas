@@ -93,6 +93,16 @@ const BOOTSTRAP_PAYLOAD = {
     minProperties: { type: "number" },
     maxProperties: { type: "number" },
     default: {},
+    // P3 combinators
+    not: { type: "object", additionalProperties: false },
+    contains: { type: "object", additionalProperties: false },
+    propertyNames: { type: "object", additionalProperties: false },
+    // P3 metadata
+    examples: { type: "array" },
+    readOnly: { type: "boolean" },
+    writeOnly: { type: "boolean" },
+    deprecated: { type: "boolean" },
+    $comment: { type: "string" },
   },
 } as const;
 

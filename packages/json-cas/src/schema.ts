@@ -58,6 +58,16 @@ const ALLOWED_SCHEMA_KEYS = new Set([
   "minProperties",
   "maxProperties",
   "default",
+  // P3 combinators (need collectRefs)
+  "not",
+  "contains",
+  "propertyNames",
+  // P3 metadata (no collectRefs impact)
+  "examples",
+  "readOnly",
+  "writeOnly",
+  "deprecated",
+  "$comment",
 ]);
 
 const JSON_SCHEMA_TYPES = new Set([
@@ -210,6 +220,22 @@ function isValidSchema(value: unknown): boolean {
     return false;
   // "default" accepts any value — no type check needed
 
+  // P3 combinators — recursive sub-schema checks
+  if ("not" in schema && !isValidSchema(schema.not)) return false;
+  if ("contains" in schema && !isValidSchema(schema.contains)) return false;
+  if ("propertyNames" in schema && !isValidSchema(schema.propertyNames))
+    return false;
+
+  // P3 metadata — type checks only
+  if ("examples" in schema && !Array.isArray(schema.examples)) return false;
+  if ("readOnly" in schema && typeof schema.readOnly !== "boolean")
+    return false;
+  if ("writeOnly" in schema && typeof schema.writeOnly !== "boolean")
+    return false;
+  if ("deprecated" in schema && typeof schema.deprecated !== "boolean")
+    return false;
+  if ("$comment" in schema && typeof schema.$comment !== "string") return false;
+
   return true;
 }
 
@@ -268,7 +294,7 @@ export function validate(store: Store, node: CasNode): boolean {
 /**
  * Recursively collect values of all properties whose schema has format: 'cas_ref'.
  * Handles: direct format, anyOf/allOf (combinators), oneOf, if/then/else (conditionals),
- * items + prefixItems (arrays), properties (nested objects),
+ * not, contains, items + prefixItems (arrays), properties (nested objects),
  * additionalProperties (record refs), and patternProperties (regex-keyed refs).
  */
 export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
@@ -328,6 +354,15 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
         result.push(...collectRefs(itemSchema, arr[i]));
       }
     }
+
+    // P3: contains — sub-schema for array items
+    if (schema.contains && typeof schema.contains === "object") {
+      const containsSchema = schema.contains as JSONSchema;
+      for (const item of value as unknown[]) {
+        result.push(...collectRefs(containsSchema, item));
+      }
+    }
+
     return result;
   }
 
@@ -367,6 +402,11 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
         }
       }
     }
+  }
+
+  // P3: not — sub-schema applies to the same value
+  if (schema.not && typeof schema.not === "object") {
+    result.push(...collectRefs(schema.not as JSONSchema, value));
   }
 
   return result;
