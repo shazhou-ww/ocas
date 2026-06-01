@@ -185,3 +185,97 @@ describe("@ Alias Resolution - hash", () => {
     expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 });
+
+describe("@ Alias Resolution - hash params (Phase 3)", () => {
+  test("ocas get @ocas/string should resolve name to hash", async () => {
+    await runCliAlias("init");
+
+    const { stdout, stderr, exitCode } = await runCliAlias(
+      "get",
+      "@ocas/string",
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    const value = envValue(stdout) as { type: string; payload: unknown };
+    expect(value).toHaveProperty("type");
+    expect(value).toHaveProperty("payload");
+  });
+
+  test("ocas has @ocas/string should resolve name and return true", async () => {
+    await runCliAlias("init");
+
+    const { stdout, stderr, exitCode } = await runCliAlias(
+      "has",
+      "@ocas/string",
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(envValue(stdout)).toBe(true);
+  });
+
+  test("ocas verify @ocas/string should resolve name", async () => {
+    await runCliAlias("init");
+
+    const { stdout, stderr, exitCode } = await runCliAlias(
+      "verify",
+      "@ocas/string",
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(envValue(stdout)).toBe("ok");
+  });
+
+  test("ocas refs @ocas/string should resolve name", async () => {
+    await runCliAlias("init");
+
+    const { stdout, stderr, exitCode } = await runCliAlias(
+      "refs",
+      "@ocas/string",
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(Array.isArray(envValue(stdout))).toBe(true);
+  });
+
+  test("ocas walk @ocas/string should resolve name", async () => {
+    await runCliAlias("init");
+
+    const { stdout, stderr, exitCode } = await runCliAlias(
+      "walk",
+      "@ocas/string",
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    const value = envValue(stdout);
+    expect(Array.isArray(value)).toBe(true);
+    expect((value as string[]).length).toBeGreaterThan(0);
+  });
+
+  test("ocas list --type @ocas/string should resolve name", async () => {
+    await runCliAlias("init");
+
+    const { stdout, stderr, exitCode } = await runCliAlias(
+      "list",
+      "--type",
+      "@ocas/string",
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(Array.isArray(envValue(stdout))).toBe(true);
+  });
+
+  test("ocas get with non-existent name should fail with Error", async () => {
+    await runCliAlias("init");
+
+    const { stderr, exitCode } = await runCliAlias("get", "@nonexistent/name");
+
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Error: Schema not found:");
+  });
+});
