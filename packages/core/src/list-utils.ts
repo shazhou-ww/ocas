@@ -1,13 +1,9 @@
-import {
-  DEFAULT_LIST_LIMIT,
-  type Hash,
-  type ListEntry,
-  type ListOptions,
-} from "./types.js";
+import type { Hash, ListEntry, ListOptions } from "./types.js";
 
 /**
  * Apply sort/desc/offset/limit to an array of `ListEntry` records.
- * Default sort is by `created` ascending; default limit is `DEFAULT_LIST_LIMIT`.
+ * Default sort is by `created` ascending. If `limit` is omitted, all entries
+ * (after offset) are returned.
  *
  * Tiebreaker is the entry hash (lexicographic ascending) so ordering remains
  * deterministic for entries sharing the same timestamp.
@@ -18,7 +14,7 @@ export function applyListOptions(
 ): ListEntry[] {
   const sort = options?.sort ?? "created";
   const desc = options?.desc ?? false;
-  const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+  const limit = options?.limit;
   const offset = options?.offset ?? 0;
 
   const sorted = [...entries].sort((a, b) => {
@@ -30,8 +26,11 @@ export function applyListOptions(
     return desc ? (a.hash < b.hash ? 1 : -1) : a.hash < b.hash ? -1 : 1;
   });
 
-  if (limit <= 0) return [];
-  return sorted.slice(offset, offset + limit);
+  if (limit !== undefined) {
+    if (limit <= 0) return [];
+    return sorted.slice(offset, offset + limit);
+  }
+  return sorted.slice(offset);
 }
 
 /**

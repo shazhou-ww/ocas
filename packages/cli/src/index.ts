@@ -238,7 +238,9 @@ function parseTagsLabels(args: string[]): {
  * Validates each flag and dies with a clear error on invalid values.
  */
 function parseListOptions(): ListOptions {
-  const opts: ListOptions = {};
+  // Default limit applied at the CLI layer only; core treats undefined as
+  // "no limit" so internal callers (e.g. gc) can fetch full result sets.
+  const opts: ListOptions = { limit: 100 };
   const sortFlag = flags.sort;
   if (sortFlag !== undefined) {
     if (typeof sortFlag !== "string") {
@@ -988,7 +990,6 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
     const variables = varStore.list({
       namePrefix: "@ocas/template/text/",
       schema: stringHash,
-      limit: Number.MAX_SAFE_INTEGER,
     });
 
     const templates = variables.map((v) => ({

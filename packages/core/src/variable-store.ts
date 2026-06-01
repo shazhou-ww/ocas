@@ -1,6 +1,5 @@
 import { Database } from "bun:sqlite";
 import type { Hash, ListSort, Store } from "./types.js";
-import { DEFAULT_LIST_LIMIT } from "./types.js";
 import type { Variable } from "./variable.js";
 
 /**
@@ -608,7 +607,6 @@ export class VariableStore {
     // Remove all schema variants for this name
     const variants = this.list({
       exactName: name,
-      limit: Number.MAX_SAFE_INTEGER,
     });
 
     if (variants.length === 0) {
@@ -652,10 +650,10 @@ export class VariableStore {
     const filterLabels = options?.labels ?? [];
     const sort = options?.sort ?? "created";
     const desc = options?.desc ?? false;
-    const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+    const limit = options?.limit;
     const offset = options?.offset ?? 0;
 
-    if (limit <= 0) return [];
+    if (limit !== undefined && limit <= 0) return [];
 
     // Build query with filters
     let query = `
@@ -713,8 +711,14 @@ export class VariableStore {
     const direction = desc ? "DESC" : "ASC";
     // Tiebreaker: name ASC for stable ordering across same-ms timestamps
     query += ` ORDER BY ${sortColumn} ${direction}, v.name ASC`;
-    query += " LIMIT ? OFFSET ?";
-    params.push(limit, offset);
+    if (limit !== undefined) {
+      query += " LIMIT ? OFFSET ?";
+      params.push(limit, offset);
+    } else if (offset > 0) {
+      // SQLite requires LIMIT when using OFFSET; use -1 to mean "no limit".
+      query += " LIMIT -1 OFFSET ?";
+      params.push(offset);
+    }
 
     const stmt = this.db.prepare(query);
     const rows = stmt.all(...params) as Array<{

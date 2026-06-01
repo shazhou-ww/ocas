@@ -25,7 +25,6 @@ export {
 export { createMemoryStore } from "./store.js";
 export {
   type CasNode,
-  DEFAULT_LIST_LIMIT,
   type Hash,
   type ListEntry,
   type ListOptions,

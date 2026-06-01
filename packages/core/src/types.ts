@@ -45,11 +45,6 @@ export type ListEntry = {
 };
 
 /**
- * Default limit applied when callers omit `limit` from list options.
- */
-export const DEFAULT_LIST_LIMIT = 100;
-
-/**
  * Content-addressable store interface.
  * Self-referencing nodes are created only via bootstrap().
  */

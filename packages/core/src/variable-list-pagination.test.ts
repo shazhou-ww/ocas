@@ -82,10 +82,10 @@ describe("VariableStore.list - pagination + sort", () => {
     ).toHaveLength(3);
   });
 
-  test("D5. default limit is 100", async () => {
+  test("D5. core has no default limit (returns all)", async () => {
     await setN("big", 105, 0);
     const list = varStore.list({ namePrefix: "big-" });
-    expect(list).toHaveLength(100);
+    expect(list).toHaveLength(105);
   });
 
   test("D6. pagination applied AFTER namePrefix/schema filters", async () => {

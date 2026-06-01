@@ -103,11 +103,13 @@ describe("listByType - pagination + sort + timestamps", () => {
     expect(store.listByType(m, { offset: 100 })).toEqual([]);
   });
 
-  test("A9. default limit is 100", async () => {
+  test("A9. core has no default limit (returns all)", async () => {
     const store = createMemoryStore();
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 150, 0);
-    expect(store.listByType(m)).toHaveLength(100);
+    // No CLI-layer cap; with 150 nodes of type m (plus m itself which is
+    // self-typed), the full set is returned.
+    expect(store.listByType(m)).toHaveLength(151);
   });
 
   test("A10. desc + offset + limit combined", async () => {
@@ -136,12 +138,12 @@ describe("listMeta / listSchemas - pagination", () => {
     expect(typeof e.updated).toBe("number");
   });
 
-  test("B2. listMeta default limit 100", async () => {
+  test("B2. listMeta has no default limit (returns all)", async () => {
     const store = createMemoryStore();
     for (let i = 0; i < 150; i++) {
       await store[BOOTSTRAP_STORE]({ type: "object", i });
     }
-    expect(store.listMeta()).toHaveLength(100);
+    expect(store.listMeta()).toHaveLength(150);
   });
 
   test("B3. listMeta limit/offset/desc", async () => {
