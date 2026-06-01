@@ -1,16 +1,16 @@
-# CLAUDE.md — ocas
+# CLAUDE.md — OCAS
 
-Self-describing content-addressable storage with JSON Schema typed nodes.
+Object Content Addressable Store — self-describing CAS with JSON Schema typed nodes.
 
 ## Project Structure
 
-Monorepo with 4 packages under `packages/`:
+Monorepo with 3 packages under `packages/`:
 
-| Package | Description |
-|---------|-------------|
-| `ocas` | Core CAS engine — hashing, schema, store, verify, bootstrap |
-| `ocas-fs` | Filesystem-backed CAS store |
-| `cli` | CLI tool |
+| Package | Directory | Description |
+|---------|-----------|-------------|
+| `@ocas/core` | `packages/core` | Core CAS engine — hashing, schema, store, verify, bootstrap |
+| `@ocas/fs` | `packages/fs` | Filesystem-backed CAS store |
+| `@ocas/cli` | `packages/cli` | CLI tool (`ocas` binary) |
 
 ## Tech Stack
 
@@ -19,7 +19,7 @@ Monorepo with 4 packages under `packages/`:
 - **Build:** `tsc --build` (composite project references)
 - **Test:** `bun test`
 - **Lint/Format:** Biome (`biome check .` / `biome format --write .`)
-- **Publish:** Changesets → npmjs (`@ocas/*`)
+- **Publish:** Changesets + `bun publish` → npmjs (`@ocas/*`)
 
 ## Commands
 
@@ -41,7 +41,7 @@ bun run format    # Biome format (auto-fix)
 
 ### Biome Rules
 
-- `noConsole: "error"` globally (except `cli`)
+- `noConsole: "error"` globally (except `packages/cli`)
 - Recommended ruleset enabled
 - Auto-organize imports via `assist.actions.source.organizeImports`
 - Indent: 2 spaces
@@ -60,6 +60,11 @@ bun run format    # Biome format (auto-fix)
 - `CasNode` — content-addressed node with schema
 - `Store` — abstract storage interface (get/put)
 
+### Internal Dependencies
+
+Workspace packages reference each other with `workspace:*` in `package.json`.
+This is resolved to real version numbers only during publishing (see below).
+
 ## Git
 
 - Commit format: `type: description` (conventional commits)
@@ -75,3 +80,45 @@ bun run format    # Biome format (auto-fix)
 1. `bun test` — all tests pass
 2. `bun run check` — no lint errors
 3. `bun run build` — builds cleanly
+
+## Release Process
+
+Releases use a **release branch** workflow. `main` always keeps `workspace:*` for
+internal dependencies; version numbers are only fixed on the release branch.
+
+### Prepare
+
+```bash
+./scripts/prepare-release.sh
+```
+
+This script:
+1. Checks you're on `main` with a clean tree and pending changesets
+2. Creates `release/<version>` branch
+3. Runs `changeset version` to fix versions and generate CHANGELOGs
+4. Runs full validation (install, build, lint, test)
+5. Commits the version bump
+
+After preparation, review changes and fix any issues on the release branch.
+
+### Publish
+
+```bash
+./scripts/publish.sh
+```
+
+This script:
+1. Validates you're on a `release/*` branch with no pending changesets
+2. Runs final build + test
+3. Publishes packages in order: `@ocas/core` → `@ocas/fs` → `@ocas/cli`
+4. Tags, pushes, merges back to `main`, cleans up the release branch
+
+### Adding a Changeset
+
+Before releasing, add changesets for your changes:
+
+```bash
+bunx changeset        # interactive — pick packages + bump type + summary
+```
+
+Changesets live in `.changeset/` as markdown files until consumed by `prepare-release.sh`.
