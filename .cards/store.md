@@ -16,13 +16,24 @@ type Store = {
   put(typeHash: Hash, payload: unknown): Promise<Hash>;
   get(hash: Hash): CasNode | null;
   has(hash: Hash): boolean;
-  delete(hash: Hash): void;
   listAll(): Hash[];
-  listByType(typeHash: Hash): Hash[];
-  listMeta(): Hash[];
-  listSchemas(): Hash[];
+  listByType(typeHash: Hash, options?: ListOptions): ListEntry[];
+  listMeta(options?: ListOptions): ListEntry[];
+  listSchemas(options?: ListOptions): ListEntry[];
 };
 ```
+
+### ListOptions & ListEntry
+
+List methods accept optional `ListOptions` for sorting and pagination:
+
+```typescript
+type ListSort = "created" | "updated";
+type ListOptions = { sort?: ListSort; desc?: boolean; limit?: number; offset?: number };
+type ListEntry = { hash: Hash; created: number; updated: number };
+```
+
+When `limit` is `undefined`, all results are returned (no cap). The [[CLI]] defaults `limit` to 100.
 
 `put()` computes the [[Content Addressing|hash]] from `{ type, payload }`, validates the payload against its [[Schema]], and stores the [[Content Addressing|node]]. If a node with the same hash already exists, it's a no-op — content addressing gives deduplication for free.
 

@@ -67,6 +67,10 @@ Every variable tracks its last `MAX_HISTORY` (default 10) values with LRU rotati
 ocas var history <name> [--schema <hash-or-name>]   # show history, [0] = current
 ```
 
+## Sorting & Pagination
+
+`var list` and `var history` support the common list flags: `--sort created|updated`, `--limit`, `--offset`, `--desc`. The CLI defaults `--limit` to 100; the core layer returns all results when `limit` is omitted.
+
 ## Role in Garbage Collection
 
 Variables are the **roots** of [[Garbage Collection]]. Any node reachable from a variable's value hash (via [[Schema|ocas_ref]] edges) is kept alive; unreachable nodes are swept.

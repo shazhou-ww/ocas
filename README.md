@@ -131,6 +131,10 @@ Flags:
   --home <path>   Store directory (default: $OCAS_HOME or ~/.ocas)
   --json          Compact JSON output
   --pipe, -p      Read a { type, value } envelope from stdin for render
+  --sort <key>    Sort key: created|updated (default: created)
+  --limit <n>     Max results (default: 100)
+  --offset <n>    Skip first N results (default: 0)
+  --desc          Sort descending (default: ascending)
 ```
 
 ### Variable names

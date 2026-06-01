@@ -60,6 +60,12 @@ bun run format    # Biome format (auto-fix)
 - `CasNode` — content-addressed node with schema
 - `Store` — abstract storage interface (get/put)
 - `VariableStore` — SQLite-backed mutable bindings (name → hash)
+- `ListOptions` — sorting/pagination options (`sort`, `desc`, `limit`, `offset`)
+- `ListEntry` — list result entry (`hash`, `created`, `updated`)
+
+### List Utilities
+
+`packages/core/src/list-utils.ts` provides `applyListOptions()` — in-memory sort/paginate for `ListEntry[]` arrays. Used by `MemoryStore`; `FsStore` pushes sort/limit to SQLite. Core layer treats `limit: undefined` as "no limit"; the CLI defaults to 100 in `parseListOptions()`.
 
 ### Architecture Notes
 
