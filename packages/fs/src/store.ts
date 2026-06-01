@@ -307,22 +307,18 @@ export function createFsStore(dir: string): BootstrapCapableStore {
 }
 
 /**
- * Open a filesystem-backed CAS store with automatic directory creation and bootstrap.
- * This is an async function that:
- * 1. Creates the directory (with recursive: true) if it doesn't exist
- * 2. Validates that the path is actually a directory (not a file)
- * 3. Creates the store
- * 4. Runs bootstrap (which is idempotent)
+ * Prepare a filesystem-backed CAS store: create the directory (if needed),
+ * validate that the path is a directory, and instantiate the store. Does NOT
+ * run bootstrap — callers that want bootstrap should either use {@link openStore}
+ * or call `bootstrap` themselves (useful when wiring a varStore before
+ * bootstrap to avoid running it twice).
  *
  * @param dir - The directory path for the store
- * @param varStore - Optional variable store; when provided, builtin schema
- *   aliases are written to it during bootstrap
  * @returns A Promise resolving to the BootstrapCapableStore
  * @throws Error if the path exists but is not a directory
  */
-export async function openStore(
+export async function prepareStore(
   dir: string,
-  varStore?: VariableStore,
 ): Promise<BootstrapCapableStore> {
   // Create directory if it doesn't exist
   try {
@@ -356,11 +352,29 @@ export async function openStore(
     throw error;
   }
 
-  // Create the store
-  const store = createFsStore(dir);
+  return createFsStore(dir);
+}
 
+/**
+ * Open a filesystem-backed CAS store with automatic directory creation and bootstrap.
+ * This is an async function that:
+ * 1. Creates the directory (with recursive: true) if it doesn't exist
+ * 2. Validates that the path is actually a directory (not a file)
+ * 3. Creates the store
+ * 4. Runs bootstrap (which is idempotent)
+ *
+ * @param dir - The directory path for the store
+ * @param varStore - Optional variable store; when provided, builtin schema
+ *   aliases are written to it during bootstrap
+ * @returns A Promise resolving to the BootstrapCapableStore
+ * @throws Error if the path exists but is not a directory
+ */
+export async function openStore(
+  dir: string,
+  varStore?: VariableStore,
+): Promise<BootstrapCapableStore> {
+  const store = await prepareStore(dir);
   // Bootstrap (idempotent)
   await bootstrap(store, varStore);
-
   return store;
 }

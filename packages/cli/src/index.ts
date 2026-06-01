@@ -24,7 +24,7 @@ import {
   walk,
   wrapEnvelope,
 } from "@ocas/core";
-import { openStore as openFsStore } from "@ocas/fs";
+import { openStore as openFsStore, prepareStore } from "@ocas/fs";
 
 // ---- Argument parsing ----
 
@@ -163,32 +163,39 @@ async function openStore(varStore?: VariableStore): Promise<Store> {
   return await openFsStore(fullPath, varStore);
 }
 
-async function openVarStore(): Promise<VariableStore> {
-  const store = await openStore();
+async function openStoreAndVarStore(): Promise<{
+  store: Store;
+  varStore: VariableStore;
+}> {
+  const fullPath = resolve(storePath);
+  const store = await prepareStore(fullPath);
   const varStore = createVariableStore(resolve(varDbPath), store);
-  // Populate varStore with builtin schema aliases (idempotent).
   await bootstrap(store, varStore);
-  return varStore;
+  return { store, varStore };
 }
 
 /**
- * Resolve a type-hash, handling @ aliases via varStore lookup.
+ * Hash format check: 13-char uppercase Crockford Base32.
  */
-async function resolveTypeHash(typeHashOrAlias: string): Promise<Hash> {
-  if (typeHashOrAlias.startsWith("@")) {
-    const varStore = await openVarStore();
-    try {
-      const variants = varStore.list({ exactName: typeHashOrAlias });
-      const first = variants[0];
-      if (!first) {
-        die(`Schema not found: ${typeHashOrAlias}`);
-      }
-      return first.value;
-    } finally {
-      varStore.close();
-    }
+function isHash(input: string): boolean {
+  return /^[0-9A-Z]{13}$/.test(input);
+}
+
+/**
+ * Resolve a hash-or-name. If `input` already looks like a hash, return it as-is.
+ * Otherwise, query the provided varStore for a variable with that exact name
+ * and return the first match's value.
+ */
+function resolveHash(input: string, varStore: VariableStore): Hash {
+  if (isHash(input)) {
+    return input as Hash;
   }
-  return typeHashOrAlias;
+  const variants = varStore.list({ exactName: input });
+  const first = variants[0];
+  if (!first) {
+    die(`Schema not found: ${input}`);
+  }
+  return first.value as Hash;
 }
 
 /**
@@ -235,44 +242,50 @@ async function cmdPut(args: string[]): Promise<void> {
     );
   if (isPipe && args[1])
     die("Cannot use --pipe/-p with a file argument. Use one or the other.");
-  const typeHash = await resolveTypeHash(typeHashOrAlias);
-  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
-  const store = await openStore();
+  const { store, varStore } = await openStoreAndVarStore();
+  try {
+    const typeHash = resolveHash(typeHashOrAlias, varStore);
+    const payload = isPipe
+      ? await readStdinJson()
+      : readJsonFile(file as string);
 
-  // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
-  // instead of ajv against meta-schema (which can't express recursive constraints)
-  const metaHash = await resolveTypeHash("@ocas/schema");
-  if (typeHash === metaHash) {
-    try {
-      const hash = await putSchema(store, payload as Record<string, unknown>);
-      await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
-    } catch (_e) {
+    // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
+    // instead of ajv against meta-schema (which can't express recursive constraints)
+    const metaHash = resolveHash("@ocas/schema", varStore);
+    if (typeHash === metaHash) {
+      try {
+        const hash = await putSchema(store, payload as Record<string, unknown>);
+        await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
+      } catch (_e) {
+        console.error(
+          `Validation failed: payload in ${file} does not match schema ${typeHash}`,
+        );
+        process.exit(1);
+      }
+      return;
+    }
+
+    // Check if schema exists
+    const schema = getSchema(store, typeHash);
+    if (schema === null) {
+      console.error(`Schema not found: ${typeHash}`);
+      process.exit(1);
+    }
+
+    // Validate payload against schema before storing
+    const tempNode = { type: typeHash, payload, timestamp: Date.now() };
+    if (!validate(store, tempNode)) {
       console.error(
         `Validation failed: payload in ${file} does not match schema ${typeHash}`,
       );
       process.exit(1);
     }
-    return;
-  }
 
-  // Check if schema exists
-  const schema = getSchema(store, typeHash);
-  if (schema === null) {
-    console.error(`Schema not found: ${typeHash}`);
-    process.exit(1);
+    const hash = await store.put(typeHash, payload);
+    await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
+  } finally {
+    varStore.close();
   }
-
-  // Validate payload against schema before storing
-  const tempNode = { type: typeHash, payload, timestamp: Date.now() };
-  if (!validate(store, tempNode)) {
-    console.error(
-      `Validation failed: payload in ${file} does not match schema ${typeHash}`,
-    );
-    process.exit(1);
-  }
-
-  const hash = await store.put(typeHash, payload);
-  await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
 }
 
 async function cmdGet(args: string[]): Promise<void> {
@@ -376,11 +389,17 @@ async function cmdHash(args: string[]): Promise<void> {
     );
   if (isPipe && args[1])
     die("Cannot use --pipe/-p with a file argument. Use one or the other.");
-  const typeHash = await resolveTypeHash(typeHashOrAlias);
-  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
-  const hash = await computeHash(typeHash, payload);
-  const store = await openStore();
-  await out(await wrapEnvelope(store, "@ocas/output/hash", hash), store);
+  const { store, varStore } = await openStoreAndVarStore();
+  try {
+    const typeHash = resolveHash(typeHashOrAlias, varStore);
+    const payload = isPipe
+      ? await readStdinJson()
+      : readJsonFile(file as string);
+    const hash = await computeHash(typeHash, payload);
+    await out(await wrapEnvelope(store, "@ocas/output/hash", hash), store);
+  } finally {
+    varStore.close();
+  }
 }
 
 async function cmdRender(args: string[]): Promise<void> {
@@ -397,7 +416,14 @@ async function cmdRender(args: string[]): Promise<void> {
     );
   }
 
-  const store = await openStore();
+  let storeAndVarStore: { store: Store; varStore: VariableStore } | undefined;
+  let store: Store;
+  if (isPipe) {
+    store = await openStore();
+  } else {
+    storeAndVarStore = await openStoreAndVarStore();
+    store = storeAndVarStore.store;
+  }
 
   // Parse numeric options
   const resolution =
@@ -472,15 +498,21 @@ async function cmdRender(args: string[]): Promise<void> {
       );
       process.stdout.write(output);
     } else {
-      const varStore = await openVarStore();
-      const output = await renderAsync(store, hash, {
-        resolution,
-        decay,
-        epsilon,
-        varStore,
-      });
-      // Output to stdout without JSON wrapping (raw output)
-      process.stdout.write(output);
+      const varStore = (
+        storeAndVarStore as { store: Store; varStore: VariableStore }
+      ).varStore;
+      try {
+        const output = await renderAsync(store, hash, {
+          resolution,
+          decay,
+          epsilon,
+          varStore,
+        });
+        // Output to stdout without JSON wrapping (raw output)
+        process.stdout.write(output);
+      } finally {
+        varStore.close();
+      }
     }
   } catch (error) {
     if (error instanceof CasNodeNotFoundError) {
@@ -711,8 +743,7 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     die("Usage: ocas template set <schema-hash> <file> | --inline <text>");
   }
 
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
     // Validate schema hash exists in CAS
@@ -750,7 +781,7 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     }
 
     // Store content in CAS under @string schema
-    const stringHash = await resolveTypeHash("@ocas/string");
+    const stringHash = resolveHash("@ocas/string", varStore);
     const contentHash = await store.put(stringHash, content);
 
     // Create variable binding: @ocas/template/text/<schema-hash>
@@ -781,12 +812,11 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
     die("Usage: ocas template get <schema-hash>");
   }
 
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
     const varName = `@ocas/template/text/${schemaHash}`;
-    const stringHash = await resolveTypeHash("@ocas/string");
+    const stringHash = resolveHash("@ocas/string", varStore);
     const variable = varStore.get(varName, stringHash);
 
     if (variable === null) {
@@ -813,11 +843,10 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
 }
 
 async function cmdTemplateList(_args: string[]): Promise<void> {
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
-    const stringHash = await resolveTypeHash("@ocas/string");
+    const stringHash = resolveHash("@ocas/string", varStore);
     const variables = varStore.list({
       namePrefix: "@ocas/template/text/",
       schema: stringHash,
@@ -844,12 +873,11 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
     die("Usage: ocas template delete <schema-hash>");
   }
 
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
     const varName = `@ocas/template/text/${schemaHash}`;
-    const stringHash = await resolveTypeHash("@ocas/string");
+    const stringHash = resolveHash("@ocas/string", varStore);
     varStore.remove(varName, stringHash);
 
     await out(
@@ -884,10 +912,14 @@ async function cmdList(_args: string[]): Promise<void> {
   const typeFlag = flags.type;
   if (typeof typeFlag !== "string")
     die("Usage: ocas list --type <hash-or-alias>");
-  const typeHash = await resolveTypeHash(typeFlag);
-  const store = await openStore();
-  const hashes = Array.from(store.listByType(typeHash));
-  await out(await wrapEnvelope(store, "@ocas/output/list", hashes), store);
+  const { store, varStore } = await openStoreAndVarStore();
+  try {
+    const typeHash = resolveHash(typeFlag, varStore);
+    const hashes = Array.from(store.listByType(typeHash));
+    await out(await wrapEnvelope(store, "@ocas/output/list", hashes), store);
+  } finally {
+    varStore.close();
+  }
 }
 
 async function cmdListMeta(_args: string[]): Promise<void> {
