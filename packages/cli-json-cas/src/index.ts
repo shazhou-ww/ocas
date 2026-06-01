@@ -75,6 +75,8 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
       } else {
         flags[key] = true;
       }
+    } else if (arg === "-p") {
+      flags.p = true;
     } else {
       positional.push(arg);
     }
@@ -110,6 +112,22 @@ function readJsonFile(file: string): unknown {
     return JSON.parse(readFileSync(file, "utf-8"));
   } catch (e) {
     return die(`Cannot read JSON from "${file}": ${e}`);
+  }
+}
+
+async function readStdinJson(): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk as Buffer);
+  }
+  const input = Buffer.concat(chunks).toString("utf-8").trim();
+  if (!input) {
+    die("No input on stdin. Pipe JSON content.");
+  }
+  try {
+    return JSON.parse(input);
+  } catch {
+    return die("Invalid JSON on stdin.");
   }
 }
 
@@ -180,12 +198,17 @@ function parseTagsLabels(args: string[]): {
 // ---- Commands ----
 
 async function cmdPut(args: string[]): Promise<void> {
+  const isPipe = flags.pipe === true || flags.p === true;
   const typeHashOrAlias = args[0];
-  const file = args[1];
-  if (!typeHashOrAlias || !file)
-    die("Usage: json-cas put <type-hash> <file.json>");
+  const file = isPipe ? undefined : args[1];
+  if (!typeHashOrAlias || (!isPipe && !file))
+    die(
+      "Usage: json-cas put <type-hash> <file.json>\n       json-cas put <type-hash> --pipe/-p",
+    );
+  if (isPipe && args[1])
+    die("Cannot use --pipe/-p with a file argument. Use one or the other.");
   const typeHash = await resolveTypeHash(typeHashOrAlias);
-  const payload = readJsonFile(file);
+  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
   const store = await openStore();
 
   // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
@@ -311,12 +334,17 @@ async function cmdWalk(args: string[]): Promise<void> {
 }
 
 async function cmdHash(args: string[]): Promise<void> {
+  const isPipe = flags.pipe === true || flags.p === true;
   const typeHashOrAlias = args[0];
-  const file = args[1];
-  if (!typeHashOrAlias || !file)
-    die("Usage: json-cas hash <type-hash> <file.json>");
+  const file = isPipe ? undefined : args[1];
+  if (!typeHashOrAlias || (!isPipe && !file))
+    die(
+      "Usage: json-cas hash <type-hash> <file.json>\n       json-cas hash <type-hash> --pipe/-p",
+    );
+  if (isPipe && args[1])
+    die("Cannot use --pipe/-p with a file argument. Use one or the other.");
   const typeHash = await resolveTypeHash(typeHashOrAlias);
-  const payload = readJsonFile(file);
+  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
   const hash = await computeHash(typeHash, payload);
   const store = await openStore();
   out(await wrapEnvelope(store, "@output/hash", hash));
@@ -804,13 +832,13 @@ command's @output/* schema (shown in parentheses); pipe any envelope into
 \`render -p\` to render its value (cas_ref hashes are expanded).
 
 Commands:
-  put <type-hash> <file.json>       Store node, print envelope (value=hash)            (@output/put)
+  put <type-hash> <file.json|--pipe> Store node, print envelope (value=hash)            (@output/put)
   get <hash>                        Print node as envelope                             (@output/get)
   has <hash>                        Print envelope (value=boolean)                     (@output/has)
   verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@output/verify)
   refs <hash>                       List direct cas_ref edges                          (@output/refs)
   walk <hash> [--format tree]       Recursive traversal                                (@output/walk)
-  hash <type-hash> <file.json>      Compute hash without storing                       (@output/hash)
+  hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@output/hash)
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
   list --type <hash-or-alias>       List hashes for a type (value=string[])            (@output/list)
@@ -835,7 +863,7 @@ Flags:
   --resolution <n>    Initial resolution for render (default: 1.0)
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)
-  --pipe, -p          Read { type, value } JSON from stdin for render`);
+  --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)`);
 }
 
 // ---- Dispatch ----

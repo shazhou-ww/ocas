@@ -628,3 +628,68 @@ describe("Phase 8: Pipe Composition", () => {
     expect(stdout).toBe("Person: Carol (25)");
   });
 });
+
+// ---- Phase 9: Put/Hash Pipe Input ----
+
+describe("Phase 9: Put/Hash Pipe Input", () => {
+  test("9.1 put -p reads JSON from stdin and stores node", async () => {
+    const payload = JSON.stringify({ name: "PipeAlice", age: 99 });
+    const { stdout, exitCode } = await runCliWithStdin(
+      ["put", typeHash, "-p"],
+      payload,
+    );
+    expect(exitCode).toBe(0);
+    const hash = envValue(stdout);
+    expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+
+    // Verify stored correctly
+    const { stdout: getOut } = await runCli(["get", hash as string]);
+    expect(getOut).toContain("PipeAlice");
+  });
+
+  test("9.2 hash -p reads JSON from stdin and computes hash without storing", async () => {
+    const payload = JSON.stringify({ name: "PipeBob", age: 55 });
+    const { stdout, exitCode } = await runCliWithStdin(
+      ["hash", typeHash, "-p"],
+      payload,
+    );
+    expect(exitCode).toBe(0);
+    const hash = envValue(stdout);
+    expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+
+    // Should NOT be stored
+    const { exitCode: hasExit, stdout: hasOut } = await runCli([
+      "has",
+      hash as string,
+    ]);
+    expect(hasExit).toBe(0);
+    expect(envValue(hasOut)).toBe(false);
+  });
+
+  test("9.3 put -p with file arg errors", async () => {
+    const { stderr, exitCode } = await runCliWithStdin(
+      ["put", typeHash, "some-file.json", "-p"],
+      "{}",
+    );
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Cannot use --pipe/-p with a file argument");
+  });
+
+  test("9.4 put -p with empty stdin errors", async () => {
+    const { stderr, exitCode } = await runCliWithStdin(
+      ["put", typeHash, "-p"],
+      "",
+    );
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("No input on stdin");
+  });
+
+  test("9.5 put -p with invalid JSON errors", async () => {
+    const { stderr, exitCode } = await runCliWithStdin(
+      ["put", typeHash, "-p"],
+      "not json",
+    );
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Invalid JSON on stdin");
+  });
+});
