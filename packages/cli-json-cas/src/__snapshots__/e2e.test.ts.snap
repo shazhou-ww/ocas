@@ -2,36 +2,36 @@
 
 exports[`Phase 1: CAS Core 1.6 get returns node JSON (snapshot) 1`] = `
 {
-  "type": "CRK52TZT2ZND7",
+  "type": "CE40D09H75NFZ",
   "value": {
     "payload": {
       "age": 30,
       "name": "Alice",
     },
-    "type": "5J4TDW3H4J427",
+    "type": "8WAZV39SD724T",
   },
 }
 `;
 
 exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `
 {
-  "type": "0RJTSZR6K608G",
+  "type": "BZ31JDDWX2AWH",
   "value": "ok",
 }
 `;
 
 exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `
 "{
-  "type": "DGB04ECT2M49Q",
+  "type": "DG8SAB75PV9P7",
   "value": []
 }"
 `;
 
 exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `
 "{
-  "type": "EQ015GFTBKQJA",
+  "type": "EVHG7Q7FK83H0",
   "value": [
-    "078KT0M8N554S"
+    "6KZ930XYK2MHB"
   ]
 }"
 `;
@@ -40,40 +40,40 @@ exports[`Phase 2: Schema Validation 2.3 put against non-existent schema hash fai
 
 exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
 {
-  "type": "E88C2CKY90ERT",
+  "type": "5KVHSESSX7N96",
   "value": {
     "labels": [],
     "name": "myapp/config",
-    "schema": "5J4TDW3H4J427",
+    "schema": "8WAZV39SD724T",
     "tags": {},
-    "value": "078KT0M8N554S",
+    "value": "6KZ930XYK2MHB",
   },
 }
 `;
 
 exports[`Phase 3: Variable System 3.2 var get returns variable 1`] = `
 {
-  "type": "0GVNZDR5AC35Y",
+  "type": "7D4R2MJ1EYF08",
   "value": {
     "labels": [],
     "name": "myapp/config",
-    "schema": "5J4TDW3H4J427",
+    "schema": "8WAZV39SD724T",
     "tags": {},
-    "value": "078KT0M8N554S",
+    "value": "6KZ930XYK2MHB",
   },
 }
 `;
 
 exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
 {
-  "type": "3XAAW976C1KT8",
+  "type": "E8158M25YNR9M",
   "value": [
     {
       "labels": [],
       "name": "myapp/config",
-      "schema": "5J4TDW3H4J427",
+      "schema": "8WAZV39SD724T",
       "tags": {},
-      "value": "078KT0M8N554S",
+      "value": "6KZ930XYK2MHB",
     },
   ],
 }
@@ -81,14 +81,14 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
 
 exports[`Phase 3: Variable System 3.4 var list prefix filters by prefix 1`] = `
 {
-  "type": "3XAAW976C1KT8",
+  "type": "E8158M25YNR9M",
   "value": [
     {
       "labels": [],
       "name": "myapp/config",
-      "schema": "5J4TDW3H4J427",
+      "schema": "8WAZV39SD724T",
       "tags": {},
-      "value": "078KT0M8N554S",
+      "value": "6KZ930XYK2MHB",
     },
   ],
 }
@@ -96,48 +96,48 @@ exports[`Phase 3: Variable System 3.4 var list prefix filters by prefix 1`] = `
 
 exports[`Phase 3: Variable System 3.5 var set upsert updates existing variable 1`] = `
 {
-  "type": "E88C2CKY90ERT",
+  "type": "5KVHSESSX7N96",
   "value": {
     "labels": [],
     "name": "myapp/config",
-    "schema": "5J4TDW3H4J427",
+    "schema": "8WAZV39SD724T",
     "tags": {},
-    "value": "0S3E6H68VK328",
+    "value": "AE80669JYG4K2",
   },
 }
 `;
 
 exports[`Phase 3: Variable System 3.6 var tag adds kv tag and label 1`] = `
 {
-  "type": "92GB8QS47S7HS",
+  "type": "2WX4XRYSACRWR",
   "value": {
     "labels": [
       "important",
     ],
     "name": "myapp/config",
-    "schema": "5J4TDW3H4J427",
+    "schema": "8WAZV39SD724T",
     "tags": {
       "env": "prod",
     },
-    "value": "078KT0M8N554S",
+    "value": "6KZ930XYK2MHB",
   },
 }
 `;
 
 exports[`Phase 3: Variable System 3.7 var list --tag env:prod filters by kv tag 1`] = `
 {
-  "type": "3XAAW976C1KT8",
+  "type": "E8158M25YNR9M",
   "value": [
     {
       "labels": [
         "important",
       ],
       "name": "myapp/config",
-      "schema": "5J4TDW3H4J427",
+      "schema": "8WAZV39SD724T",
       "tags": {
         "env": "prod",
       },
-      "value": "078KT0M8N554S",
+      "value": "6KZ930XYK2MHB",
     },
   ],
 }
@@ -145,18 +145,18 @@ exports[`Phase 3: Variable System 3.7 var list --tag env:prod filters by kv tag 
 
 exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 1`] = `
 {
-  "type": "3XAAW976C1KT8",
+  "type": "E8158M25YNR9M",
   "value": [
     {
       "labels": [
         "important",
       ],
       "name": "myapp/config",
-      "schema": "5J4TDW3H4J427",
+      "schema": "8WAZV39SD724T",
       "tags": {
         "env": "prod",
       },
-      "value": "078KT0M8N554S",
+      "value": "6KZ930XYK2MHB",
     },
   ],
 }
@@ -164,62 +164,62 @@ exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 
 
 exports[`Phase 3: Variable System 3.9 var tag remove deletes label 1`] = `
 {
-  "type": "92GB8QS47S7HS",
+  "type": "2WX4XRYSACRWR",
   "value": {
     "labels": [],
     "name": "myapp/config",
-    "schema": "5J4TDW3H4J427",
+    "schema": "8WAZV39SD724T",
     "tags": {
       "env": "prod",
     },
-    "value": "078KT0M8N554S",
+    "value": "6KZ930XYK2MHB",
   },
 }
 `;
 
 exports[`Phase 3: Variable System 3.10 var delete removes variable 1`] = `
 {
-  "type": "EV9W9HDVK7WX2",
+  "type": "F89626QEK09YY",
   "value": [
     {
       "labels": [],
       "name": "myapp/config",
-      "schema": "5J4TDW3H4J427",
+      "schema": "8WAZV39SD724T",
       "tags": {
         "env": "prod",
       },
-      "value": "078KT0M8N554S",
+      "value": "6KZ930XYK2MHB",
     },
   ],
 }
 `;
 
-exports[`Phase 3: Variable System 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=myapp/config, schema=5J4TDW3H4J427"`;
+exports[`Phase 3: Variable System 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=myapp/config, schema=8WAZV39SD724T"`;
 
 exports[`Phase 4: Template System 4.1 template set registers template 1`] = `
 {
-  "type": "FTZ3B2BN1H3SA",
+  "type": "A8RGY9B1JSCDJ",
   "value": {
-    "contentHash": "0MNS832R7RZSV",
-    "schemaHash": "5J4TDW3H4J427",
+    "contentHash": "0359SHMP7VBFD",
+    "schemaHash": "8WAZV39SD724T",
   },
 }
 `;
 
 exports[`Phase 4: Template System 4.2 template get returns template text 1`] = `
 {
-  "type": "EZ034E7H0JWFV",
+  "type": "64FP3TWKK69YH",
   "value": "Name: {{ payload.name }}, Age: {{ payload.age }}",
 }
 `;
 
 exports[`Phase 4: Template System 4.3 template list shows registered templates 1`] = `
 {
-  "type": "DCVZJFMSKBGJV",
+  "type": "BE20H482GBNM3",
   "value": [
     {
-      "contentHash": "0MNS832R7RZSV",
-      "schemaHash": "5J4TDW3H4J427",
+      "contentHash": "0359SHMP7VBFD",
+      "schemaHash": "8WAZV39SD724T",
     },
   ],
 }
@@ -227,14 +227,14 @@ exports[`Phase 4: Template System 4.3 template list shows registered templates 1
 
 exports[`Phase 4: Template System 4.4 template delete removes template 1`] = `
 {
-  "type": "3RKA4H2KVF0TF",
+  "type": "0FXB2GS8Y9R1R",
   "value": {
     "deleted": true,
   },
 }
 `;
 
-exports[`Phase 4: Template System 4.5 template get deleted template returns not found 1`] = `"Error: Template not found for schema: 5J4TDW3H4J427"`;
+exports[`Phase 4: Template System 4.5 template get deleted template returns not found 1`] = `"Error: Template not found for schema: 8WAZV39SD724T"`;
 
 exports[`Phase 5: Render 5.1 render fills payload variables 1`] = `"Hello Alice!"`;
 

@@ -72,7 +72,6 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
     expect(properties).not.toHaveProperty("$ref");
     expect(properties).not.toHaveProperty("$id");
     expect(properties).not.toHaveProperty("$defs");
-    expect(properties).not.toHaveProperty("not");
 
     // P2 keywords should be present
     expect(properties).toHaveProperty("allOf");
@@ -85,6 +84,16 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
     expect(properties).toHaveProperty("minProperties");
     expect(properties).toHaveProperty("maxProperties");
     expect(properties).toHaveProperty("default");
+
+    // P3 keywords should be present
+    expect(properties).toHaveProperty("not");
+    expect(properties).toHaveProperty("contains");
+    expect(properties).toHaveProperty("propertyNames");
+    expect(properties).toHaveProperty("examples");
+    expect(properties).toHaveProperty("readOnly");
+    expect(properties).toHaveProperty("writeOnly");
+    expect(properties).toHaveProperty("deprecated");
+    expect(properties).toHaveProperty("$comment");
   });
 
   test("1.5: Meta-schema node type equals its own hash", async () => {

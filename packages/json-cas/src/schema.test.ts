@@ -663,4 +663,91 @@ describe("bootstrap meta-schema self-reference", () => {
     const refList = refs(store, node);
     expect(refList).toContain(targetHash);
   });
+
+  // ── P3 combinators, propertyNames, and metadata ──────────────────────────
+
+  test("accepts schema with not", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      not: { type: "string" },
+    });
+    expect(hash).toHaveLength(13);
+
+    const good = await store.put(hash, 42);
+    expect(validate(store, store.get(good) as CasNode)).toBe(true);
+
+    const bad = await store.put(hash, "hello");
+    expect(validate(store, store.get(bad) as CasNode)).toBe(false);
+  });
+
+  test("accepts schema with contains", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      type: "array",
+      contains: { type: "number", minimum: 10 },
+    });
+    expect(hash).toHaveLength(13);
+
+    const good = await store.put(hash, [1, 2, 15]);
+    expect(validate(store, store.get(good) as CasNode)).toBe(true);
+
+    const bad = await store.put(hash, [1, 2, 3]);
+    expect(validate(store, store.get(bad) as CasNode)).toBe(false);
+  });
+
+  test("accepts schema with propertyNames", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      type: "object",
+      propertyNames: { pattern: "^[a-z]+$" },
+    });
+    expect(hash).toHaveLength(13);
+
+    const good = await store.put(hash, { foo: 1, bar: 2 });
+    expect(validate(store, store.get(good) as CasNode)).toBe(true);
+
+    const bad = await store.put(hash, { Foo: 1 });
+    expect(validate(store, store.get(bad) as CasNode)).toBe(false);
+  });
+
+  test("accepts schema with metadata keywords", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      type: "string",
+      examples: ["hello", "world"],
+      readOnly: true,
+      deprecated: false,
+      $comment: "This is a test schema",
+    });
+    expect(hash).toHaveLength(13);
+  });
+
+  test("rejects invalid P3 keyword types", async () => {
+    const store = createMemoryStore();
+    await expect(
+      putSchema(store, { not: "not-object" } as never),
+    ).rejects.toThrow();
+    await expect(
+      putSchema(store, { examples: "not-array" } as never),
+    ).rejects.toThrow();
+    await expect(
+      putSchema(store, { readOnly: "yes" } as never),
+    ).rejects.toThrow();
+    await expect(putSchema(store, { $comment: 42 } as never)).rejects.toThrow();
+  });
+
+  test("collectRefs traverses contains", async () => {
+    const store = createMemoryStore();
+    const innerSchema = await putSchema(store, { type: "string" });
+    const schema = await putSchema(store, {
+      type: "array",
+      contains: { type: "string", format: "cas_ref" },
+    });
+
+    const targetHash = await store.put(innerSchema, "hello");
+    const nodeHash = await store.put(schema, [targetHash, "not-a-ref"]);
+    const node = store.get(nodeHash) as CasNode;
+    const refList = refs(store, node);
+    expect(refList).toContain(targetHash);
+  });
 });
