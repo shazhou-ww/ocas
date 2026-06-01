@@ -28,7 +28,10 @@ beforeAll(async () => {
   const { openStore: openFsStore } = await import("@uncaged/json-cas-fs");
   const { putSchema } = await import("@uncaged/json-cas");
   const store = await openFsStore(tmpStore);
-  typeHash = await putSchema(store, JSON.parse(readFileSync(schemaFile, "utf-8")));
+  typeHash = await putSchema(
+    store,
+    JSON.parse(readFileSync(schemaFile, "utf-8")),
+  );
 
   const nodeFile = join(tmpStore, "test-node.json");
   writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
@@ -78,7 +81,16 @@ describe("Phase 6: GC", () => {
     expect(gcExit).toBe(0);
 
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, "render", "--pipe"],
+      [
+        "bun",
+        entrypoint,
+        "--store",
+        tmpStore,
+        "--var-db",
+        varDbPath,
+        "render",
+        "--pipe",
+      ],
       { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
     );
     proc.stdin.write(gcOut);

@@ -264,7 +264,7 @@ describe("bootstrap", () => {
     );
   });
 
-  test("returns a map with 24 built-in schema aliases", async () => {
+  test("returns a map with 26 built-in schema aliases", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
@@ -281,7 +281,7 @@ describe("bootstrap", () => {
       expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
     }
 
-    expect(Object.keys(builtinSchemas)).toHaveLength(24);
+    expect(Object.keys(builtinSchemas)).toHaveLength(26);
   });
 
   test("meta-schema node is stored and retrievable", async () => {
@@ -318,7 +318,7 @@ describe("bootstrap", () => {
     const h2 = await bootstrap(store);
 
     expect(h1).toEqual(h2);
-    // All 24 built-in schemas should be typed by the meta-schema
-    expect(store.listByType(h1["@schema"] ?? "")).toHaveLength(24);
+    // All 26 built-in schemas should be typed by the meta-schema
+    expect(store.listByType(h1["@schema"] ?? "")).toHaveLength(26);
   });
 });

@@ -579,12 +579,25 @@ describe("Phase 2: Schema Validation", () => {
     const { openStore: openFsStore } = await import("@uncaged/json-cas-fs");
     const { putSchema } = await import("@uncaged/json-cas");
     const store = await openFsStore(tmpStore);
-    typeHash = await putSchema(store, JSON.parse(readFileSync(schemaFile, "utf-8")));
+    typeHash = await putSchema(
+      store,
+      JSON.parse(readFileSync(schemaFile, "utf-8")),
+    );
 
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, "put", typeHash, nodeFile],
+      [
+        "bun",
+        entrypoint,
+        "--store",
+        tmpStore,
+        "--var-db",
+        varDbPath,
+        "put",
+        typeHash,
+        nodeFile,
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     await proc.exited;
@@ -600,7 +613,17 @@ describe("Phase 2: Schema Validation", () => {
     const badFile = join(tmpStore, "bad-node.json");
     writeFileSync(badFile, JSON.stringify({ name: 123 }));
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, "put", typeHash, badFile],
+      [
+        "bun",
+        entrypoint,
+        "--store",
+        tmpStore,
+        "--var-db",
+        varDbPath,
+        "put",
+        typeHash,
+        badFile,
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;
@@ -615,7 +638,17 @@ describe("Phase 2: Schema Validation", () => {
   test("2.3 put against non-existent schema hash fails", async () => {
     const nodeFile = join(tmpStore, "test-node.json");
     const proc = Bun.spawn(
-      ["bun", entrypoint, "--store", tmpStore, "--var-db", varDbPath, "put", "AAAAAAAAAAAAA", nodeFile],
+      [
+        "bun",
+        entrypoint,
+        "--store",
+        tmpStore,
+        "--var-db",
+        varDbPath,
+        "put",
+        "AAAAAAAAAAAAA",
+        nodeFile,
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;

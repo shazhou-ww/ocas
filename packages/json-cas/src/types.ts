@@ -25,5 +25,7 @@ export type Store = {
   has(hash: Hash): boolean;
   listByType(typeHash: Hash): Hash[];
   listAll(): Hash[];
+  listMeta(): Hash[];
+  listSchemas(): Hash[];
   delete(hash: Hash): void;
 };

@@ -75,7 +75,10 @@ describe("Phase 7: Edge Cases", () => {
     const { openStore: openFsStore } = await import("@uncaged/json-cas-fs");
     const { putSchema } = await import("@uncaged/json-cas");
     const store = await openFsStore(tmpStore);
-    typeHash = await putSchema(store, JSON.parse(readFileSync(schemaFile, "utf-8")));
+    typeHash = await putSchema(
+      store,
+      JSON.parse(readFileSync(schemaFile, "utf-8")),
+    );
 
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
@@ -191,7 +194,10 @@ describe("Phase 3: Variable System", () => {
     const { openStore: openFsStore } = await import("@uncaged/json-cas-fs");
     const { putSchema } = await import("@uncaged/json-cas");
     const store = await openFsStore(tmpStore);
-    typeHash = await putSchema(store, JSON.parse(readFileSync(schemaFile, "utf-8")));
+    typeHash = await putSchema(
+      store,
+      JSON.parse(readFileSync(schemaFile, "utf-8")),
+    );
 
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
@@ -377,7 +383,10 @@ describe("Phase 4: Template System", () => {
     const { openStore: openFsStore } = await import("@uncaged/json-cas-fs");
     const { putSchema } = await import("@uncaged/json-cas");
     const store = await openFsStore(tmpStore);
-    typeHash = await putSchema(store, JSON.parse(readFileSync(schemaFile, "utf-8")));
+    typeHash = await putSchema(
+      store,
+      JSON.parse(readFileSync(schemaFile, "utf-8")),
+    );
   });
 
   afterAll(() => {

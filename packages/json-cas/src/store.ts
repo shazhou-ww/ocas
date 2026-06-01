@@ -8,6 +8,7 @@ import type { CasNode, Hash } from "./types.js";
 export function createMemoryStore(): BootstrapCapableStore {
   const data = new Map<Hash, CasNode>();
   const byType = new Map<Hash, Set<Hash>>();
+  const metaSet = new Set<Hash>();
 
   function indexHash(type: Hash, hash: Hash): void {
     let set = byType.get(type);
@@ -24,6 +25,7 @@ export function createMemoryStore(): BootstrapCapableStore {
       data.set(hash, { type: hash, payload, timestamp: Date.now() });
       indexHash(hash, hash);
     }
+    metaSet.add(hash);
     return hash;
   }
 
@@ -56,6 +58,22 @@ export function createMemoryStore(): BootstrapCapableStore {
       return Array.from(data.keys());
     },
 
+    listMeta(): Hash[] {
+      return Array.from(metaSet);
+    },
+
+    listSchemas(): Hash[] {
+      const result = new Set<Hash>();
+      for (const meta of metaSet) {
+        result.add(meta);
+        const set = byType.get(meta);
+        if (set) {
+          for (const h of set) result.add(h);
+        }
+      }
+      return Array.from(result);
+    },
+
     delete(hash: Hash): void {
       const node = data.get(hash);
       if (node) {
@@ -68,6 +86,7 @@ export function createMemoryStore(): BootstrapCapableStore {
             byType.delete(node.type);
           }
         }
+        metaSet.delete(hash);
       }
     },
 

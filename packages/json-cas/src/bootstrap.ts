@@ -173,6 +173,22 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
+    "@output/list-meta",
+    {
+      type: "array",
+      items: { type: "string", format: "cas_ref" },
+      title: "ucas list-meta result",
+    },
+  ],
+  [
+    "@output/list-schema",
+    {
+      type: "array",
+      items: { type: "string", format: "cas_ref" },
+      title: "ucas list-schema result",
+    },
+  ],
+  [
     "@output/var-set",
     {
       type: "object",

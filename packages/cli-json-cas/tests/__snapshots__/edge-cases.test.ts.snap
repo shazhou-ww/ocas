@@ -24,6 +24,8 @@ Commands:
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
   list --type <hash-or-alias>       List hashes for a type (value=string[])            (@output/list)
+  list-meta                         List meta-schema hashes (value=string[])           (@output/list-meta)
+  list-schema                       List all schema hashes (value=string[])            (@output/list-schema)
   var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@output/var-set)
   var get <name> --schema <hash>    Get a variable by name + schema                    (@output/var-get)
   var delete <name> [--schema <hash>] Delete variable(s)                               (@output/var-delete)
