@@ -71,6 +71,28 @@ const BOOTSTRAP_PAYLOAD = {
     minItems: { type: "number" },
     maxItems: { type: "number" },
     uniqueItems: { type: "boolean" },
+    // P2 combinators + conditionals
+    allOf: {
+      type: "array",
+      items: { type: "object", additionalProperties: false },
+    },
+    if: { type: "object", additionalProperties: false },
+    // biome-ignore lint/suspicious/noThenProperty: JSON Schema keyword, not a thenable
+    then: { type: "object", additionalProperties: false },
+    else: { type: "object", additionalProperties: false },
+    patternProperties: {
+      type: "object",
+      additionalProperties: { type: "object", additionalProperties: false },
+    },
+    prefixItems: {
+      type: "array",
+      items: { type: "object", additionalProperties: false },
+    },
+    // P2 leaf constraints
+    multipleOf: { type: "number" },
+    minProperties: { type: "number" },
+    maxProperties: { type: "number" },
+    default: {},
   },
 } as const;
 

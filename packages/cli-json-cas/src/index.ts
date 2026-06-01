@@ -219,7 +219,7 @@ async function cmdPut(args: string[]): Promise<void> {
     try {
       const hash = await putSchema(store, payload as Record<string, unknown>);
       out(await wrapEnvelope(store, "@output/put", hash));
-    } catch (e) {
+    } catch (_e) {
       console.error(
         `Validation failed: payload in ${file} does not match schema ${typeHash}`,
       );

@@ -46,6 +46,18 @@ const ALLOWED_SCHEMA_KEYS = new Set([
   "minItems",
   "maxItems",
   "uniqueItems",
+  // P2 combinators + conditionals (need collectRefs)
+  "allOf",
+  "if",
+  "then",
+  "else",
+  "patternProperties",
+  "prefixItems",
+  // P2 leaf constraints
+  "multipleOf",
+  "minProperties",
+  "maxProperties",
+  "default",
 ]);
 
 const JSON_SCHEMA_TYPES = new Set([
@@ -160,6 +172,44 @@ function isValidSchema(value: unknown): boolean {
   if ("uniqueItems" in schema && typeof schema.uniqueItems !== "boolean")
     return false;
 
+  // P2 combinators + conditionals — recursive sub-schema checks
+  if ("allOf" in schema) {
+    if (!Array.isArray(schema.allOf) || schema.allOf.length === 0) return false;
+    for (const entry of schema.allOf) {
+      if (!isValidSchema(entry)) return false;
+    }
+  }
+
+  if ("if" in schema && !isValidSchema(schema.if)) return false;
+  if ("then" in schema && !isValidSchema(schema.then)) return false;
+  if ("else" in schema && !isValidSchema(schema.else)) return false;
+
+  if ("patternProperties" in schema) {
+    const pp = schema.patternProperties;
+    if (pp === null || typeof pp !== "object" || Array.isArray(pp))
+      return false;
+    for (const nested of Object.values(pp as Record<string, unknown>)) {
+      if (!isValidSchema(nested)) return false;
+    }
+  }
+
+  if ("prefixItems" in schema) {
+    if (!Array.isArray(schema.prefixItems) || schema.prefixItems.length === 0)
+      return false;
+    for (const entry of schema.prefixItems) {
+      if (!isValidSchema(entry)) return false;
+    }
+  }
+
+  // P2 leaf constraints — type checks only
+  if ("multipleOf" in schema && typeof schema.multipleOf !== "number")
+    return false;
+  if ("minProperties" in schema && typeof schema.minProperties !== "number")
+    return false;
+  if ("maxProperties" in schema && typeof schema.maxProperties !== "number")
+    return false;
+  // "default" accepts any value — no type check needed
+
   return true;
 }
 
@@ -217,8 +267,9 @@ export function validate(store: Store, node: CasNode): boolean {
 
 /**
  * Recursively collect values of all properties whose schema has format: 'cas_ref'.
- * Handles: direct format, anyOf (nullable refs), items (array refs),
- * properties (nested objects), and additionalProperties (record refs).
+ * Handles: direct format, anyOf/allOf (combinators), oneOf, if/then/else (conditionals),
+ * items + prefixItems (arrays), properties (nested objects),
+ * additionalProperties (record refs), and patternProperties (regex-keyed refs).
  */
 export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
   const result: Hash[] = [];
@@ -237,10 +288,45 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
     return result;
   }
 
-  if (schema.type === "array" && schema.items && Array.isArray(value)) {
-    const itemSchema = schema.items as JSONSchema;
-    for (const item of value as unknown[]) {
-      result.push(...collectRefs(itemSchema, item));
+  // P2: allOf — each sub-schema applies to the same value
+  if (Array.isArray(schema.allOf)) {
+    for (const sub of schema.allOf as JSONSchema[]) {
+      result.push(...collectRefs(sub, value));
+    }
+  }
+
+  // P2: if/then/else — conditional sub-schemas apply to the same value
+  if (schema.if && typeof schema.if === "object") {
+    result.push(...collectRefs(schema.if as JSONSchema, value));
+  }
+  if (schema.then && typeof schema.then === "object") {
+    result.push(...collectRefs(schema.then as JSONSchema, value));
+  }
+  if (schema.else && typeof schema.else === "object") {
+    result.push(...collectRefs(schema.else as JSONSchema, value));
+  }
+
+  if (schema.type === "array" && Array.isArray(value)) {
+    // P2: prefixItems — tuple validation, each item has its own schema
+    if (Array.isArray(schema.prefixItems)) {
+      const tupleSchemas = schema.prefixItems as JSONSchema[];
+      const arr = value as unknown[];
+      for (let i = 0; i < tupleSchemas.length && i < arr.length; i++) {
+        const ts = tupleSchemas[i];
+        if (ts) result.push(...collectRefs(ts, arr[i]));
+      }
+    }
+
+    if (schema.items) {
+      const itemSchema = schema.items as JSONSchema;
+      // When prefixItems exists, items applies only to remaining elements
+      const startIdx = Array.isArray(schema.prefixItems)
+        ? (schema.prefixItems as unknown[]).length
+        : 0;
+      const arr = value as unknown[];
+      for (let i = startIdx; i < arr.length; i++) {
+        result.push(...collectRefs(itemSchema, arr[i]));
+      }
     }
     return result;
   }
@@ -262,6 +348,23 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
       const obj = value as Record<string, unknown>;
       for (const val of Object.values(obj)) {
         result.push(...collectRefs(addlSchema, val));
+      }
+    }
+
+    // P2: patternProperties — regex-keyed property schemas
+    if (
+      schema.patternProperties &&
+      typeof schema.patternProperties === "object"
+    ) {
+      const pp = schema.patternProperties as Record<string, JSONSchema>;
+      const obj = value as Record<string, unknown>;
+      for (const [pat, subSchema] of Object.entries(pp)) {
+        const re = new RegExp(pat);
+        for (const [key, val] of Object.entries(obj)) {
+          if (re.test(key)) {
+            result.push(...collectRefs(subSchema, val));
+          }
+        }
       }
     }
   }
