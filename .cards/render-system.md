@@ -63,4 +63,5 @@ At each level, `resolution *= decay`. When resolution drops below epsilon, refer
 
 - **`ocas render <hash>`** — render a stored node by hash, expanding ocas_ref references
 - **`ocas render -p`** — read a `{ type, value }` envelope from stdin and render it
+- **`ocas <any-command> -r`** — inline render shortcut; any command with `-r` / `--render` automatically pipes its envelope output through the renderer, equivalent to `| ocas render -p`
 - **`renderDirect(type, value, store, options)`** — in-memory render without requiring the data to be stored (used internally for CLI output)

@@ -25,7 +25,7 @@ type Variable = {
 };
 ```
 
-The primary key is `(name, schema)` — the same name can point to nodes of different types.
+The primary key is `(name, schema)` — the same name can point to nodes of different types. When using `var set`, the schema is automatically inferred from the node the hash points to, so you don't need to specify it explicitly.
 
 ## Operations
 

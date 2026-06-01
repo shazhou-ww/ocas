@@ -68,6 +68,8 @@ ocas render --pipe/-p [options]
 | `--pipe`, `-p` | Read from stdin (`put`/`hash`: raw JSON; `render`: envelope) |
 | `--schema <hash>` | Schema filter for var commands |
 | `--tag <expr>` | Tag/label operations (repeatable) |
+| `--render`, `-r` | Render output inline (equivalent to piping to `ocas render -p`) |
+| `--inline <text>` | Inline text content for `template set` |
 | `--format tree` | Tree display for `walk` |
 
 ## Type Aliases
