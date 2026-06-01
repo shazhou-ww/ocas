@@ -1,0 +1,24 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `
+{
+  "type": "BZ31JDDWX2AWH",
+  "value": "ok",
+}
+`;
+
+exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `
+"{
+  "type": "DG8SAB75PV9P7",
+  "value": []
+}"
+`;
+
+exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `
+"{
+  "type": "EVHG7Q7FK83H0",
+  "value": [
+    "6KZ930XYK2MHB"
+  ]
+}"
+`;

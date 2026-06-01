@@ -1,0 +1,5 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Phase 5: Render 5.1 render fills payload variables 1`] = `"Hello Alice!"`;
+
+exports[`Phase 5: Render 5.2 render --resolution with different value 1`] = `"Hello Alice!"`;

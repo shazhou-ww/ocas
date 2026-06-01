@@ -21,7 +21,7 @@ beforeEach(() => {
   );
   storePath = join(testDir, "store");
   varDbPath = join(testDir, "variables.db");
-  cliPath = join(import.meta.dir, "index.ts");
+  cliPath = join(import.meta.dir, "../src/index.ts");
 
   mkdirSync(testDir, { recursive: true });
   mkdirSync(storePath, { recursive: true });
