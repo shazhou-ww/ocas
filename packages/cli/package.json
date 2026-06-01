@@ -1,6 +1,6 @@
 {
   "name": "@ocas/cli",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "type": "module",
   "bin": {
     "ocas": "src/index.ts"
@@ -10,7 +10,7 @@
     "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
-    "@ocas/core": "workspace:*",
-    "@ocas/fs": "workspace:*"
+    "@ocas/core": "0.1.0-alpha.1",
+    "@ocas/fs": "0.1.0-alpha.1"
   }
 }
