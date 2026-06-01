@@ -5,6 +5,7 @@ export { cborEncode } from "./cbor.js";
 export { type GcStats, gc } from "./gc.js";
 export { computeHash, computeSelfHash } from "./hash.js";
 export { renderWithTemplate } from "./liquid-render.js";
+export { applyListOptions, casListEntry } from "./list-utils.js";
 export { registerOutputTemplates } from "./output-templates.js";
 export {
   type RenderOptions,
@@ -22,7 +23,15 @@ export {
   walk,
 } from "./schema.js";
 export { createMemoryStore } from "./store.js";
-export type { CasNode, Hash, Store } from "./types.js";
+export {
+  type CasNode,
+  DEFAULT_LIST_LIMIT,
+  type Hash,
+  type ListEntry,
+  type ListOptions,
+  type ListSort,
+  type Store,
+} from "./types.js";
 export type { Variable } from "./variable.js";
 export {
   CasNodeNotFoundError,

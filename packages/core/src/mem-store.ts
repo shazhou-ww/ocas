@@ -1,7 +1,7 @@
 import type { BootstrapCapableStore } from "./bootstrap-capable.js";
 import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import { createMemoryStore } from "./store.js";
-import type { CasNode, Hash } from "./types.js";
+import type { CasNode, Hash, ListEntry, ListOptions } from "./types.js";
 
 /** In-memory store wrapper used by schema validation tests. */
 export class MemStore implements BootstrapCapableStore {
@@ -23,20 +23,20 @@ export class MemStore implements BootstrapCapableStore {
     return this.#inner.has(hash);
   }
 
-  listByType(typeHash: Hash): Hash[] {
-    return this.#inner.listByType(typeHash);
+  listByType(typeHash: Hash, options?: ListOptions): ListEntry[] {
+    return this.#inner.listByType(typeHash, options);
   }
 
   listAll(): Hash[] {
     return this.#inner.listAll();
   }
 
-  listMeta(): Hash[] {
-    return this.#inner.listMeta();
+  listMeta(options?: ListOptions): ListEntry[] {
+    return this.#inner.listMeta(options);
   }
 
-  listSchemas(): Hash[] {
-    return this.#inner.listSchemas();
+  listSchemas(options?: ListOptions): ListEntry[] {
+    return this.#inner.listSchemas(options);
   }
 
   delete(hash: Hash): void {

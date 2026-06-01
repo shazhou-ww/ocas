@@ -17,8 +17,9 @@ export interface GcStats {
  * - Schema preservation: schemas of reachable nodes are also marked
  */
 export function gc(store: Store, varStore: VariableStore): GcStats {
-  // Get all variables (no filters → global)
-  const variables = varStore.list();
+  // Get all variables (no filters → global). Pass a very large limit so the
+  // API-level default of 100 does not silently truncate gc roots.
+  const variables = varStore.list({ limit: Number.MAX_SAFE_INTEGER });
   const scanned = variables.length;
 
   // Collect unique root hashes from all variables

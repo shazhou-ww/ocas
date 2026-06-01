@@ -13,8 +13,8 @@ describe("createMemoryStore – meta and schema indexes", () => {
     const store = createMemoryStore();
     const hash = await store[BOOTSTRAP_STORE]({ type: "object" });
 
-    expect(store.listMeta()).toContain(hash);
-    expect(store.listSchemas()).toContain(hash);
+    expect(store.listMeta().map((e) => e.hash)).toContain(hash);
+    expect(store.listSchemas().map((e) => e.hash)).toContain(hash);
   });
 
   test("B3. regular put does not add hash to metaSet", async () => {
@@ -22,8 +22,8 @@ describe("createMemoryStore – meta and schema indexes", () => {
     const metaHash = await store[BOOTSTRAP_STORE]({ type: "object" });
     const schemaHash = await store.put(metaHash, { type: "string" });
 
-    expect(store.listMeta()).not.toContain(schemaHash);
-    expect(store.listMeta()).toContain(metaHash);
+    expect(store.listMeta().map((e) => e.hash)).not.toContain(schemaHash);
+    expect(store.listMeta().map((e) => e.hash)).toContain(metaHash);
   });
 
   test("B4. schema typed by meta-schema appears in listSchemas", async () => {
@@ -31,11 +31,11 @@ describe("createMemoryStore – meta and schema indexes", () => {
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     const s = await store.put(m, { type: "string" });
 
-    const schemas = store.listSchemas();
+    const schemas = store.listSchemas().map((e) => e.hash);
     expect(schemas).toContain(m);
     expect(schemas).toContain(s);
 
-    const meta = store.listMeta();
+    const meta = store.listMeta().map((e) => e.hash);
     expect(meta).toContain(m);
     expect(meta).not.toContain(s);
   });
@@ -47,12 +47,12 @@ describe("createMemoryStore – meta and schema indexes", () => {
     const s1 = await store.put(m1, { type: "string" });
     const s2 = await store.put(m2, { type: "number" });
 
-    const meta = store.listMeta();
+    const meta = store.listMeta().map((e) => e.hash);
     expect(meta).toContain(m1);
     expect(meta).toContain(m2);
     expect(meta).toHaveLength(2);
 
-    const schemas = store.listSchemas();
+    const schemas = store.listSchemas().map((e) => e.hash);
     expect(schemas).toContain(m1);
     expect(schemas).toContain(m2);
     expect(schemas).toContain(s1);
@@ -66,7 +66,7 @@ describe("createMemoryStore – meta and schema indexes", () => {
     const h2 = await store[BOOTSTRAP_STORE](payload);
     expect(h1).toBe(h2);
 
-    const meta = store.listMeta();
+    const meta = store.listMeta().map((e) => e.hash);
     const occurrences = meta.filter((h) => h === h1).length;
     expect(occurrences).toBe(1);
   });
@@ -76,14 +76,14 @@ describe("createMemoryStore – meta and schema indexes", () => {
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     const s = await store.put(m, { type: "string" });
 
-    expect(store.listMeta()).toContain(m);
-    expect(store.listSchemas()).toContain(s);
+    expect(store.listMeta().map((e) => e.hash)).toContain(m);
+    expect(store.listSchemas().map((e) => e.hash)).toContain(s);
 
     store.delete(m);
 
-    expect(store.listMeta()).not.toContain(m);
+    expect(store.listMeta().map((e) => e.hash)).not.toContain(m);
     // schemas typed by deleted meta no longer surface
-    expect(store.listSchemas()).not.toContain(s);
-    expect(store.listSchemas()).not.toContain(m);
+    expect(store.listSchemas().map((e) => e.hash)).not.toContain(s);
+    expect(store.listSchemas().map((e) => e.hash)).not.toContain(m);
   });
 });
