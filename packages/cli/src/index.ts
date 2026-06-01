@@ -89,7 +89,9 @@ const { flags, positional } = parseArgs(process.argv.slice(2));
 
 const defaultStorePath = join(homedir(), ".ocas");
 const storePath =
-  typeof flags.store === "string" ? flags.store : defaultStorePath;
+  typeof flags.store === "string"
+    ? flags.store
+    : (process.env["OCAS_HOME"] ?? defaultStorePath);
 const compact = flags.json === true;
 
 const defaultVarDbPath = join(storePath, "variables.db");
@@ -878,7 +880,7 @@ Commands:
   gc                                Run garbage collection                             (@ocas/output/gc)
 
 Flags:
-  --store <path>      Store directory (default: ~/.ocas)
+  --store <path>      Store directory (default: $OCAS_HOME or ~/.ocas)
   --var-db <path>     Variable database path (default: <store>/variables.db)
   --json              Compact JSON output
   --schema <hash>     Schema hash filter for var get/delete/tag/list

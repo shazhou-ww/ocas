@@ -386,7 +386,7 @@ describe("openStore – async with auto-bootstrap", () => {
     expect(store.has(builtinSchemas["@ocas/number"] as string)).toBe(true);
     expect(store.has(builtinSchemas["@ocas/object"] as string)).toBe(true);
     expect(store.has(builtinSchemas["@ocas/array"] as string)).toBe(true);
-    expect(store.has(builtinSchemas["@bool"] as string)).toBe(true);
+    expect(store.has(builtinSchemas["@ocas/bool"] as string)).toBe(true);
     expect(store.has(builtinSchemas["@ocas/schema"] as string)).toBe(true);
   });
 

@@ -207,7 +207,7 @@ describe("createMemoryStore – listByType", () => {
     expect(allTypedByMeta).toContain(builtinSchemas["@ocas/number"] ?? "");
     expect(allTypedByMeta).toContain(builtinSchemas["@ocas/object"] ?? "");
     expect(allTypedByMeta).toContain(builtinSchemas["@ocas/array"] ?? "");
-    expect(allTypedByMeta).toContain(builtinSchemas["@bool"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@ocas/bool"] ?? "");
   });
 });
 
@@ -273,7 +273,7 @@ describe("bootstrap", () => {
     expect(builtinSchemas).toHaveProperty("@ocas/number");
     expect(builtinSchemas).toHaveProperty("@ocas/object");
     expect(builtinSchemas).toHaveProperty("@ocas/array");
-    expect(builtinSchemas).toHaveProperty("@bool");
+    expect(builtinSchemas).toHaveProperty("@ocas/bool");
 
     // All values should be valid hashes
     for (const hash of Object.values(builtinSchemas)) {

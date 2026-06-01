@@ -42,7 +42,7 @@ describe("bootstrap - Built-in Schemas", () => {
     expect(builtinSchemas).toHaveProperty("@ocas/number");
     expect(builtinSchemas).toHaveProperty("@ocas/object");
     expect(builtinSchemas).toHaveProperty("@ocas/array");
-    expect(builtinSchemas).toHaveProperty("@bool");
+    expect(builtinSchemas).toHaveProperty("@ocas/bool");
 
     for (const alias of OUTPUT_ALIASES) {
       expect(builtinSchemas).toHaveProperty(alias);
@@ -114,12 +114,12 @@ describe("bootstrap - Built-in Schemas", () => {
     expect(arraySchema).toEqual({ type: "array" });
   });
 
-  test("should register @bool schema correctly", async () => {
+  test("should register @ocas/bool schema correctly", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
-    const boolHash = builtinSchemas["@bool"];
-    if (!boolHash) throw new Error("@bool not found");
+    const boolHash = builtinSchemas["@ocas/bool"];
+    if (!boolHash) throw new Error("@ocas/bool not found");
 
     const boolSchema = getSchema(store, boolHash);
     expect(boolSchema).toEqual({ type: "boolean" });
@@ -137,7 +137,7 @@ describe("bootstrap - Built-in Schemas", () => {
     expect(first["@ocas/number"]).toBe(second["@ocas/number"]);
     expect(first["@ocas/object"]).toBe(second["@ocas/object"]);
     expect(first["@ocas/array"]).toBe(second["@ocas/array"]);
-    expect(first["@bool"]).toBe(second["@bool"]);
+    expect(first["@ocas/bool"]).toBe(second["@ocas/bool"]);
     expect(first["@ocas/schema"]).toBe(second["@ocas/schema"]);
   });
 

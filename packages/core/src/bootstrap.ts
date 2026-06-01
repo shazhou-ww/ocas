@@ -308,7 +308,7 @@ export async function bootstrap(store: Store): Promise<Record<string, Hash>> {
     "@ocas/number": numberHash,
     "@ocas/object": objectHash,
     "@ocas/array": arrayHash,
-    "@bool": boolHash,
+    "@ocas/bool": boolHash,
   };
 
   for (const [alias, schema] of OUTPUT_SCHEMAS) {
