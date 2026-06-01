@@ -91,7 +91,7 @@ describe("Phase 8: Pipe Composition", () => {
     ]);
     expect(putExit).toBe(0);
 
-    // The put envelope value is a cas_ref hash; render -p dereferences it and
+    // The put envelope value is a ocas_ref hash; render -p dereferences it and
     // renders the stored node's payload.
     const { stdout, exitCode } = await runCliWithStdin(
       ["render", "--pipe"],
@@ -102,7 +102,11 @@ describe("Phase 8: Pipe Composition", () => {
   });
 
   test("8.3 list --type @schema emits a parseable envelope of hashes", async () => {
-    const { stdout, exitCode } = await runCli(["list", "--type", "@schema"]);
+    const { stdout, exitCode } = await runCli([
+      "list",
+      "--type",
+      "@ocas/schema",
+    ]);
     expect(exitCode).toBe(0);
 
     // Downstream consumers (jq, etc.) read the `value` array of hashes.
@@ -114,8 +118,12 @@ describe("Phase 8: Pipe Composition", () => {
   });
 
   test("8.4 list --type @schema | render -p expands the schema list", async () => {
-    const { stdout: listOut } = await runCli(["list", "--type", "@schema"]);
-    // list result items are cas_ref hashes; render -p dereferences each one
+    const { stdout: listOut } = await runCli([
+      "list",
+      "--type",
+      "@ocas/schema",
+    ]);
+    // list result items are ocas_ref hashes; render -p dereferences each one
     // and renders the schema contents.
     const { stdout, exitCode } = await runCliWithStdin(
       ["render", "--pipe"],

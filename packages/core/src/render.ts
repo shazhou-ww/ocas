@@ -112,7 +112,7 @@ export async function renderAsync(
 /**
  * Render a value directly (in-memory) without requiring it to be stored.
  * Accepts a raw { type, value } pair. Store is optional and read-only —
- * used only for schema lookup and expanding nested cas_ref references.
+ * used only for schema lookup and expanding nested ocas_ref references.
  * No data is written to the store.
  */
 export function renderDirect(
@@ -123,7 +123,7 @@ export function renderDirect(
 ): string {
   const { resolution, decay, epsilon } = validateAndExtractOptions(options);
 
-  // Try to get schema from store to identify cas_ref fields
+  // Try to get schema from store to identify ocas_ref fields
   let refSet = new Set<Hash>();
   if (store !== null) {
     const schema = getSchema(store, typeHash);
@@ -197,7 +197,7 @@ function renderNode(
   // Calculate child resolution for next level
   const childResolution = currentResolution * decay;
 
-  // Render the payload with recursive expansion of cas_ref fields
+  // Render the payload with recursive expansion of ocas_ref fields
   const rendered = renderValue(
     store,
     node.payload,
@@ -229,7 +229,7 @@ function renderValue(
 
   // Handle primitives
   if (typeof value === "string") {
-    // Check if this string is a cas_ref
+    // Check if this string is a ocas_ref
     if (refHashes.has(value as Hash)) {
       // Recursively render the referenced node
       return renderNode(

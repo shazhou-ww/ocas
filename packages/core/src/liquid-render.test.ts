@@ -78,7 +78,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         type: "object",
         properties: {
           name: { type: "string" },
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, {
@@ -124,7 +124,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         properties: {
           level: { type: "number" },
           child: {
-            anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+            anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
           },
         },
       });
@@ -181,8 +181,8 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          left: { type: "string", format: "cas_ref" },
-          right: { type: "string", format: "cas_ref" },
+          left: { type: "string", format: "ocas_ref" },
+          right: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, {
@@ -228,7 +228,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         properties: {
           name: { type: "string" },
           child: {
-            anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+            anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
           },
         },
       });
@@ -268,7 +268,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         type: "object",
         properties: {
           name: { type: "string" },
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const nodeHash = await store.put(nodeSchema, {
@@ -311,7 +311,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -680,7 +680,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -727,7 +727,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -774,7 +774,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -818,7 +818,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
         properties: {
           level: { type: "number" },
           next: {
-            anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+            anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
           },
         },
       });
@@ -865,7 +865,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
         properties: {
           name: { type: "string" },
           ref: {
-            anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+            anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
           },
         },
       });
@@ -893,7 +893,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
     }
   });
 
-  test("6.3 Array of cas_ref with Template", async () => {
+  test("6.3 Array of ocas_ref with Template", async () => {
     const { store, varStore, cleanup } = await createTempVarStore();
 
     try {
@@ -912,7 +912,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
         properties: {
           items: {
             type: "array",
-            items: { type: "string", format: "cas_ref" },
+            items: { type: "string", format: "ocas_ref" },
           },
         },
       });
@@ -998,7 +998,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -1038,7 +1038,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -1078,7 +1078,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -1118,7 +1118,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       const parentSchema = await putSchema(store, {
         type: "object",
         properties: {
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, { child: childHash });
@@ -1206,7 +1206,7 @@ describe("Suite 8: Performance & Scalability", () => {
         properties: {
           items: {
             type: "array",
-            items: { type: "string", format: "cas_ref" },
+            items: { type: "string", format: "ocas_ref" },
           },
         },
       });
@@ -1748,7 +1748,7 @@ describe("Suite 10: Context Variable Completeness", () => {
         type: "object",
         properties: {
           name: { type: "string" },
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, {
@@ -1808,7 +1808,7 @@ describe("Suite 10: Context Variable Completeness", () => {
         type: "object",
         properties: {
           custom: { type: "string" },
-          child: { type: "string", format: "cas_ref" },
+          child: { type: "string", format: "ocas_ref" },
         },
       });
       const parentHash = await store.put(parentSchema, {

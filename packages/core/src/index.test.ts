@@ -198,15 +198,15 @@ describe("createMemoryStore – listByType", () => {
   test("bootstrap node is listed under its self type", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
-    const hash = builtinSchemas["@schema"] ?? "";
+    const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     // All built-in schemas should be typed by the meta-schema
     const allTypedByMeta = store.listByType(hash);
     expect(allTypedByMeta).toContain(hash); // meta-schema itself
-    expect(allTypedByMeta).toContain(builtinSchemas["@string"] ?? "");
-    expect(allTypedByMeta).toContain(builtinSchemas["@number"] ?? "");
-    expect(allTypedByMeta).toContain(builtinSchemas["@object"] ?? "");
-    expect(allTypedByMeta).toContain(builtinSchemas["@array"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@ocas/string"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@ocas/number"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@ocas/object"] ?? "");
+    expect(allTypedByMeta).toContain(builtinSchemas["@ocas/array"] ?? "");
     expect(allTypedByMeta).toContain(builtinSchemas["@bool"] ?? "");
   });
 });
@@ -268,11 +268,11 @@ describe("bootstrap", () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
-    expect(builtinSchemas).toHaveProperty("@schema");
-    expect(builtinSchemas).toHaveProperty("@string");
-    expect(builtinSchemas).toHaveProperty("@number");
-    expect(builtinSchemas).toHaveProperty("@object");
-    expect(builtinSchemas).toHaveProperty("@array");
+    expect(builtinSchemas).toHaveProperty("@ocas/schema");
+    expect(builtinSchemas).toHaveProperty("@ocas/string");
+    expect(builtinSchemas).toHaveProperty("@ocas/number");
+    expect(builtinSchemas).toHaveProperty("@ocas/object");
+    expect(builtinSchemas).toHaveProperty("@ocas/array");
     expect(builtinSchemas).toHaveProperty("@bool");
 
     // All values should be valid hashes
@@ -287,7 +287,7 @@ describe("bootstrap", () => {
   test("meta-schema node is stored and retrievable", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
 
     expect(store.has(metaHash)).toBe(true);
     const node = store.get(metaHash);
@@ -297,7 +297,7 @@ describe("bootstrap", () => {
   test("meta-schema node is self-referencing: type === hash", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const node = store.get(metaHash) as CasNode;
 
     expect(node.type).toBe(metaHash);
@@ -306,7 +306,7 @@ describe("bootstrap", () => {
   test("bootstrap node passes verify()", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const node = store.get(metaHash) as CasNode;
 
     expect(await verify(metaHash, node)).toBe(true);
@@ -319,6 +319,6 @@ describe("bootstrap", () => {
 
     expect(h1).toEqual(h2);
     // All 26 built-in schemas should be typed by the meta-schema
-    expect(store.listByType(h1["@schema"] ?? "")).toHaveLength(26);
+    expect(store.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(26);
   });
 });

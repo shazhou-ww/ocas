@@ -142,7 +142,7 @@ describe("Issue #50: Schema Validation in put", () => {
         writeFileSync(payloadFile, JSON.stringify("hello world"));
 
         const { exitCode, stdout } = await runCli(
-          ["put", "@string", payloadFile],
+          ["put", "@ocas/string", payloadFile],
           tmpStore,
         );
 
@@ -422,25 +422,25 @@ describe("Issue #50: Schema Validation in put", () => {
       }
     });
 
-    test("T4.2: Validation respects cas_ref format in schemas", async () => {
+    test("T4.2: Validation respects ocas_ref format in schemas", async () => {
       const tmpStore = mkdtempSync(join(tmpdir(), "ocas-test-"));
       try {
         await runCli(["init"], tmpStore);
 
-        // Schema with cas_ref format
+        // Schema with ocas_ref format
         const schemaFile = join(tmpStore, "schema.json");
         writeFileSync(
           schemaFile,
           JSON.stringify({
             type: "object",
             properties: {
-              ref: { type: "string", format: "cas_ref" },
+              ref: { type: "string", format: "ocas_ref" },
             },
           }),
         );
         const schemaHash = await putSchemaFile(tmpStore, schemaFile);
 
-        // Valid cas_ref
+        // Valid ocas_ref
         const validFile = join(tmpStore, "valid.json");
         writeFileSync(validFile, JSON.stringify({ ref: "0000000000000" }));
 
@@ -450,7 +450,7 @@ describe("Issue #50: Schema Validation in put", () => {
         );
         expect(validExitCode).toBe(0);
 
-        // Invalid cas_ref (wrong length)
+        // Invalid ocas_ref (wrong length)
         const invalidFile = join(tmpStore, "invalid.json");
         writeFileSync(invalidFile, JSON.stringify({ ref: "short" }));
 

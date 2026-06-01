@@ -2,7 +2,7 @@ import { bootstrap } from "./bootstrap.js";
 import type { Hash, Store } from "./types.js";
 
 /**
- * Resolve a schema alias (e.g. "@output/put") to its hash via bootstrap,
+ * Resolve a schema alias (e.g. "@ocas/output/put") to its hash via bootstrap,
  * then return a typed envelope ready for store.put() or direct rendering.
  */
 export async function wrapEnvelope(

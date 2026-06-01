@@ -94,7 +94,7 @@ describe("Suite 2: Resolution Decay Model", () => {
       type: "object",
       properties: {
         title: { type: "string" },
-        child: { type: "string", format: "cas_ref" },
+        child: { type: "string", format: "ocas_ref" },
       },
     });
     const parentHash = await store.put(parentSchema, {
@@ -123,7 +123,7 @@ describe("Suite 2: Resolution Decay Model", () => {
       properties: {
         value: { type: "number" },
         next: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -159,7 +159,7 @@ describe("Suite 2: Resolution Decay Model", () => {
       properties: {
         level: { type: "number" },
         child: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -197,7 +197,7 @@ describe("Suite 2: Resolution Decay Model", () => {
       properties: {
         level: { type: "number" },
         next: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -232,7 +232,7 @@ describe("Suite 2: Resolution Decay Model", () => {
       properties: {
         level: { type: "number" },
         next: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -281,7 +281,7 @@ describe("Suite 3: Complex Graph Structures", () => {
       properties: {
         items: {
           type: "array",
-          items: { type: "string", format: "cas_ref" },
+          items: { type: "string", format: "ocas_ref" },
         },
       },
     });
@@ -300,7 +300,7 @@ describe("Suite 3: Complex Graph Structures", () => {
     expect(output).toContain("item3");
   });
 
-  test("3.2 Object with Multiple cas_ref Fields", async () => {
+  test("3.2 Object with Multiple ocas_ref Fields", async () => {
     const store = createMemoryStore();
     await bootstrap(store);
 
@@ -317,8 +317,8 @@ describe("Suite 3: Complex Graph Structures", () => {
     const parentSchema = await putSchema(store, {
       type: "object",
       properties: {
-        left: { type: "string", format: "cas_ref" },
-        right: { type: "string", format: "cas_ref" },
+        left: { type: "string", format: "ocas_ref" },
+        right: { type: "string", format: "ocas_ref" },
         data: { type: "string" },
       },
     });
@@ -348,7 +348,7 @@ describe("Suite 3: Complex Graph Structures", () => {
       properties: {
         name: { type: "string" },
         ref: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -387,7 +387,7 @@ describe("Suite 3: Complex Graph Structures", () => {
       type: "object",
       properties: {
         name: { type: "string" },
-        child: { type: "string", format: "cas_ref" },
+        child: { type: "string", format: "ocas_ref" },
       },
     });
     const branchA = await store.put(branchSchema, {
@@ -402,8 +402,8 @@ describe("Suite 3: Complex Graph Structures", () => {
     const rootSchema = await putSchema(store, {
       type: "object",
       properties: {
-        left: { type: "string", format: "cas_ref" },
-        right: { type: "string", format: "cas_ref" },
+        left: { type: "string", format: "ocas_ref" },
+        right: { type: "string", format: "ocas_ref" },
       },
     });
     const rootHash = await store.put(rootSchema, {
@@ -431,10 +431,10 @@ describe("Suite 3: Complex Graph Structures", () => {
       properties: {
         value: { type: "number" },
         left: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
         right: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -502,7 +502,7 @@ describe("Suite 4: Epsilon Boundary Cases", () => {
       properties: {
         level: { type: "number" },
         next: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -537,7 +537,7 @@ describe("Suite 4: Epsilon Boundary Cases", () => {
       properties: {
         level: { type: "number" },
         next: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -639,7 +639,7 @@ describe("Suite 5: YAML Output Format", () => {
     const parentSchema = await putSchema(store, {
       type: "object",
       properties: {
-        child: { type: "string", format: "cas_ref" },
+        child: { type: "string", format: "ocas_ref" },
       },
     });
     const parentHash = await store.put(parentSchema, { child: childHash });
@@ -673,7 +673,7 @@ describe("Suite 5: YAML Output Format", () => {
       type: "object",
       properties: {
         ref: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -686,7 +686,7 @@ describe("Suite 5: YAML Output Format", () => {
 });
 
 describe("Suite 6: Schema Integration", () => {
-  test("6.1 Detect cas_ref Fields via Schema", async () => {
+  test("6.1 Detect ocas_ref Fields via Schema", async () => {
     const store = createMemoryStore();
     await bootstrap(store);
 
@@ -701,7 +701,7 @@ describe("Suite 6: Schema Integration", () => {
     const parentSchema = await putSchema(store, {
       type: "object",
       properties: {
-        link: { type: "string", format: "cas_ref" },
+        link: { type: "string", format: "ocas_ref" },
       },
     });
     const parentHash = await store.put(parentSchema, { link: childHash });
@@ -715,7 +715,7 @@ describe("Suite 6: Schema Integration", () => {
     expect(output).toContain("child");
   });
 
-  test("6.2 Non-cas_ref String Not Expanded", async () => {
+  test("6.2 Non-ocas_ref String Not Expanded", async () => {
     const store = createMemoryStore();
     await bootstrap(store);
     const objSchema = await putSchema(store, {
@@ -733,7 +733,7 @@ describe("Suite 6: Schema Integration", () => {
     expect(output).not.toMatch(/cas:[0-9A-HJKMNP-TV-Z]{13}/);
   });
 
-  test("6.3 Array of cas_ref", async () => {
+  test("6.3 Array of ocas_ref", async () => {
     const store = createMemoryStore();
     await bootstrap(store);
 
@@ -748,7 +748,7 @@ describe("Suite 6: Schema Integration", () => {
 
     const arraySchema = await putSchema(store, {
       type: "array",
-      items: { type: "string", format: "cas_ref" },
+      items: { type: "string", format: "ocas_ref" },
     });
     const arrayHash = await store.put(arraySchema, [item1, item2]);
 
@@ -762,7 +762,7 @@ describe("Suite 6: Schema Integration", () => {
     expect(output).toContain("item2");
   });
 
-  test("6.4 anyOf with cas_ref (Nullable Reference)", async () => {
+  test("6.4 anyOf with ocas_ref (Nullable Reference)", async () => {
     const store = createMemoryStore();
     await bootstrap(store);
 
@@ -778,7 +778,7 @@ describe("Suite 6: Schema Integration", () => {
       type: "object",
       properties: {
         ref: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -796,7 +796,7 @@ describe("Suite 6: Schema Integration", () => {
   test("6.5 Schema-less Node (Bootstrap Node)", async () => {
     const store = createMemoryStore();
     const types = await bootstrap(store);
-    const schemaHash = types["@schema"];
+    const schemaHash = types["@ocas/schema"];
 
     const output = render(store, schemaHash);
 
@@ -813,7 +813,7 @@ describe("Suite 7: Error Handling", () => {
     const parentSchema = await putSchema(store, {
       type: "object",
       properties: {
-        child: { type: "string", format: "cas_ref" },
+        child: { type: "string", format: "ocas_ref" },
       },
     });
     const fakeChildHash = "ZZZZZZZZZZZZZ" as Hash;
@@ -895,7 +895,7 @@ describe("Suite 8: Performance & Edge Cases", () => {
 
     const parentSchema = await putSchema(store, {
       type: "array",
-      items: { type: "string", format: "cas_ref" },
+      items: { type: "string", format: "ocas_ref" },
     });
     const parentHash = await store.put(parentSchema, children);
 
@@ -984,7 +984,7 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
     expect(output).toContain("active: true");
   });
 
-  test("9.5 Render with store expands cas_ref fields", async () => {
+  test("9.5 Render with store expands ocas_ref fields", async () => {
     const store = createMemoryStore();
     await bootstrap(store);
 
@@ -995,15 +995,15 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
     });
     const childHash = await store.put(childSchema, { msg: "inner" });
 
-    // Parent schema with cas_ref
+    // Parent schema with ocas_ref
     const parentSchema = await putSchema(store, {
       type: "object",
       properties: {
-        child: { type: "string", format: "cas_ref" },
+        child: { type: "string", format: "ocas_ref" },
       },
     });
 
-    // Render directly with store — cas_ref should expand
+    // Render directly with store — ocas_ref should expand
     const output = renderDirect(
       parentSchema,
       { child: childHash },
@@ -1041,8 +1041,8 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
     expect(output.trim()).toBe("null");
   });
 
-  test("9.9 cas_ref without store renders as cas: reference", () => {
-    // Without store, can't identify cas_ref fields — hash strings stay as strings
+  test("9.9 ocas_ref without store renders as cas: reference", () => {
+    // Without store, can't identify ocas_ref fields — hash strings stay as strings
     const fakeTypeHash = "0000000000000" as Hash;
     const someHash = "ABCDEFGH12345" as Hash;
     const output = renderDirect(fakeTypeHash, { ref: someHash }, null, null);
@@ -1099,7 +1099,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
       type: "object",
       properties: {
         title: { type: "string" },
-        child: { type: "string", format: "cas_ref" },
+        child: { type: "string", format: "ocas_ref" },
       },
     });
 
@@ -1124,7 +1124,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
       properties: {
         level: { type: "number" },
         next: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });

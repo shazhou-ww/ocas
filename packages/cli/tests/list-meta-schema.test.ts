@@ -21,7 +21,7 @@ describe("list-meta CLI command", () => {
   test("E1. list-meta on bootstrapped store contains exactly the meta-schema hash", async () => {
     // First, get @schema hash by calling has on it (also triggers bootstrap)
     const { stdout: hashOut, exitCode: hashCode } = await runCli(
-      ["hash", "@schema", "--pipe"],
+      ["hash", "@ocas/schema", "--pipe"],
       storePath,
     );
     // ensure bootstrap by running a no-op command:
@@ -30,7 +30,7 @@ describe("list-meta CLI command", () => {
 
     // Bootstrap fully via 'list --type @schema'
     const { stdout: schemaListOut } = await runCli(
-      ["list", "--type", "@schema"],
+      ["list", "--type", "@ocas/schema"],
       storePath,
     );
     const schemaList = envValue(schemaListOut) as string[];
@@ -85,11 +85,11 @@ describe("usage help", () => {
 });
 
 describe("F1. output schemas registered", () => {
-  test("@output/list-meta and @output/list-schema schemas exist", async () => {
+  test("@ocas/output/list-meta and @ocas/output/list-schema schemas exist", async () => {
     const { stdout, exitCode } = await runCli(["list-meta"], storePath);
     expect(exitCode).toBe(0);
     const parsed = JSON.parse(stdout) as { type: string };
-    // type hash references the @output/list-meta schema, must be retrievable
+    // type hash references the @ocas/output/list-meta schema, must be retrievable
     const { stdout: getOut, exitCode: getCode } = await runCli(
       ["get", parsed.type],
       storePath,

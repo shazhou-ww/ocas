@@ -16,7 +16,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
   test("1.1: Meta-schema is a valid JSON Schema", async () => {
     const store = new MemStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaNode = store.get(metaHash);
 
     expect(metaNode).not.toBeNull();
@@ -27,7 +27,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
   test("1.2: Meta-schema self-validates", async () => {
     const store = new MemStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaNode = store.get(metaHash);
 
     expect(metaNode).not.toBeNull();
@@ -37,7 +37,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
   test("1.3: Meta-schema defines all supported keywords", async () => {
     const store = new MemStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();
@@ -61,7 +61,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
   test("1.4: Meta-schema does not include unsupported keywords", async () => {
     const store = new MemStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();
@@ -99,7 +99,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
   test("1.5: Meta-schema node type equals its own hash", async () => {
     const store = new MemStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaNode = store.get(metaHash);
 
     expect(metaNode).not.toBeNull();
@@ -199,7 +199,7 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
     await bootstrap(store);
     const hash = await putSchema(store, {
       type: "string",
-      format: "cas_ref",
+      format: "ocas_ref",
     });
     expect(hash).toBeTruthy();
   });
@@ -239,13 +239,13 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
       type: "object",
       required: ["type", "payload"],
       properties: {
-        type: { type: "string", format: "cas_ref" },
+        type: { type: "string", format: "ocas_ref" },
         payload: {
           anyOf: [{ type: "object" }, { type: "null" }],
         },
         refs: {
           type: "array",
-          items: { type: "string", format: "cas_ref" },
+          items: { type: "string", format: "ocas_ref" },
         },
       },
       additionalProperties: false,
@@ -469,7 +469,7 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
     // This is a documentation test - the old hash was different
     const store = new MemStore();
     const builtinSchemas = await bootstrap(store);
-    const newMetaHash = builtinSchemas["@schema"] ?? "";
+    const newMetaHash = builtinSchemas["@ocas/schema"] ?? "";
 
     // The new hash should be different from the old system metadata hash
     // We just verify it's a valid hash format
@@ -555,14 +555,14 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
     expect(validate(store, invalidNode as CasNode)).toBe(false);
   });
 
-  test("6.3: refs() works with validated schemas containing cas_ref", async () => {
+  test("6.3: refs() works with validated schemas containing ocas_ref", async () => {
     const store = new MemStore();
     await bootstrap(store);
 
     const schemaHash = await putSchema(store, {
       type: "object",
       properties: {
-        ref: { type: "string", format: "cas_ref" },
+        ref: { type: "string", format: "ocas_ref" },
       },
     });
 
@@ -581,7 +581,7 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
       type: "object",
       properties: {
         next: {
-          anyOf: [{ type: "string", format: "cas_ref" }, { type: "null" }],
+          anyOf: [{ type: "string", format: "ocas_ref" }, { type: "null" }],
         },
       },
     });
@@ -612,7 +612,7 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
   test("7.1: Meta-schema allows recursive schema definitions", async () => {
     const store = new MemStore();
     const builtinSchemas = await bootstrap(store);
-    const metaHash = builtinSchemas["@schema"] ?? "";
+    const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
     expect(metaSchema).not.toBeNull();
