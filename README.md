@@ -1,10 +1,10 @@
-# ocas
+# OCAS
 
-Self-describing content-addressable storage with JSON Schema typed nodes.
+**Object Content Addressable Store** — self-describing CAS with JSON Schema typed nodes.
 
 ## Overview
 
-ocas is a monorepo for storing and validating JSON data in a content-addressable store (CAS). Each node has a typed payload: its `type` field is the hash of a JSON Schema node that describes the payload shape. Hashes are 13-character Crockford Base32 strings derived from XXH64 over deterministic CBOR encoding.
+OCAS is a monorepo for storing and validating JSON data in a content-addressable store (CAS). Each node has a typed payload: its `type` field is the hash of a JSON Schema node that describes the payload shape. Hashes are 13-character Crockford Base32 strings derived from XXH64 over deterministic CBOR encoding.
 
 A bootstrap meta-schema is stored as a self-referencing seed node (`type === hash`). All other schemas are registered as nodes typed by that meta-schema. Payloads can reference other nodes via `format: "cas_ref"` fields; the library provides traversal, reference extraction, and integrity verification.
 
@@ -13,19 +13,19 @@ Use the in-memory store for tests and embedded apps, the filesystem store for pe
 ## Architecture
 
 ```
-     ┌─────────────────┐
-     │  cli-ocas   │
-     └────────┬────────┘
-              │
-              ▼
-     ┌─────────────────┐
-     │  ocas-fs    │
-     └────────┬────────┘
-              │
-              ▼
-     ┌─────────────────┐
-     │    ocas     │  (core)
-     └─────────────────┘
+  ┌───────────┐
+  │ @ocas/cli │
+  └─────┬─────┘
+        │
+        ▼
+  ┌───────────┐
+  │ @ocas/fs  │
+  └─────┬─────┘
+        │
+        ▼
+  ┌────────────┐
+  │ @ocas/core │
+  └────────────┘
 ```
 
 | Layer | Package | Role |
@@ -38,9 +38,9 @@ Use the in-memory store for tests and embedded apps, the filesystem store for pe
 
 | Package | Description | Type |
 |---------|-------------|------|
-| [`@ocas/core`](packages/ocas/README.md) | Core CAS engine — hashing, schema, store, verify, bootstrap | lib |
-| [`@ocas/fs`](packages/ocas-fs/README.md) | Filesystem-backed CAS store | lib |
-| [`@ocas/cli`](packages/cli-ocas/README.md) | CLI tool (`ocas` binary) | cli |
+| [`@ocas/core`](packages/core/README.md) | Core CAS engine — hashing, schema, store, verify, bootstrap | lib |
+| [`@ocas/fs`](packages/fs/README.md) | Filesystem-backed CAS store | lib |
+| [`@ocas/cli`](packages/cli/README.md) | CLI tool (`ocas` binary) | cli |
 
 ## Quick Start
 
@@ -84,14 +84,15 @@ const store = createFsStore("/path/to/store");
 await bootstrap(store);
 ```
 
-Or use the CLI (see [CLI Reference](#cli-reference) and [`packages/cli-ocas/README.md`](packages/cli-ocas/README.md)).
+Or use the CLI (see [CLI Reference](#cli-reference) and [`packages/cli/README.md`](packages/cli/README.md)).
 
 ## CLI Reference
 
-Binary: `ocas` (from `@ocas/cli`; legacy alias `ocas` is deprecated). Default store:
-`~/.ocas`. The store is auto-created and bootstrapped on first use — there is
-no `init`/`bootstrap` command, and schemas are ordinary `@schema`-typed nodes (`ocas put
-@schema file.json`), so there is no `schema` subcommand.
+Binary: `ocas` (from `@ocas/cli`). Default store: `~/.ocas`.
+
+The store is auto-created and bootstrapped on first use — there is no `init`/`bootstrap`
+command, and schemas are ordinary `@schema`-typed nodes (`ocas put @schema file.json`),
+so there is no `schema` subcommand.
 
 ### Envelope format
 
@@ -165,3 +166,7 @@ bun run release   # changeset version → build → publish to npm (@ocas/*)
 ```
 
 Individual packages block `prepublishOnly` and expect releases via the workspace `release` script.
+
+## License
+
+[MIT](LICENSE)
