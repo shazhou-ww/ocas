@@ -156,31 +156,37 @@ async function readStdinJson(): Promise<unknown> {
 /**
  * Open the filesystem-backed CAS store.
  * Automatically creates directory and bootstraps if needed.
+ * If a varStore is provided, builtin schema aliases are written to it during bootstrap.
  */
-async function openStore(): Promise<Store> {
+async function openStore(varStore?: VariableStore): Promise<Store> {
   const fullPath = resolve(storePath);
-  return await openFsStore(fullPath);
+  return await openFsStore(fullPath, varStore);
 }
 
 async function openVarStore(): Promise<VariableStore> {
   const store = await openStore();
-  return createVariableStore(resolve(varDbPath), store);
+  const varStore = createVariableStore(resolve(varDbPath), store);
+  // Populate varStore with builtin schema aliases (idempotent).
+  await bootstrap(store, varStore);
+  return varStore;
 }
 
 /**
- * Resolve a type-hash, handling @ aliases
- * If the input starts with @, resolve it via bootstrap
- * Otherwise, return the hash as-is
+ * Resolve a type-hash, handling @ aliases via varStore lookup.
  */
 async function resolveTypeHash(typeHashOrAlias: string): Promise<Hash> {
   if (typeHashOrAlias.startsWith("@")) {
-    const store = await openStore();
-    const builtinSchemas = await bootstrap(store);
-    const resolvedHash = builtinSchemas[typeHashOrAlias];
-    if (!resolvedHash) {
-      die(`Schema not found: ${typeHashOrAlias}`);
+    const varStore = await openVarStore();
+    try {
+      const variants = varStore.list({ exactName: typeHashOrAlias });
+      const first = variants[0];
+      if (!first) {
+        die(`Schema not found: ${typeHashOrAlias}`);
+      }
+      return first.value;
+    } finally {
+      varStore.close();
     }
-    return resolvedHash;
   }
   return typeHashOrAlias;
 }
@@ -235,8 +241,7 @@ async function cmdPut(args: string[]): Promise<void> {
 
   // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
   // instead of ajv against meta-schema (which can't express recursive constraints)
-  const builtinSchemas = await bootstrap(store);
-  const metaHash = builtinSchemas["@ocas/schema"];
+  const metaHash = await resolveTypeHash("@ocas/schema");
   if (typeHash === metaHash) {
     try {
       const hash = await putSchema(store, payload as Record<string, unknown>);
@@ -283,7 +288,10 @@ async function cmdHas(args: string[]): Promise<void> {
   const hash = args[0];
   if (!hash) die("Usage: ocas has <hash>");
   const store = await openStore();
-  await out(await wrapEnvelope(store, "@ocas/output/has", store.has(hash)), store);
+  await out(
+    await wrapEnvelope(store, "@ocas/output/has", store.has(hash)),
+    store,
+  );
 }
 
 async function cmdVerify(args: string[]): Promise<void> {
@@ -345,7 +353,10 @@ async function cmdWalk(args: string[]): Promise<void> {
     }
 
     printNode(hash, "", true);
-    await out(await wrapEnvelope(store, "@ocas/output/walk", lines.join("\n")), store);
+    await out(
+      await wrapEnvelope(store, "@ocas/output/walk", lines.join("\n")),
+      store,
+    );
   } else {
     const hashes: Hash[] = [];
     walk(store, hash, (h) => {
@@ -523,7 +534,10 @@ async function cmdVarSet(args: string[]): Promise<void> {
         : undefined;
 
     const variable = varStore.set(name, value, options);
-    await out(await wrapEnvelope(store, "@ocas/output/var-set", variable), store);
+    await out(
+      await wrapEnvelope(store, "@ocas/output/var-set", variable),
+      store,
+    );
   } catch (e) {
     if (
       e instanceof InvalidVariableNameError ||
@@ -554,7 +568,10 @@ async function cmdVarGet(args: string[]): Promise<void> {
     if (variable === null) {
       die(`Error: Variable not found: name=${name}, schema=${schema}`);
     }
-    await out(await wrapEnvelope(store, "@ocas/output/var-get", variable), store);
+    await out(
+      await wrapEnvelope(store, "@ocas/output/var-get", variable),
+      store,
+    );
   } finally {
     varStore.close();
   }
@@ -579,11 +596,17 @@ async function cmdVarDelete(args: string[]): Promise<void> {
     if (schema !== undefined) {
       // Precise deletion: remove specific (name, schema) variant
       const variable = varStore.remove(name, schema);
-      await out(await wrapEnvelope(store, "@ocas/output/var-delete", variable), store);
+      await out(
+        await wrapEnvelope(store, "@ocas/output/var-delete", variable),
+        store,
+      );
     } else {
       // Batch deletion: remove all variants for this name
       const variables = varStore.remove(name);
-      await out(await wrapEnvelope(store, "@ocas/output/var-delete", variables), store);
+      await out(
+        await wrapEnvelope(store, "@ocas/output/var-delete", variables),
+        store,
+      );
     }
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
@@ -620,7 +643,10 @@ async function cmdVarTag(args: string[]): Promise<void> {
       delete: deleteNames.length > 0 ? deleteNames : undefined,
     });
 
-    await out(await wrapEnvelope(store, "@ocas/output/var-tag", variable), store);
+    await out(
+      await wrapEnvelope(store, "@ocas/output/var-tag", variable),
+      store,
+    );
   } catch (e) {
     if (
       e instanceof VariableNotFoundError ||
@@ -663,7 +689,10 @@ async function cmdVarList(args: string[]): Promise<void> {
       tags: Object.keys(tags).length > 0 ? tags : undefined,
       labels: labels.length > 0 ? labels : undefined,
     });
-    await out(await wrapEnvelope(store, "@ocas/output/var-list", variables), store);
+    await out(
+      await wrapEnvelope(store, "@ocas/output/var-list", variables),
+      store,
+    );
   } catch (e) {
     if (e instanceof InvalidVariableNameError) {
       die(`Error: ${e.message}`);
@@ -733,7 +762,8 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
         schemaHash,
         contentHash,
       }),
-      store);
+      store,
+    );
   } catch (e) {
     if (e instanceof CasNodeNotFoundError) {
       die(`Error: ${e.message}`);
@@ -775,7 +805,8 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
         "@ocas/output/template-get",
         node.payload as string,
       ),
-      store);
+      store,
+    );
   } finally {
     varStore.close();
   }
@@ -797,7 +828,10 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
       contentHash: v.value,
     }));
 
-    await out(await wrapEnvelope(store, "@ocas/output/template-list", templates), store);
+    await out(
+      await wrapEnvelope(store, "@ocas/output/template-list", templates),
+      store,
+    );
   } finally {
     varStore.close();
   }
@@ -822,7 +856,8 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
       await wrapEnvelope(store, "@ocas/output/template-delete", {
         deleted: true,
       }),
-      store);
+      store,
+    );
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
       die(`Error: Template not found for schema: ${schemaHash}`);
@@ -864,7 +899,10 @@ async function cmdListMeta(_args: string[]): Promise<void> {
 async function cmdListSchema(_args: string[]): Promise<void> {
   const store = await openStore();
   const hashes = store.listSchemas();
-  await out(await wrapEnvelope(store, "@ocas/output/list-schema", hashes), store);
+  await out(
+    await wrapEnvelope(store, "@ocas/output/list-schema", hashes),
+    store,
+  );
 }
 
 function printUsage(): void {

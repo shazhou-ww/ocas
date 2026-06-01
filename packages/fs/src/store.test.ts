@@ -67,7 +67,7 @@ describe("createFsStore – init and bootstrap", () => {
     const h2 = await bootstrap(store);
 
     expect(h1).toEqual(h2);
-    expect(store.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(26);
+    expect(store.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(28);
   });
 });
 
