@@ -4,7 +4,7 @@ CLI tool for ocas stores.
 
 ## Overview
 
-`@ocas/cli` provides the `ocas` command (also aliased `ocas`) for managing a filesystem-backed store: node CRUD, integrity checks, reference listing, graph walks, variables, and output templates. It uses `@ocas/fs` for persistence and `@ocas/core` for core operations.
+`@ocas/cli` provides the `ocas` command for managing a filesystem-backed store: node CRUD, integrity checks, reference listing, graph walks, variables, and output templates. It uses `@ocas/fs` for persistence and `@ocas/core` for core operations.
 
 The store is **auto-created and bootstrapped** on first use, so there is no `init`/`bootstrap` command. Schemas are ordinary `@schema`-typed nodes — register one with `ocas put @schema file.json` and list them with `ocas list --type @schema`; there is no dedicated `schema` subcommand.
 

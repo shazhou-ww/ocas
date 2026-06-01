@@ -89,7 +89,7 @@ Or use the CLI (see [CLI Reference](#cli-reference) and [`packages/cli-ocas/READ
 ## CLI Reference
 
 Binary: `ocas` (from `@ocas/cli`; legacy alias `ocas` is deprecated). Default store:
-`~/.uncaged/ocas`. The store is auto-created and bootstrapped on first use — there is
+`~/.ocas`. The store is auto-created and bootstrapped on first use — there is
 no `init`/`bootstrap` command, and schemas are ordinary `@schema`-typed nodes (`ocas put
 @schema file.json`), so there is no `schema` subcommand.
 
@@ -127,7 +127,7 @@ Commands (all emit a { type, value } envelope unless noted):
   gc                                Garbage collection                 (@output/gc)
 
 Flags:
-  --store <path>   Store directory (default: ~/.uncaged/ocas)
+  --store <path>   Store directory (default: ~/.ocas)
   --json           Compact JSON output
   --pipe, -p       Read a { type, value } envelope from stdin for render
 ```
