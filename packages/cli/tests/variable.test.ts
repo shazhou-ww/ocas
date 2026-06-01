@@ -347,7 +347,9 @@ describe("var get", () => {
     const { stderr, exitCode } = await runCli("var", "get", "config");
 
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("Usage: ocas var get <name> --schema <hash>");
+    expect(stderr).toContain(
+      "Usage: ocas var get <name> --schema <hash-or-name>",
+    );
   });
 
   test("distinguish variants by schema", async () => {
@@ -454,12 +456,12 @@ describe("var delete", () => {
       "delete",
       "config",
       "--schema",
-      "NONEXISTENT_SCHEMA",
+      "00000000000ZZ",
     );
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      "Error: Variable not found: name=config, schema=NONEXISTENT_SCHEMA",
+      "Error: Variable not found: name=config, schema=00000000000ZZ",
     );
   });
 
@@ -904,7 +906,7 @@ describe("var tag", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      "Usage: ocas var tag <name> --schema <hash> <operations...>",
+      "Usage: ocas var tag <name> --schema <hash-or-name> <operations...>",
     );
   });
 
@@ -922,7 +924,7 @@ describe("var tag", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      "Usage: ocas var tag <name> --schema <hash> <operations...>",
+      "Usage: ocas var tag <name> --schema <hash-or-name> <operations...>",
     );
   });
 });
