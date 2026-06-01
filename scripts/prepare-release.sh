@@ -51,10 +51,6 @@ bunx changeset status
 
 # --- Create release branch ---
 
-echo ""
-read -rp "Proceed with release branch? [y/N] " confirm
-[[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
-
 # Get current version to name the branch
 CURRENT_VERSION=$(python3 -c "import json; print(json.load(open('packages/core/package.json'))['version'])")
 info "Current version: $CURRENT_VERSION"
