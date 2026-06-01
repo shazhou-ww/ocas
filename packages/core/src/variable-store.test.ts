@@ -10,6 +10,7 @@ import type { Variable } from "./variable.js";
 import {
   CasNodeNotFoundError,
   InvalidVariableNameError,
+  MAX_HISTORY,
   SchemaMismatchError,
   TagLabelConflictError,
   VariableNotFoundError,
@@ -1774,5 +1775,158 @@ describe("VariableStore - @ Prefix Variable Names", () => {
     }
 
     varStore.close();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Variable Value History (LRU)
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("VariableStore - History (LRU)", () => {
+  let store: Store;
+  let dbPath: string;
+
+  afterEach(() => {
+    try {
+      unlinkSync(dbPath);
+    } catch {
+      // ignore
+    }
+  });
+
+  test("history() initializes with single entry on create", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const v1 = await store.put(schema, 1);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+    varStore.set("x", v1);
+
+    const hist = varStore.history("x", schema);
+    expect(hist).toEqual([v1]);
+    varStore.close();
+  });
+
+  test("history() pushes new values to position 0", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const v1 = await store.put(schema, 1);
+    const v2 = await store.put(schema, 2);
+    const v3 = await store.put(schema, 3);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+    varStore.set("x", v1);
+    varStore.set("x", v2);
+    varStore.set("x", v3);
+
+    expect(varStore.history("x", schema)).toEqual([v3, v2, v1]);
+    varStore.close();
+  });
+
+  test("set() with same value as current is idempotent (no history change)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const v1 = await store.put(schema, 1);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+    const created = varStore.set("x", v1);
+    const updatedTime = created.updated;
+    await new Promise((r) => setTimeout(r, 5));
+    const second = varStore.set("x", v1);
+
+    expect(second.updated).toBe(updatedTime);
+    expect(varStore.history("x", schema)).toEqual([v1]);
+    varStore.close();
+  });
+
+  test("setting an existing-history value moves it to position 0 (no duplicates)", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const v1 = await store.put(schema, 1);
+    const v2 = await store.put(schema, 2);
+    const v3 = await store.put(schema, 3);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+    varStore.set("x", v1);
+    varStore.set("x", v2);
+    varStore.set("x", v3);
+    // History: [v3, v2, v1]; setting v1 should yield [v1, v3, v2]
+    varStore.set("x", v1);
+
+    expect(varStore.history("x", schema)).toEqual([v1, v3, v2]);
+    varStore.close();
+  });
+
+  test("history is bounded by MAX_HISTORY=10", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const values: string[] = [];
+    for (let i = 0; i < 15; i++) {
+      values.push(await store.put(schema, i));
+    }
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+    for (const v of values) {
+      varStore.set("x", v);
+    }
+
+    const hist = varStore.history("x", schema);
+    expect(hist).toHaveLength(MAX_HISTORY);
+    expect(hist).toEqual(values.slice(-MAX_HISTORY).reverse());
+    varStore.close();
+  });
+
+  test("rollback semantics: re-setting an old value moves it to position 0", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const v1 = await store.put(schema, 1);
+    const v2 = await store.put(schema, 2);
+    const v3 = await store.put(schema, 3);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+    varStore.set("x", v1);
+    varStore.set("x", v2);
+    varStore.set("x", v3);
+    // History: [v3, v2, v1]; rolling back is just calling set() with v1
+    const result = varStore.set("x", v1);
+
+    expect(result.value).toBe(v1);
+    expect(varStore.history("x", schema)).toEqual([v1, v3, v2]);
+    expect((varStore.get("x", schema) as Variable).value).toBe(v1);
+    varStore.close();
+  });
+
+  test("history is cascade-deleted with the variable", async () => {
+    store = createMemoryStore();
+    await bootstrap(store);
+    const schema = await putSchema(store, { type: "number" });
+    const v1 = await store.put(schema, 1);
+    const v2 = await store.put(schema, 2);
+
+    dbPath = tmpDbPath();
+    const varStore = new VariableStore(dbPath, store);
+    varStore.set("x", v1);
+    varStore.set("x", v2);
+    expect(varStore.history("x", schema)).toHaveLength(2);
+
+    varStore.remove("x", schema);
+    expect(varStore.history("x", schema)).toEqual([]);
+    varStore.close();
+  });
+
+  test("MAX_HISTORY equals 10", () => {
+    expect(MAX_HISTORY).toBe(10);
   });
 });

@@ -29,6 +29,7 @@ export {
   createVariableStore,
   InvalidTagFormatError,
   InvalidVariableNameError,
+  MAX_HISTORY,
   SchemaMismatchError,
   TagLabelConflictError,
   VariableNotFoundError,

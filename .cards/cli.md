@@ -45,6 +45,7 @@ ocas var get <name> --schema <hash>
 ocas var delete <name> [--schema <hash>]
 ocas var list [prefix] [--schema <hash>] [--tag ...]
 ocas var tag <name> --schema <hash> <operations...>
+ocas var history <name> [--schema <hash>]
 ```
 
 ### [[Render System|Template & Render]]

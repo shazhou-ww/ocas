@@ -20,6 +20,7 @@ const OUTPUT_ALIASES = [
   "@ocas/output/var-delete",
   "@ocas/output/var-tag",
   "@ocas/output/var-list",
+  "@ocas/output/var-history",
   "@ocas/output/template-set",
   "@ocas/output/template-get",
   "@ocas/output/template-list",
@@ -32,11 +33,11 @@ const OUTPUT_ALIASES = [
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe("bootstrap - Built-in Schemas", () => {
-  test("should return map of 29 built-in schema aliases to hashes", async () => {
+  test("should return map of 30 built-in schema aliases to hashes", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
-    // Should return object with 9 primitive + 20 output aliases = 29
+    // Should return object with 9 primitive + 21 output aliases = 30
     expect(builtinSchemas).toHaveProperty("@ocas/schema");
     expect(builtinSchemas).toHaveProperty("@ocas/string");
     expect(builtinSchemas).toHaveProperty("@ocas/number");
@@ -51,7 +52,7 @@ describe("bootstrap - Built-in Schemas", () => {
       expect(builtinSchemas).toHaveProperty(alias);
     }
 
-    expect(Object.keys(builtinSchemas)).toHaveLength(29);
+    expect(Object.keys(builtinSchemas)).toHaveLength(30);
 
     // All values should be valid hashes
     for (const [_alias, hash] of Object.entries(builtinSchemas)) {

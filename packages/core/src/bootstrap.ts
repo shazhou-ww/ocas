@@ -230,6 +230,21 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
+    "@ocas/output/var-history",
+    {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        schema: { type: "string", format: "ocas_ref" },
+        values: {
+          type: "array",
+          items: { type: "string", format: "ocas_ref" },
+        },
+      },
+      title: "ocas var history result",
+    },
+  ],
+  [
     "@ocas/output/template-set",
     {
       type: "object",

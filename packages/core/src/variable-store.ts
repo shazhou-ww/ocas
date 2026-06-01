@@ -3,6 +3,12 @@ import type { Hash, Store } from "./types.js";
 import type { Variable } from "./variable.js";
 
 /**
+ * Maximum number of historical values retained per (variable_name, variable_schema).
+ * Position 0 is current; positions 1..MAX_HISTORY-1 are previous values (LRU).
+ */
+export const MAX_HISTORY = 10;
+
+/**
  * Custom error types for variable operations
  */
 export class VariableNotFoundError extends Error {
@@ -114,6 +120,18 @@ export class VariableStore {
       CREATE INDEX IF NOT EXISTS idx_var_tag_key ON variable_tags(key);
       CREATE INDEX IF NOT EXISTS idx_var_tag_key_value ON variable_tags(key, value);
       CREATE INDEX IF NOT EXISTS idx_var_label_name ON variable_labels(name);
+
+      CREATE TABLE IF NOT EXISTS variable_history (
+        variable_name TEXT NOT NULL,
+        variable_schema TEXT NOT NULL,
+        value TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        set_at INTEGER NOT NULL,
+        PRIMARY KEY (variable_name, variable_schema, position),
+        FOREIGN KEY (variable_name, variable_schema) REFERENCES variables(name, schema) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_var_history_value ON variable_history(value);
     `);
   }
 
@@ -214,6 +232,97 @@ export class VariableStore {
   }
 
   /**
+   * Manage history for a variable on set().
+   *
+   * Rules:
+   *  - If new value equals current (position 0), no-op (idempotent).
+   *  - If new value already exists in history at position N, remove it; entries
+   *    with position < N shift +1; insert new value at position 0.
+   *  - Otherwise shift all entries +1, insert new at position 0, prune any
+   *    entries at position >= MAX_HISTORY.
+   *
+   * Caller must invoke inside a transaction.
+   * Returns true if history changed (i.e. value differs from current),
+   * false if it was a no-op.
+   */
+  private recordHistory(
+    name: string,
+    schema: Hash,
+    value: Hash,
+    now: number,
+  ): boolean {
+    // Check current value at position 0
+    const currentRow = this.db
+      .prepare(
+        `SELECT value FROM variable_history WHERE variable_name = ? AND variable_schema = ? AND position = 0`,
+      )
+      .get(name, schema) as { value: string } | undefined | null;
+
+    if (currentRow && currentRow.value === value) {
+      // Idempotent: same value as current; do nothing
+      return false;
+    }
+
+    // Find existing position of this value (if any)
+    const existingRow = this.db
+      .prepare(
+        `SELECT position FROM variable_history WHERE variable_name = ? AND variable_schema = ? AND value = ?`,
+      )
+      .get(name, schema, value) as { position: number } | undefined | null;
+
+    if (existingRow) {
+      const existingPos = existingRow.position;
+      // Delete the existing entry first to free its position
+      this.db
+        .prepare(
+          `DELETE FROM variable_history WHERE variable_name = ? AND variable_schema = ? AND position = ?`,
+        )
+        .run(name, schema, existingPos);
+
+      // Shift positions [0, existingPos) up by 1.
+      // Use a temporary offset to avoid PK conflicts during the shift.
+      this.db
+        .prepare(
+          `UPDATE variable_history SET position = position + 1000000 WHERE variable_name = ? AND variable_schema = ? AND position < ?`,
+        )
+        .run(name, schema, existingPos);
+      this.db
+        .prepare(
+          `UPDATE variable_history SET position = position - 1000000 + 1 WHERE variable_name = ? AND variable_schema = ? AND position >= 1000000`,
+        )
+        .run(name, schema);
+    } else {
+      // New value: shift everything +1 (using temp offset to avoid PK conflicts)
+      this.db
+        .prepare(
+          `UPDATE variable_history SET position = position + 1000000 WHERE variable_name = ? AND variable_schema = ?`,
+        )
+        .run(name, schema);
+      this.db
+        .prepare(
+          `UPDATE variable_history SET position = position - 1000000 + 1 WHERE variable_name = ? AND variable_schema = ? AND position >= 1000000`,
+        )
+        .run(name, schema);
+
+      // Prune any entries that ended up at position >= MAX_HISTORY
+      this.db
+        .prepare(
+          `DELETE FROM variable_history WHERE variable_name = ? AND variable_schema = ? AND position >= ?`,
+        )
+        .run(name, schema, MAX_HISTORY);
+    }
+
+    // Insert new value at position 0
+    this.db
+      .prepare(
+        `INSERT INTO variable_history (variable_name, variable_schema, value, position, set_at) VALUES (?, ?, ?, 0, ?)`,
+      )
+      .run(name, schema, value, now);
+
+    return true;
+  }
+
+  /**
    * Set a variable (upsert: create or update)
    */
   set(
@@ -252,14 +361,20 @@ export class VariableStore {
 
       this.db.exec("BEGIN TRANSACTION");
 
+      let changed = false;
       try {
-        // Update value and timestamp
-        const updateStmt = this.db.prepare(`
-          UPDATE variables
-          SET value = ?, updated = ?
-          WHERE name = ? AND schema = ?
-        `);
-        updateStmt.run(value, now, name, schema);
+        // Manage history (also detects idempotent same-value sets)
+        changed = this.recordHistory(name, schema, value, now);
+
+        // Update value and timestamp only if value changed
+        if (changed) {
+          const updateStmt = this.db.prepare(`
+            UPDATE variables
+            SET value = ?, updated = ?
+            WHERE name = ? AND schema = ?
+          `);
+          updateStmt.run(value, now, name, schema);
+        }
 
         // If options provided, update tags/labels
         if (options !== undefined) {
@@ -311,7 +426,7 @@ export class VariableStore {
         schema,
         value,
         created: existing.created,
-        updated: now,
+        updated: changed ? now : existing.updated,
         tags,
         labels: [...labels],
       };
@@ -340,6 +455,13 @@ export class VariableStore {
       `);
 
       stmt.run(name, schema, value, now, now);
+
+      // Initialise history with this value at position 0
+      this.db
+        .prepare(
+          `INSERT INTO variable_history (variable_name, variable_schema, value, position, set_at) VALUES (?, ?, ?, 0, ?)`,
+        )
+        .run(name, schema, value, now);
 
       // Insert tags
       if (tagKeys.length > 0) {
@@ -705,6 +827,20 @@ export class VariableStore {
       throw new VariableNotFoundError(name, schema);
     }
     return updated;
+  }
+
+  /**
+   * Get the value history for a variable, ordered by position.
+   * Index 0 is the current value; subsequent entries are older.
+   * Returns an empty array if the variable does not exist.
+   */
+  history(name: string, schema: Hash): Hash[] {
+    const rows = this.db
+      .prepare(
+        `SELECT value, position FROM variable_history WHERE variable_name = ? AND variable_schema = ? ORDER BY position ASC`,
+      )
+      .all(name, schema) as Array<{ value: string; position: number }>;
+    return rows.map((r) => r.value as Hash);
   }
 
   /**
