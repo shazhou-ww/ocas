@@ -60,6 +60,17 @@ const BOOTSTRAP_PAYLOAD = {
     enum: { type: "array" },
     const: {},
     description: { type: "string" },
+    // P1 leaf constraints
+    minimum: { type: "number" },
+    maximum: { type: "number" },
+    exclusiveMinimum: { type: "number" },
+    exclusiveMaximum: { type: "number" },
+    minLength: { type: "number" },
+    maxLength: { type: "number" },
+    pattern: { type: "string" },
+    minItems: { type: "number" },
+    maxItems: { type: "number" },
+    uniqueItems: { type: "boolean" },
   },
 } as const;
 

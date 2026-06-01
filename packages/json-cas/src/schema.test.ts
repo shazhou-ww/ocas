@@ -388,6 +388,107 @@ describe("bootstrap meta-schema self-reference", () => {
     expect(dataNode.type).not.toBe(metaHash);
   });
 
+  // ── P1 leaf constraints ──────────────────────────────────────────────────
+
+  test("accepts schema with numeric constraints (minimum/maximum)", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      type: "number",
+      minimum: 0,
+      maximum: 100,
+      exclusiveMinimum: -1,
+      exclusiveMaximum: 101,
+    });
+    expect(hash).toHaveLength(13);
+
+    // validate a conforming payload
+    const nodeHash = await store.put(hash, 42);
+    const node = store.get(nodeHash) as CasNode;
+    expect(validate(store, node)).toBe(true);
+
+    // validate a non-conforming payload
+    const badHash = await store.put(hash, 200);
+    const badNode = store.get(badHash) as CasNode;
+    expect(validate(store, badNode)).toBe(false);
+  });
+
+  test("accepts schema with string constraints (minLength/maxLength/pattern)", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      type: "string",
+      minLength: 1,
+      maxLength: 10,
+      pattern: "^[a-z]+$",
+    });
+    expect(hash).toHaveLength(13);
+
+    const goodHash = await store.put(hash, "hello");
+    expect(validate(store, store.get(goodHash) as CasNode)).toBe(true);
+
+    const badHash = await store.put(hash, "HELLO");
+    expect(validate(store, store.get(badHash) as CasNode)).toBe(false);
+  });
+
+  test("accepts schema with array constraints (minItems/maxItems/uniqueItems)", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      type: "array",
+      items: { type: "number" },
+      minItems: 1,
+      maxItems: 3,
+      uniqueItems: true,
+    });
+    expect(hash).toHaveLength(13);
+
+    const goodHash = await store.put(hash, [1, 2, 3]);
+    expect(validate(store, store.get(goodHash) as CasNode)).toBe(true);
+
+    const tooMany = await store.put(hash, [1, 2, 3, 4]);
+    expect(validate(store, store.get(tooMany) as CasNode)).toBe(false);
+
+    const dupes = await store.put(hash, [1, 1]);
+    expect(validate(store, store.get(dupes) as CasNode)).toBe(false);
+  });
+
+  test("rejects schema with wrong constraint types", async () => {
+    const store = createMemoryStore();
+    await expect(
+      putSchema(store, { type: "number", minimum: "zero" } as never),
+    ).rejects.toThrow();
+    await expect(
+      putSchema(store, { type: "string", maxLength: true } as never),
+    ).rejects.toThrow();
+    await expect(
+      putSchema(store, { type: "array", uniqueItems: 1 } as never),
+    ).rejects.toThrow();
+  });
+
+  test("accepts schema with nested property constraints", async () => {
+    const store = createMemoryStore();
+    const hash = await putSchema(store, {
+      type: "object",
+      properties: {
+        name: { type: "string", minLength: 1, maxLength: 50 },
+        age: { type: "number", minimum: 0, maximum: 150 },
+        scores: {
+          type: "array",
+          items: { type: "number" },
+          minItems: 1,
+          uniqueItems: true,
+        },
+      },
+      required: ["name"],
+    });
+    expect(hash).toHaveLength(13);
+
+    const good = await store.put(hash, {
+      name: "Alice",
+      age: 30,
+      scores: [95, 87],
+    });
+    expect(validate(store, store.get(good) as CasNode)).toBe(true);
+  });
+
   test("bootstrap is idempotent across putSchema calls", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
