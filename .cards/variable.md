@@ -50,7 +50,11 @@ Tags and labels share a unified command (`var tag`):
 
 ## Namespace Protection
 
-Variable names starting with `@ocas/` are reserved for internal use (e.g. `@ocas/template/text/<hash>` for [[Render System|template]] storage). The CLI rejects user attempts to write to this namespace.
+Variable names starting with `@ocas/` are reserved for internal use. [[Bootstrap]] writes the builtin schema bindings (`@ocas/schema`, `@ocas/string`, `@ocas/output/*`, …) into the variable store, and `@ocas/template/text/<hash>` is used for [[Render System|template]] storage. The CLI rejects user attempts to write to this namespace.
+
+## Names as Hash Inputs
+
+Every CLI command that takes a hash argument also accepts a variable name. The `resolveHash()` helper checks whether the input matches the 13-char hash format; if not, it queries the variable store by exact name and returns the first match's value. This unifies builtin schema names and user-defined variables under a single resolution path — there is no separate "alias" concept.
 
 ## Role in Garbage Collection
 

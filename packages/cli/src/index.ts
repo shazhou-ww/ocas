@@ -156,7 +156,7 @@ async function readStdinJson(): Promise<unknown> {
 /**
  * Open the filesystem-backed CAS store.
  * Automatically creates directory and bootstraps if needed.
- * If a varStore is provided, builtin schema aliases are written to it during bootstrap.
+ * If a varStore is provided, builtin schema variables are written to it during bootstrap.
  */
 async function openStore(varStore?: VariableStore): Promise<Store> {
   const fullPath = resolve(storePath);
@@ -234,9 +234,9 @@ function parseTagsLabels(args: string[]): {
 
 async function cmdPut(args: string[]): Promise<void> {
   const isPipe = flags.pipe === true || flags.p === true;
-  const typeHashOrAlias = args[0];
+  const typeHashOrName = args[0];
   const file = isPipe ? undefined : args[1];
-  if (!typeHashOrAlias || (!isPipe && !file))
+  if (!typeHashOrName || (!isPipe && !file))
     die(
       "Usage: ocas put <type-hash> <file.json>\n       ocas put <type-hash> --pipe/-p",
     );
@@ -244,7 +244,7 @@ async function cmdPut(args: string[]): Promise<void> {
     die("Cannot use --pipe/-p with a file argument. Use one or the other.");
   const { store, varStore } = await openStoreAndVarStore();
   try {
-    const typeHash = resolveHash(typeHashOrAlias, varStore);
+    const typeHash = resolveHash(typeHashOrName, varStore);
     const payload = isPipe
       ? await readStdinJson()
       : readJsonFile(file as string);
@@ -406,9 +406,9 @@ async function cmdWalk(args: string[]): Promise<void> {
 
 async function cmdHash(args: string[]): Promise<void> {
   const isPipe = flags.pipe === true || flags.p === true;
-  const typeHashOrAlias = args[0];
+  const typeHashOrName = args[0];
   const file = isPipe ? undefined : args[1];
-  if (!typeHashOrAlias || (!isPipe && !file))
+  if (!typeHashOrName || (!isPipe && !file))
     die(
       "Usage: ocas hash <type-hash> <file.json>\n       ocas hash <type-hash> --pipe/-p",
     );
@@ -416,7 +416,7 @@ async function cmdHash(args: string[]): Promise<void> {
     die("Cannot use --pipe/-p with a file argument. Use one or the other.");
   const { store, varStore } = await openStoreAndVarStore();
   try {
-    const typeHash = resolveHash(typeHashOrAlias, varStore);
+    const typeHash = resolveHash(typeHashOrName, varStore);
     const payload = isPipe
       ? await readStdinJson()
       : readJsonFile(file as string);
@@ -619,8 +619,7 @@ async function cmdVarGet(args: string[]): Promise<void> {
     die("Usage: ocas var get <name> --schema <hash-or-name>");
   }
 
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
     const schema = resolveHash(schemaInput, varStore);
@@ -649,8 +648,7 @@ async function cmdVarDelete(args: string[]): Promise<void> {
     die("The @ocas/ namespace is reserved and cannot be modified directly.");
   }
 
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
     if (schemaInput !== undefined) {
@@ -692,8 +690,7 @@ async function cmdVarTag(args: string[]): Promise<void> {
     die("Usage: ocas var tag <name> --schema <hash-or-name> <operations...>");
   }
 
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
     const schema = resolveHash(schemaInput, varStore);
@@ -728,8 +725,7 @@ async function cmdVarList(args: string[]): Promise<void> {
   const schemaInput = flags.schema as string | undefined;
   const tagFlags = flags.tag;
 
-  const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
+  const { store, varStore } = await openStoreAndVarStore();
 
   try {
     const schema =
@@ -950,7 +946,7 @@ async function cmdGc(_args: string[]): Promise<void> {
 async function cmdList(_args: string[]): Promise<void> {
   const typeFlag = flags.type;
   if (typeof typeFlag !== "string")
-    die("Usage: ocas list --type <hash-or-alias>");
+    die("Usage: ocas list --type <hash-or-name>");
   const { store, varStore } = await openStoreAndVarStore();
   try {
     const typeHash = resolveHash(typeFlag, varStore);
@@ -994,7 +990,7 @@ Commands:
   hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
-  list --type <hash-or-alias>       List hashes for a type (value=string[])            (@ocas/output/list)
+  list --type <hash-or-name>        List hashes for a type (value=string[])            (@ocas/output/list)
   list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
   list-schema                       List all schema hashes (value=string[])            (@ocas/output/list-schema)
   var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)

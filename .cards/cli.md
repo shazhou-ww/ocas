@@ -31,7 +31,7 @@ ocas hash <type> <file|--pipe>  # compute hash without storing
 ocas verify <hash>              # check integrity + schema validity
 ocas refs <hash>                # list direct ocas_ref edges
 ocas walk <hash>                # recursive DAG traversal
-ocas list --type <hash|alias>   # list nodes by type
+ocas list --type <hash|name>    # list nodes by type
 ocas list-schema                # list all schema hashes
 ocas list-meta                  # list meta-schema hashes
 ocas gc                         # garbage collection
@@ -72,12 +72,14 @@ ocas render --pipe/-p [options]
 | `--inline <text>` | Inline text content for `template set` |
 | `--format tree` | Tree display for `walk` |
 
-## Type Aliases
+## Variable Names
 
-The CLI resolves `@ocas/*` aliases to hashes automatically:
+The CLI resolves `@ocas/*` variable names to hashes automatically. All commands that accept a hash argument also accept a variable name — `resolveHash()` queries the [[Variable]] store and returns the bound hash:
 
 ```bash
 ocas put @ocas/object data.json    # resolves @ocas/object → hash
 ocas put @ocas/schema schema.json  # auto-routes to putSchema()
 ocas list --type @ocas/schema      # list all schemas
 ```
+
+User-defined variable names work the same way — once `ocas var set myapp/config <hash>` is registered, `ocas get myapp/config` resolves to that hash.

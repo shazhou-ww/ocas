@@ -498,13 +498,14 @@ describe("var list", () => {
     const hash2 = await createTestNode(store, typeHash, { test: "data2" });
     const hash3 = await createTestNode(store, typeHash, { test: "data3" });
 
-    // Create three variables
-    await runCli("var", "set", "a", hash1);
-    await runCli("var", "set", "b", hash2);
-    await runCli("var", "set", "c", hash3);
+    // Create three variables (use a prefix to filter out builtin @ocas/* vars
+    // that bootstrap writes into the varStore)
+    await runCli("var", "set", "test/a", hash1);
+    await runCli("var", "set", "test/b", hash2);
+    await runCli("var", "set", "test/c", hash3);
 
-    // List all
-    const { stdout, exitCode } = await runCli("var", "list");
+    // List all under our prefix
+    const { stdout, exitCode } = await runCli("var", "list", "test/");
 
     expect(exitCode).toBe(0);
 
@@ -538,10 +539,19 @@ describe("var list", () => {
 
   test("filter by schema", async () => {
     const store = createFsStore(storePath);
-    const typeHash1 = await getBootstrapHash(store);
-    const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
+    const bootstrapHash = await getBootstrapHash(store);
+    const typeHash1 = await putSchema(store, {
+      title: "TypeA",
+      type: "object",
+    });
+    const typeHash2 = await putSchema(store, {
+      title: "TypeB",
+      type: "object",
+    });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
+    // bootstrapHash is the meta-schema, used implicitly when bootstrap runs
+    void bootstrapHash;
 
     // Create variables with different schemas
     await runCli("var", "set", "a", hash1);

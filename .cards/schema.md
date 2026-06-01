@@ -51,10 +51,10 @@ When the store sees `ocas_ref`, it knows this field is a graph edge — not just
 
 ## Namespace
 
-Alias names starting with `@ocas/` are reserved for the system. Built-in aliases:
+Variable names starting with `@ocas/` are reserved for the system. Built-in names:
 
 - `@ocas/schema` — the meta-schema (self-referencing)
 - `@ocas/string`, `@ocas/number`, `@ocas/object`, `@ocas/array`, `@ocas/bool` — primitive types
 - `@ocas/output/*` — [[Render System|envelope]] schemas for CLI output
 
-Users define their own schemas freely — the only restriction is the `@ocas/` prefix.
+These names are written to the [[Variable]] store during [[Bootstrap]] and resolve to their hashes via the same lookup that handles user-defined variables. Users define their own schemas freely — the only restriction is the `@ocas/` prefix.

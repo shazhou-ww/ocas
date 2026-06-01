@@ -108,7 +108,7 @@ raw (non-envelope) text.
 ```
 
 ```
-Usage: ocas [--store <path>] [--json] <command> [args]
+Usage: ocas [--home <path>] [--json] <command> [args]
 
 Commands (all emit a { type, value } envelope unless noted):
   put <type-hash> <file.json>       Store node (value = hash)          (@output/put)
@@ -120,7 +120,7 @@ Commands (all emit a { type, value } envelope unless noted):
   hash <type-hash> <file.json>      Compute hash without storing       (@output/hash)
   render <hash> [options]           Render node as text (raw output)
   render --pipe/-p [options]        Render a piped envelope (raw output)
-  list --type <hash-or-alias>       Hashes for a type (value = list)   (@output/list)
+  list --type <hash-or-name>        Hashes for a type (value = list)   (@output/list)
   list-meta                         Meta-schema hashes                 (@output/list-meta)
   list-schema                       All schema hashes                  (@output/list-schema)
   var set|get|delete|tag|list ...   Variable CRUD                      (@output/var-*)
@@ -128,10 +128,18 @@ Commands (all emit a { type, value } envelope unless noted):
   gc                                Garbage collection                 (@output/gc)
 
 Flags:
-  --store <path>   Store directory (default: ~/.ocas)
-  --json           Compact JSON output
-  --pipe, -p       Read a { type, value } envelope from stdin for render
+  --home <path>   Store directory (default: $OCAS_HOME or ~/.ocas)
+  --json          Compact JSON output
+  --pipe, -p      Read a { type, value } envelope from stdin for render
 ```
+
+### Variable names
+
+Any command that takes a hash also accepts a variable name. Builtin schemas
+(`@ocas/schema`, `@ocas/string`, `@ocas/object`, `@ocas/output/*`, …) are
+registered in the variable store during bootstrap; user variables created via
+`ocas var set <name> <hash>` resolve the same way. There is no separate alias
+concept — every name lookup queries the variable store.
 
 ### Pipe examples
 

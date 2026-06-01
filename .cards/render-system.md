@@ -28,7 +28,7 @@ ocas gc | ocas render -p
 ocas list --type @ocas/schema | ocas render -p
 ```
 
-`wrapEnvelope(store, alias, value)` creates an envelope by resolving the alias to its schema hash.
+`wrapEnvelope(store, name, value)` creates an envelope by resolving the variable name to its schema hash.
 
 ## Templates
 
