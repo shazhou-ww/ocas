@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { BOOTSTRAP_STORE } from "@uncaged/json-cas";
+import { openStore as openFsStore } from "@uncaged/json-cas-fs";
 import { envValue, runCli } from "./helpers.js";
 
 let storePath: string;
@@ -109,5 +111,46 @@ describe("F1. output schemas registered", () => {
       payload: { title?: string };
     };
     expect(schNode.payload.title).toBe("ucas list-schema result");
+  });
+});
+
+describe("E4. list-schema vs list --type with multiple meta-schema versions", () => {
+  test("list-schema includes schemas typed by older meta-schemas; list --type @schema does not", async () => {
+    // Set up two distinct meta-schemas via the library
+    const store = await openFsStore(storePath);
+    const m1 = await store[BOOTSTRAP_STORE]({
+      type: "object",
+      title: "meta-v1",
+    });
+    const m2 = await store[BOOTSTRAP_STORE]({
+      type: "object",
+      title: "meta-v2",
+    });
+    // schema typed by older meta M1
+    const sM1 = await store.put(m1, { type: "string" });
+    expect(m1).not.toBe(m2);
+
+    // CLI: list-schema must include sM1
+    const { stdout: lsOut, exitCode: lsCode } = await runCli(
+      ["list-schema"],
+      storePath,
+    );
+    expect(lsCode).toBe(0);
+    const lsValue = envValue(lsOut) as string[];
+    expect(lsValue).toContain(sM1);
+    expect(lsValue).toContain(m1);
+    expect(lsValue).toContain(m2);
+
+    // CLI: list --type <M2 hash> must NOT include sM1
+    const { stdout: ltOut, exitCode: ltCode } = await runCli(
+      ["list", "--type", m2],
+      storePath,
+    );
+    expect(ltCode).toBe(0);
+    const ltValue = envValue(ltOut) as string[];
+    expect(ltValue).not.toContain(sM1);
+
+    // list-schema.value.length > list --type <newest>.value.length
+    expect(lsValue.length).toBeGreaterThan(ltValue.length);
   });
 });
