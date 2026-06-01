@@ -37,6 +37,10 @@ const DEFAULT_TEMPLATES: ReadonlyArray<
     "{% for v in payload %}name: {{ v.name }}\nschema: {{ v.schema }}\nvalue: {{ v.value }}\n{% endfor %}",
   ],
   [
+    "@ocas/output/var-history",
+    "name: {{ payload.name }}\nschema: {{ payload.schema }}\n{% for v in payload.values %}{{ forloop.index0 }}: {{ v }}\n{% endfor %}",
+  ],
+  [
     "@ocas/output/template-set",
     "schemaHash: {{ payload.schemaHash }}\ncontentHash: {{ payload.contentHash }}",
   ],

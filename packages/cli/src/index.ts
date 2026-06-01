@@ -720,6 +720,51 @@ async function cmdVarTag(args: string[]): Promise<void> {
   }
 }
 
+async function cmdVarHistory(args: string[]): Promise<void> {
+  const name = args[0];
+  const schemaInput = flags.schema as string | undefined;
+
+  if (!name) {
+    die("Usage: ocas var history <name> [--schema <hash-or-name>]");
+  }
+
+  const { store, varStore } = await openStoreAndVarStore();
+
+  try {
+    let schema: Hash;
+    if (schemaInput !== undefined) {
+      schema = resolveHash(schemaInput, varStore);
+    } else {
+      const variants = varStore.list({ exactName: name });
+      if (variants.length === 0) {
+        die(`Error: Variable not found: ${name}`);
+      }
+      if (variants.length > 1) {
+        die(
+          `Error: Multiple schema variants for "${name}"; use --schema to disambiguate`,
+        );
+      }
+      schema = (variants[0] as { schema: string }).schema as Hash;
+    }
+
+    const values = varStore.history(name, schema);
+    if (values.length === 0) {
+      die(`Error: Variable not found: name=${name}, schema=${schema}`);
+    }
+
+    await out(
+      await wrapEnvelope(store, "@ocas/output/var-history", {
+        name,
+        schema,
+        values,
+      }),
+      store,
+    );
+  } finally {
+    varStore.close();
+  }
+}
+
 async function cmdVarList(args: string[]): Promise<void> {
   const namePrefix = args[0] ?? "";
   const schemaInput = flags.schema as string | undefined;
@@ -998,6 +1043,7 @@ Commands:
   var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
   var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
   var tag <name> --schema <hash> <operations...> Modify tags/labels                    (@ocas/output/var-tag)
+  var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
   template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
   template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
   template list                     List all templates                                 (@ocas/output/template-list)
@@ -1089,6 +1135,9 @@ switch (cmd) {
         break;
       case "list":
         await cmdVarList(subRest);
+        break;
+      case "history":
+        await cmdVarHistory(subRest);
         break;
       default:
         die(`Unknown var subcommand: ${sub ?? "(none)"}`);

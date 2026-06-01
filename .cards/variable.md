@@ -56,6 +56,17 @@ Variable names starting with `@ocas/` are reserved for internal use. [[Bootstrap
 
 Every CLI command that takes a hash argument also accepts a variable name. The `resolveHash()` helper checks whether the input matches the 13-char hash format; if not, it queries the variable store by exact name and returns the first match's value. This unifies builtin schema names and user-defined variables under a single resolution path — there is no separate "alias" concept.
 
+## Value History
+
+Every variable tracks its last `MAX_HISTORY` (default 10) values with LRU rotation:
+
+- **set()** appends to history: if the new value already exists in history, it rotates to position 0; otherwise it's inserted at 0 and the oldest entry beyond MAX_HISTORY is evicted.
+- **Idempotent**: setting the same value as the current (position 0) is a no-op — important for [[Bootstrap]] which calls set() repeatedly.
+
+```bash
+ocas var history <name> [--schema <hash-or-name>]   # show history, [0] = current
+```
+
 ## Role in Garbage Collection
 
 Variables are the **roots** of [[Garbage Collection]]. Any node reachable from a variable's value hash (via [[Schema|ocas_ref]] edges) is kept alive; unreachable nodes are swept.
