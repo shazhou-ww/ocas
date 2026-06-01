@@ -15,21 +15,13 @@ The store is auto-created and bootstrapped on first use — no `init` command ne
 ## Quick Start
 
 ```bash
-# Define a schema
-cat > todo.schema.json << 'EOF'
-{
+# Register a schema (schemas are just nodes typed by the meta-schema)
+echo '{
   "type": "object",
-  "properties": {
-    "title": { "type": "string" },
-    "done": { "type": "boolean" }
-  },
+  "properties": { "title": { "type": "string" }, "done": { "type": "boolean" } },
   "required": ["title", "done"],
   "additionalProperties": false
-}
-EOF
-
-# Register the schema (schemas are just nodes typed by the meta-schema)
-ocas put @ocas/schema todo.schema.json
+}' | ocas put @ocas/schema -p
 # → { "type": "...", "value": "1ABC2DEF34567" }
 
 # Give it a friendly name
