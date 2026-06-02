@@ -59,6 +59,7 @@ export type {
   VarSetOptions,
   VarStore,
 } from "./types.js";
+export { validateName } from "./validation.js";
 export type { Variable } from "./variable.js";
 export { verify } from "./verify.js";
 export { wrapEnvelope } from "./wrap-envelope.js";

@@ -9,6 +9,7 @@ import type {
   CasStore,
   Hash,
   HistoryEntry,
+  ListEntry,
   Tag,
   TagStore,
   Variable,
@@ -16,45 +17,18 @@ import type {
   VarStore,
 } from "@ocas/core";
 import {
+  applyListOptions,
   CasNodeNotFoundError,
-  InvalidVariableNameError,
+  casListEntry,
   MAX_HISTORY,
   SchemaMismatchError,
   TagLabelConflictError,
   VariableNotFoundError,
+  validateName,
 } from "@ocas/core";
 
 const VARS_FILE = "_vars.jsonl";
 const TAGS_FILE = "_tags.jsonl";
-
-function validateName(name: string): void {
-  if (name === "")
-    throw new InvalidVariableNameError(name, "Name cannot be empty");
-  const match = name.match(/^@([a-zA-Z][a-zA-Z0-9]*)\/(.+)$/);
-  if (!match)
-    throw new InvalidVariableNameError(
-      name,
-      "Name must follow @scope/name format (e.g. @myapp/config)",
-    );
-  const rest = match[2] as string;
-  if (rest.endsWith("/"))
-    throw new InvalidVariableNameError(
-      name,
-      "Name cannot end with trailing slash",
-    );
-  for (const segment of rest.split("/")) {
-    if (segment === "")
-      throw new InvalidVariableNameError(
-        name,
-        "Name contains empty segment (consecutive slashes //)",
-      );
-    if (!/^[a-zA-Z0-9._-]+$/.test(segment))
-      throw new InvalidVariableNameError(
-        name,
-        `Segment "${segment}" contains invalid characters (only a-z, A-Z, 0-9, ., _, - allowed)`,
-      );
-  }
-}
 
 type VarRecord = {
   name: string;
@@ -481,7 +455,7 @@ export function createFsTagStore(dir: string): TagStore {
         a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
       );
     },
-    listByTag(tag, _options) {
+    listByTag(tag, options) {
       let key = tag;
       let value: string | null | undefined;
       const eqIdx = tag.indexOf("=");
@@ -491,16 +465,17 @@ export function createFsTagStore(dir: string): TagStore {
       }
       const targets = byKey.get(key);
       if (!targets) return [];
-      const result: Hash[] = [];
+      let entries: ListEntry[] = [];
       for (const t of targets) {
         const tm = byTarget.get(t);
         if (!tm) continue;
         const tagEntry = tm.get(key);
         if (!tagEntry) continue;
         if (value !== undefined && tagEntry.value !== value) continue;
-        result.push(t);
+        entries.push(casListEntry(t, tagEntry.created));
       }
-      return result;
+      entries = applyListOptions(entries, options);
+      return entries.map((e) => e.hash);
     },
   };
 }

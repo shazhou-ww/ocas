@@ -4,7 +4,6 @@ import {
 } from "./bootstrap-capable.js";
 import {
   CasNodeNotFoundError,
-  InvalidVariableNameError,
   MAX_HISTORY,
   SchemaMismatchError,
   TagLabelConflictError,
@@ -27,6 +26,7 @@ import type {
   VarSetOptions,
   VarStore,
 } from "./types.js";
+import { validateName } from "./validation.js";
 import type { Variable } from "./variable.js";
 
 // Initialise the xxhash WASM instance once at module load. This allows the
@@ -43,41 +43,6 @@ export type MemoryCasStore = BootstrapCapableStore & {
   put(typeHash: Hash, payload: unknown): Hash;
   delete(hash: Hash): boolean;
 };
-
-function validateName(name: string): void {
-  if (name === "") {
-    throw new InvalidVariableNameError(name, "Name cannot be empty");
-  }
-  const match = name.match(/^@([a-zA-Z][a-zA-Z0-9]*)\/(.+)$/);
-  if (!match) {
-    throw new InvalidVariableNameError(
-      name,
-      "Name must follow @scope/name format (e.g. @myapp/config)",
-    );
-  }
-  const rest = match[2] as string;
-  if (rest.endsWith("/")) {
-    throw new InvalidVariableNameError(
-      name,
-      "Name cannot end with trailing slash",
-    );
-  }
-  const segments = rest.split("/");
-  for (const segment of segments) {
-    if (segment === "") {
-      throw new InvalidVariableNameError(
-        name,
-        "Name contains empty segment (consecutive slashes //)",
-      );
-    }
-    if (!/^[a-zA-Z0-9._-]+$/.test(segment)) {
-      throw new InvalidVariableNameError(
-        name,
-        `Segment "${segment}" contains invalid characters (only a-z, A-Z, 0-9, ., _, - allowed)`,
-      );
-    }
-  }
-}
 
 function createCasStore(): MemoryCasStore {
   const data = new Map<Hash, CasNode>();
