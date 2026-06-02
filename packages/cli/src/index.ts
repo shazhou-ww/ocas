@@ -576,9 +576,9 @@ async function cmdRender(args: string[]): Promise<void> {
       // Otherwise, use renderDirect for inline rendering of the envelope value.
       if (typeof envelope.value === "string" && isHash(envelope.value)) {
         const output = await renderAsync(store, envelope.value as Hash, {
-          resolution,
-          decay,
-          epsilon,
+          ...(resolution !== undefined && { resolution }),
+          ...(decay !== undefined && { decay }),
+          ...(epsilon !== undefined && { epsilon }),
           varStore,
         });
         process.stdout.write(output + "\n");
@@ -588,9 +588,9 @@ async function cmdRender(args: string[]): Promise<void> {
           envelope.value,
           store,
           {
-            resolution,
-            decay,
-            epsilon,
+            ...(resolution !== undefined && { resolution }),
+            ...(decay !== undefined && { decay }),
+            ...(epsilon !== undefined && { epsilon }),
           },
         );
         process.stdout.write(output + "\n");
@@ -598,9 +598,9 @@ async function cmdRender(args: string[]): Promise<void> {
     } else {
       const hash = resolveHash(input as string, varStore);
       const output = await renderAsync(store, hash, {
-        resolution,
-        decay,
-        epsilon,
+        ...(resolution !== undefined && { resolution }),
+        ...(decay !== undefined && { decay }),
+        ...(epsilon !== undefined && { epsilon }),
         varStore,
       });
       // Output to stdout without JSON wrapping (raw output)
@@ -767,9 +767,9 @@ async function cmdVarTag(args: string[]): Promise<void> {
     const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
 
     const variable = varStore.tag(name, schema, {
-      add: Object.keys(tags).length > 0 ? tags : undefined,
-      addLabels: labels.length > 0 ? labels : undefined,
-      delete: deleteNames.length > 0 ? deleteNames : undefined,
+      ...(Object.keys(tags).length > 0 && { add: tags }),
+      ...(labels.length > 0 && { addLabels: labels }),
+      ...(deleteNames.length > 0 && { delete: deleteNames }),
     });
 
     await out(
@@ -1040,7 +1040,7 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
     );
   } catch (e) {
     if (e instanceof VariableNotFoundError) {
-      die(`Error: Template not found for schema: ${schemaHash}`);
+      die(`Error: Template not found for schema: ${schemaInput}`);
     }
     throw e;
   } finally {
