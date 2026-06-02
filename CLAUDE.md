@@ -101,6 +101,16 @@ This is resolved to real version numbers only during publishing (see below).
 Releases use a **release branch** workflow. `main` always keeps `workspace:*` for
 internal dependencies; version numbers are only fixed on the release branch.
 
+### Adding a Changeset
+
+Add changesets alongside feature PRs on `main`:
+
+```bash
+bunx changeset        # interactive — pick packages + bump type + summary
+```
+
+Changesets live in `.changeset/` as markdown files until consumed by `prepare-release.sh`.
+
 ### Prepare
 
 ```bash
@@ -111,12 +121,22 @@ This script:
 1. Checks you're on `main` with a clean tree and pending changesets
 2. Creates `release/<version>` branch
 3. Runs `changeset version` to fix versions and generate CHANGELOGs
-4. Runs full validation (install, build, lint, test)
-5. Commits the version bump
+4. **Switches back to main and deletes consumed `.changeset/*.md` files**
+5. Runs full validation (install, build, lint, test) on the release branch
+6. Commits the version bump
 
 After preparation, review changes and fix any issues on the release branch.
 
-### Publish
+### Prerelease
+
+```bash
+./scripts/publish.sh --rc
+```
+
+Publishes `<version>-rc.N` with npm tag `rc`. Auto-increments the rc number.
+Install for testing: `bun add -g @ocas/cli@rc`
+
+### Final Release
 
 ```bash
 ./scripts/publish.sh
@@ -124,16 +144,8 @@ After preparation, review changes and fix any issues on the release branch.
 
 This script:
 1. Validates you're on a `release/*` branch with no pending changesets
-2. Runs final build + test
-3. Publishes packages in order: `@ocas/core` → `@ocas/fs` → `@ocas/cli`
-4. Tags, pushes, merges back to `main`, cleans up the release branch
-
-### Adding a Changeset
-
-Before releasing, add changesets for your changes:
-
-```bash
-bunx changeset        # interactive — pick packages + bump type + summary
-```
-
-Changesets live in `.changeset/` as markdown files until consumed by `prepare-release.sh`.
+2. Sets the final version, fixes `workspace:*` → real versions
+3. Runs final build + test
+4. Publishes packages in order: `@ocas/core` → `@ocas/fs` → `@ocas/cli`
+5. Tags, pushes to origin + github
+6. Merges back to `main`, restores `workspace:*`, cleans up release branch

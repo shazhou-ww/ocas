@@ -71,6 +71,23 @@ info "New version: $NEW_VERSION"
 git branch -m "release/next" "release/$NEW_VERSION"
 info "Release branch: release/$NEW_VERSION"
 
+# --- Clean up changesets on main ---
+
+info "Removing consumed changesets from main..."
+git stash --include-untracked
+git checkout main
+# Delete the changeset files that were consumed
+for cs in $CHANGESETS; do
+  rm -f "$cs"
+done
+git add -A
+if [[ -n "$(git status --porcelain)" ]]; then
+  git commit -m "chore: remove changesets consumed by release/$NEW_VERSION"
+  git push origin main
+fi
+git checkout "release/$NEW_VERSION"
+git stash pop || true
+
 # --- Validate ---
 
 echo ""
@@ -101,5 +118,6 @@ echo ""
 echo "  Next steps:"
 echo "    1. Review changes:  git diff main...HEAD"
 echo "    2. Fix issues if needed, commit to this branch"
-echo "    3. When ready:      ./scripts/publish.sh"
+echo "    3. Prerelease:      ./scripts/publish.sh --rc"
+echo "    4. Final release:   ./scripts/publish.sh"
 echo ""
