@@ -558,3 +558,33 @@ describe("createFsStore – listMeta and listSchemas", () => {
     }
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// E2. OcasStore shape from openStore
+// ──────────────────────────────────────────────────────────────────────────────
+describe("openStore – OcasStore shape", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = makeTmpDir();
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("E2. returns object with cas, var, tag sub-stores", async () => {
+    const store = await openStore(dir);
+    expect(typeof store.cas).toBe("object");
+    expect(typeof store.var).toBe("object");
+    expect(typeof store.tag).toBe("object");
+    expect(typeof store.cas.put).toBe("function");
+    expect(typeof store.cas.get).toBe("function");
+    expect(typeof store.cas.has).toBe("function");
+    expect(typeof store.var.set).toBe("function");
+    expect(typeof store.var.get).toBe("function");
+    expect(typeof store.var.list).toBe("function");
+    expect(typeof store.var.history).toBe("function");
+    expect(typeof store.tag.tag).toBe("function");
+    expect(typeof store.tag.tags).toBe("function");
+    expect(typeof store.tag.listByTag).toBe("function");
+  });
+});

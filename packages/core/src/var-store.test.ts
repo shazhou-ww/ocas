@@ -9,6 +9,7 @@ import {
 } from "./errors.js";
 import { createMemoryStore } from "./store.js";
 import type { Hash } from "./types.js";
+import { validateName } from "./validation.js";
 
 function makeStoreWithSchema(): {
   store: ReturnType<typeof createMemoryStore>;
@@ -222,5 +223,35 @@ describe("In-memory VarStore", () => {
     const got = store.var.get("@app/x", schema);
     expect(got).not.toBeNull();
     expect(got?.value).toBe(h);
+  });
+});
+
+describe("validateName (shared)", () => {
+  test("C-VN1. accepts well-formed names", () => {
+    expect(() => validateName("@app/x")).not.toThrow();
+    expect(() => validateName("@app/a.b_c-1")).not.toThrow();
+    expect(() => validateName("@app/nested/path")).not.toThrow();
+    expect(() => validateName("@ocas/schema")).not.toThrow();
+  });
+
+  test("C-VN2. rejects empty / missing-@ / @ -only / trailing slash / double slash", () => {
+    expect(() => validateName("")).toThrow(InvalidVariableNameError);
+    expect(() => validateName("x")).toThrow(InvalidVariableNameError);
+    expect(() => validateName("@/x")).toThrow(InvalidVariableNameError);
+    expect(() => validateName("@app/")).toThrow(InvalidVariableNameError);
+    expect(() => validateName("@app//x")).toThrow(InvalidVariableNameError);
+  });
+
+  test("C-VN3. rejects invalid segment characters", () => {
+    expect(() => validateName("@app/foo bar")).toThrow(
+      InvalidVariableNameError,
+    );
+    expect(() => validateName("@app/foo!bar")).toThrow(
+      InvalidVariableNameError,
+    );
+  });
+
+  test("C-VN4. scope must start with a letter", () => {
+    expect(() => validateName("@1bad/x")).toThrow(InvalidVariableNameError);
   });
 });

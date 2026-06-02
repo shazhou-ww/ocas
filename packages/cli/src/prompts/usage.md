@@ -184,8 +184,9 @@ const hash = await store.put(typeHash, { message: "hello" });
 For filesystem persistence:
 
 ```typescript
-import { openStoreAndVarStore } from "@ocas/fs";
-const { store, varStore } = await openStoreAndVarStore("/path/to/store");
+import { openStore } from "@ocas/fs";
+const store = await openStore("/path/to/store");
+// store.cas / store.var / store.tag
 ```
 
 ## Common Pitfalls
