@@ -334,7 +334,9 @@ async function cmdGet(args: string[]): Promise<void> {
   const hash = resolveHash(input, store);
   const node = store.cas.get(hash);
   if (node === null) die(`Node not found: ${hash}`);
-  await out(await wrapEnvelope(store, "@ocas/output/get", node), store);
+  const tags = store.tag.tags(hash);
+  const value = tags.length === 0 ? node : { ...node, tags };
+  await out(await wrapEnvelope(store, "@ocas/output/get", value), store);
 }
 
 async function cmdHas(args: string[]): Promise<void> {
@@ -633,7 +635,13 @@ async function cmdVarGet(args: string[]): Promise<void> {
   if (variable === null) {
     die(`Error: Variable not found: name=${name}, schema=${schema}`);
   }
-  await out(await wrapEnvelope(store, "@ocas/output/var-get", variable), store);
+  const valueTags = store.tag.tags(variable.value);
+  const out_value =
+    valueTags.length === 0 ? variable : { ...variable, valueTags };
+  await out(
+    await wrapEnvelope(store, "@ocas/output/var-get", out_value),
+    store,
+  );
 }
 
 async function cmdVarDelete(args: string[]): Promise<void> {

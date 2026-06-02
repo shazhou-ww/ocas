@@ -131,6 +131,18 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
         type: { type: "string", format: "ocas_ref" },
         payload: {},
         timestamp: { type: "number" },
+        tags: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              key: { type: "string" },
+              value: { type: ["string", "null"] },
+              target: { type: "string", format: "ocas_ref" },
+              created: { type: "number" },
+            },
+          },
+        },
       },
       title: "ocas get result",
     },
@@ -224,7 +236,21 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     "@ocas/output/var-get",
     {
       type: "object",
-      properties: { ...VARIABLE_PROPERTIES },
+      properties: {
+        ...VARIABLE_PROPERTIES,
+        valueTags: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              key: { type: "string" },
+              value: { type: ["string", "null"] },
+              target: { type: "string", format: "ocas_ref" },
+              created: { type: "number" },
+            },
+          },
+        },
+      },
       title: "ocas var get result",
     },
   ],

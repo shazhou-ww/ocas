@@ -69,7 +69,7 @@ exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
 
 exports[`Phase 3: Variable System 3.2 var get returns variable 1`] = `
 {
-  "type": "7C75FQT98KKQD",
+  "type": "F5RRJTXP8Z99D",
   "value": {
     "labels": [],
     "name": "@myapp/config",
@@ -152,7 +152,7 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
       "name": "@ocas/output/get",
       "schema": "CTS5P6RD8HMCS",
       "tags": {},
-      "value": "FB4K0SXG68ZFS",
+      "value": "7V5G8E2VW8B2G",
     },
     {
       "labels": [],
@@ -257,7 +257,7 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
       "name": "@ocas/output/var-get",
       "schema": "CTS5P6RD8HMCS",
       "tags": {},
-      "value": "7C75FQT98KKQD",
+      "value": "F5RRJTXP8Z99D",
     },
     {
       "labels": [],
