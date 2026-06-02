@@ -7,7 +7,7 @@
   },
   "scripts": {
     "test": "bun test",
-    "postinstall": "node scripts/postinstall.js || true",
+    "postinstall": "bun scripts/postinstall.js || true",
     "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
