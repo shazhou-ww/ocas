@@ -1,13 +1,13 @@
 import { createMemoryStore } from "./store.js";
-import type { CasStore, OcasStore, TagStore, VarStore } from "./types.js";
+import type { CasStore, Store, TagStore, VarStore } from "./types.js";
 
 /**
- * In-memory `OcasStore` used by schema validation tests. It exposes the
- * `cas`, `var`, and `tag` sub-stores of an `OcasStore` plus a few legacy
+ * In-memory `Store` used by schema validation tests. It exposes the
+ * `cas`, `var`, and `tag` sub-stores of an `Store` plus a few legacy
  * pass-through helpers (`get`, `put`, `has`, …) that some older tests still
  * use directly.
  */
-export class MemStore implements OcasStore {
+export class MemStore implements Store {
   readonly cas: CasStore;
   readonly var: VarStore;
   readonly tag: TagStore;

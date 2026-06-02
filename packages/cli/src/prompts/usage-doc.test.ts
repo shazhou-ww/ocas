@@ -11,7 +11,7 @@ describe("usage.md doc cleanup (D)", () => {
     expect(content).not.toContain("createVariableStore");
   });
 
-  test("D1. usage.md references openStore returning OcasStore", () => {
+  test("D1. usage.md references openStore returning Store", () => {
     const content = readFileSync(usagePath, "utf8");
     expect(content).toContain("openStore");
     expect(content).toMatch(/store\.cas|store\.var|store\.tag/);

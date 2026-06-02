@@ -577,10 +577,7 @@ describe("Phase 2: Schema Validation", () => {
     const { openStore: openFsStore } = await import("@ocas/fs");
     const { putSchema } = await import("@ocas/core");
     const store = await openFsStore(tmpStore);
-    typeHash = await putSchema(
-      store,
-      JSON.parse(readFileSync(schemaFile, "utf-8")),
-    );
+    typeHash = putSchema(store, JSON.parse(readFileSync(schemaFile, "utf-8")));
 
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));

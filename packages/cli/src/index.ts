@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Hash, ListOptions, OcasStore } from "@ocas/core";
+import type { Hash, ListOptions, Store } from "@ocas/core";
 import {
   CasNodeNotFoundError,
   computeHash,
@@ -108,7 +108,7 @@ const compact = flags.json === true;
 
 const inlineRender = flags.render === true || flags.r === true;
 
-async function out(data: unknown, store?: OcasStore): Promise<void> {
+async function out(data: unknown, store?: Store): Promise<void> {
   if (
     inlineRender &&
     typeof data === "object" &&
@@ -156,10 +156,10 @@ async function readStdinJson(): Promise<unknown> {
 }
 
 /**
- * Open the filesystem-backed OcasStore. Automatically creates directory and
+ * Open the filesystem-backed Store. Automatically creates directory and
  * bootstraps if needed.
  */
-async function openStore(): Promise<OcasStore> {
+async function openStore(): Promise<Store> {
   const fullPath = resolve(storePath);
   return await openFsStore(fullPath);
 }
@@ -176,7 +176,7 @@ function isHash(input: string): boolean {
  * Otherwise, query the store's var sub-store for a variable with that exact
  * name and return the first match's value.
  */
-function resolveHash(input: string, store: OcasStore): Hash {
+function resolveHash(input: string, store: Store): Hash {
   if (isHash(input)) {
     return input as Hash;
   }
@@ -297,7 +297,7 @@ async function cmdPut(args: string[]): Promise<void> {
   const metaHash = resolveHash("@ocas/schema", store);
   if (typeHash === metaHash) {
     try {
-      const hash = await putSchema(store, payload as Record<string, unknown>);
+      const hash = putSchema(store, payload as Record<string, unknown>);
       await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
     } catch (_e) {
       console.error(

@@ -4,7 +4,7 @@ import { bootstrap } from "./bootstrap.js";
 import { cborEncode } from "./cbor.js";
 import { computeHash, computeSelfHash } from "./hash.js";
 import { createMemoryStore } from "./store.js";
-import type { CasNode, Store } from "./types.js";
+import type { CasNode, CasStore } from "./types.js";
 import { verify } from "./verify.js";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ describe("createMemoryStore – listByType", () => {
 
   test("bootstrap node is listed under its self type", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     // All built-in schemas should be typed by the meta-schema
@@ -253,25 +253,25 @@ describe("verify", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 describe("bootstrap", () => {
   test("throws when store lacks internal bootstrap path", async () => {
-    const cas: Store = {
-      put: async () => "0000000000000",
+    const cas = {
+      put: () => "0000000000000",
       get: () => null,
       has: () => false,
       listByType: () => [],
-    };
+    } as unknown as CasStore;
     const fakeStore = {
       cas,
       var: { set: () => null } as never,
       tag: {} as never,
     } as never;
-    await expect(bootstrap(fakeStore)).rejects.toThrow(
+    expect(() => bootstrap(fakeStore)).toThrow(
       "Store does not support bootstrap",
     );
   });
 
   test("returns a map with 30 built-in schema aliases", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     expect(builtinSchemas).toHaveProperty("@ocas/schema");
     expect(builtinSchemas).toHaveProperty("@ocas/string");
@@ -294,7 +294,7 @@ describe("bootstrap", () => {
 
   test("meta-schema node is stored and retrievable", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
 
     expect(store.cas.has(metaHash)).toBe(true);
@@ -304,7 +304,7 @@ describe("bootstrap", () => {
 
   test("meta-schema node is self-referencing: type === hash", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const node = store.cas.get(metaHash) as CasNode;
 
@@ -313,7 +313,7 @@ describe("bootstrap", () => {
 
   test("bootstrap node passes verify()", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const node = store.cas.get(metaHash) as CasNode;
 
@@ -322,8 +322,8 @@ describe("bootstrap", () => {
 
   test("bootstrap is idempotent: same hashes on repeated calls", async () => {
     const store = createMemoryStore();
-    const h1 = await bootstrap(store);
-    const h2 = await bootstrap(store);
+    const h1 = bootstrap(store);
+    const h2 = bootstrap(store);
 
     expect(h1).toEqual(h2);
     // All built-in schemas typed by the meta-schema (1 self + 7 unique primitives + 21 outputs)

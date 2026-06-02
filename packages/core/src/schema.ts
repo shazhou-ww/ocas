@@ -11,7 +11,7 @@ const Ajv = ((AjvModule as any).default ?? AjvModule) as {
 };
 
 import { bootstrap } from "./bootstrap.js";
-import type { CasNode, Hash, OcasStore } from "./types.js";
+import type { CasNode, Hash, Store } from "./types.js";
 
 export type JSONSchema = Record<string, unknown>;
 
@@ -239,7 +239,7 @@ function isValidSchema(value: unknown): boolean {
   return true;
 }
 
-function isMetaSchemaNode(store: OcasStore, node: CasNode): boolean {
+function isMetaSchemaNode(store: Store, node: CasNode): boolean {
   const schema = getSchema(store, node.type);
   return schema !== null && schema === node.payload;
 }
@@ -248,11 +248,8 @@ function isMetaSchemaNode(store: OcasStore, node: CasNode): boolean {
  * Store a JSON Schema as a CAS node typed by the meta-schema hash.
  * The returned hash becomes the typeHash for nodes that conform to this schema.
  */
-export async function putSchema(
-  store: OcasStore,
-  jsonSchema: JSONSchema,
-): Promise<Hash> {
-  const builtinSchemas = await bootstrap(store);
+export function putSchema(store: Store, jsonSchema: JSONSchema): Hash {
+  const builtinSchemas = bootstrap(store);
   const metaHash = builtinSchemas["@ocas/schema"];
   if (!metaHash) {
     throw new Error("Meta-schema not found in bootstrap result");
@@ -262,14 +259,14 @@ export async function putSchema(
       "Invalid schema: input does not conform to the ocas JSON Schema meta-schema",
     );
   }
-  return Promise.resolve(store.cas.put(metaHash, jsonSchema));
+  return store.cas.put(metaHash, jsonSchema);
 }
 
 /**
  * Retrieve the JSON Schema payload for a given type hash.
  * Returns null if no node exists at that hash.
  */
-export function getSchema(store: OcasStore, typeHash: Hash): JSONSchema | null {
+export function getSchema(store: Store, typeHash: Hash): JSONSchema | null {
   const node = store.cas.get(typeHash);
   if (node === null) return null;
   return node.payload as JSONSchema;
@@ -279,7 +276,7 @@ export function getSchema(store: OcasStore, typeHash: Hash): JSONSchema | null {
  * Validate a node's payload against the schema identified by node.type.
  * Returns false if the schema cannot be found or validation fails.
  */
-export function validate(store: OcasStore, node: CasNode): boolean {
+export function validate(store: Store, node: CasNode): boolean {
   const schema = getSchema(store, node.type);
   if (schema === null) return false;
   if (isMetaSchemaNode(store, node)) {
@@ -416,7 +413,7 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
  * Return all hashes referenced by this node via ocas_ref fields in its schema.
  * Null/undefined values are skipped.
  */
-export function refs(store: OcasStore, node: CasNode): Hash[] {
+export function refs(store: Store, node: CasNode): Hash[] {
   const schema = getSchema(store, node.type);
   if (schema === null) return [];
   return collectRefs(schema, node.payload);
@@ -428,7 +425,7 @@ export function refs(store: OcasStore, node: CasNode): Hash[] {
  * Handles cycles via a visited set.
  */
 export function walk(
-  store: OcasStore,
+  store: Store,
   rootHash: Hash,
   visitor: (hash: Hash, node: CasNode) => void,
 ): void {

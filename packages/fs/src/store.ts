@@ -24,7 +24,7 @@ import {
   initHasher,
   type ListEntry,
   type ListOptions,
-  type OcasStore,
+  type Store,
 } from "@ocas/core";
 import { decode } from "cborg";
 import { createFsTagStore, createFsVarStoreFor } from "./var-store.js";
@@ -194,7 +194,7 @@ function hashesToEntries(
 }
 
 /**
- * The CAS sub-store of an FS-backed `OcasStore` — also satisfies the legacy
+ * The CAS sub-store of an FS-backed `Store` — also satisfies the legacy
  * `BootstrapCapableStore` interface so `bootstrap()` can run against it.
  */
 export type FsCasStore = BootstrapCapableStore & {
@@ -383,21 +383,21 @@ export async function prepareStore(dir: string): Promise<FsCasStore> {
 }
 
 /**
- * Open a filesystem-backed `OcasStore` with automatic directory creation and
+ * Open a filesystem-backed `Store` with automatic directory creation and
  * bootstrap. The CAS sub-store is FS-backed; the variable and tag sub-stores
  * are in-memory (provided by `@ocas/core`).
  *
  * @param dir - The directory path for the CAS store
- * @returns A Promise resolving to the OcasStore
+ * @returns A Promise resolving to the Store
  * @throws Error if the path exists but is not a directory
  */
-export async function openStore(dir: string): Promise<OcasStore> {
+export async function openStore(dir: string): Promise<Store> {
   const cas = await prepareStore(dir);
-  const ocas: OcasStore = {
+  const ocas: Store = {
     cas,
     var: createFsVarStoreFor(dir, cas),
     tag: createFsTagStore(dir),
   };
-  await bootstrap(ocas);
+  bootstrap(ocas);
   return ocas;
 }

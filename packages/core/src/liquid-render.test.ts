@@ -5,10 +5,10 @@ import { putSchema } from "./schema.js";
 import { createMemoryStore } from "./store.js";
 import type { Hash } from "./types.js";
 
-// Helper to create an in-memory OcasStore with bootstrap
+// Helper to create an in-memory Store with bootstrap
 async function createTempVarStore() {
   const store = createMemoryStore();
-  await bootstrap(store);
+  bootstrap(store);
   return {
     store,
     cleanup: async () => {},
@@ -55,7 +55,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -65,7 +65,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         value: "child content",
       });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -78,7 +78,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
       });
 
       // Register template for parent
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Parent: {{ payload.name }}\n{% render payload.child %}",
@@ -109,7 +109,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           level: { type: "number" },
@@ -130,7 +130,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         child: level1Hash,
       });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
 
       // Template that shows the level and renders child with explicit decay
       const template = store.cas.put(
@@ -158,7 +158,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -167,7 +167,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
       const leftHash = store.cas.put(childSchema, { value: "left" });
       const rightHash = store.cas.put(childSchema, { value: "right" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           left: { type: "string", format: "ocas_ref" },
@@ -179,7 +179,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         right: rightHash,
       });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "Left:\n{% render payload.left %}\nRight:\n{% render payload.right %}",
@@ -211,7 +211,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -225,7 +225,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         child: null,
       });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "Before\n{% render payload.child %}\nAfter",
@@ -251,7 +251,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
 
     try {
       const fakeHash = "ZZZZZZZZZZZZZ" as Hash;
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -263,7 +263,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
         child: fakeHash,
       });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "{% render payload.child %}",
@@ -286,7 +286,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -294,7 +294,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -302,7 +302,7 @@ describe("Suite 2: Custom {% render %} Tag Implementation", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "{% render payload.child %}",
@@ -328,7 +328,7 @@ describe("Suite 3: Template Context Variables", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -336,7 +336,7 @@ describe("Suite 3: Template Context Variables", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "Resolution: {{ resolution }}",
@@ -359,7 +359,7 @@ describe("Suite 3: Template Context Variables", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -367,7 +367,7 @@ describe("Suite 3: Template Context Variables", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(templateSchema, "Epsilon: {{ epsilon }}");
       store.var.set(`@ocas/template/text/${nodeSchema}`, template);
 
@@ -387,7 +387,7 @@ describe("Suite 3: Template Context Variables", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -395,7 +395,7 @@ describe("Suite 3: Template Context Variables", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(templateSchema, "Hash: {{ hash }}");
       store.var.set(`@ocas/template/text/${nodeSchema}`, template);
 
@@ -415,7 +415,7 @@ describe("Suite 3: Template Context Variables", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -424,7 +424,7 @@ describe("Suite 3: Template Context Variables", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test", count: 42 });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "Name: {{ payload.name }}, Count: {{ payload.count }}",
@@ -447,7 +447,7 @@ describe("Suite 3: Template Context Variables", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -455,7 +455,7 @@ describe("Suite 3: Template Context Variables", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(templateSchema, "Type: {{ type }}");
       store.var.set(`@ocas/template/text/${nodeSchema}`, template);
 
@@ -475,7 +475,7 @@ describe("Suite 3: Template Context Variables", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -483,7 +483,7 @@ describe("Suite 3: Template Context Variables", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "Timestamp: {{ timestamp }}",
@@ -506,7 +506,7 @@ describe("Suite 3: Template Context Variables", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -514,7 +514,7 @@ describe("Suite 3: Template Context Variables", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         `Hash: {{ hash }}
@@ -549,7 +549,7 @@ describe("Suite 4: Render Flow Integration", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -557,7 +557,7 @@ describe("Suite 4: Render Flow Integration", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "Custom template: {{ payload.name }}",
@@ -580,7 +580,7 @@ describe("Suite 4: Render Flow Integration", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -588,7 +588,7 @@ describe("Suite 4: Render Flow Integration", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(templateSchema, "");
       store.var.set(`@ocas/template/text/${nodeSchema}`, template);
 
@@ -608,7 +608,7 @@ describe("Suite 4: Render Flow Integration", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -616,7 +616,7 @@ describe("Suite 4: Render Flow Integration", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "{% render %}", // Invalid: no variable
@@ -641,7 +641,7 @@ describe("Suite 5: Decay Priority Chain", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -649,7 +649,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -657,7 +657,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "{% render payload.child, decay: 0.7 %}",
@@ -687,7 +687,7 @@ describe("Suite 5: Decay Priority Chain", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -695,7 +695,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -703,7 +703,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "{% render payload.child %}", // No explicit decay
@@ -733,7 +733,7 @@ describe("Suite 5: Decay Priority Chain", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -741,7 +741,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -749,7 +749,7 @@ describe("Suite 5: Decay Priority Chain", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "{% render payload.child %}",
@@ -781,7 +781,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           level: { type: "number" },
@@ -800,7 +800,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
         });
       }
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "Level {{ payload.level }}\n{% render payload.next %}",
@@ -826,7 +826,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -839,7 +839,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
       // Create simple node first
       const nodeAHash = store.cas.put(nodeSchema, { name: "A", ref: null });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "Node {{ payload.name }}\n{% render payload.ref %}",
@@ -862,7 +862,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const itemSchema = await putSchema(store, {
+      const itemSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -872,7 +872,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
       const item2 = store.cas.put(itemSchema, { name: "item2" });
       const item3 = store.cas.put(itemSchema, { name: "item3" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           items: {
@@ -885,7 +885,7 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
         items: [item1, item2, item3],
       });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "{% for item in payload.items %}{% render item %}\n{% endfor %}",
@@ -918,7 +918,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -926,7 +926,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "test" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(templateSchema, "{% render missingVar %}");
       store.var.set(`@ocas/template/text/${nodeSchema}`, template);
 
@@ -947,7 +947,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -955,7 +955,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -963,7 +963,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "{% render payload.child, decay: 1.5 %}",
@@ -986,7 +986,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -994,7 +994,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -1002,7 +1002,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "{% render payload.child, decay: -0.5 %}",
@@ -1025,7 +1025,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -1033,7 +1033,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -1041,7 +1041,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "{% render payload.child, decay: 0 %}",
@@ -1064,7 +1064,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "string" },
@@ -1072,7 +1072,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const childHash = store.cas.put(childSchema, { value: "child" });
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           child: { type: "string", format: "ocas_ref" },
@@ -1080,7 +1080,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const parentHash = store.cas.put(parentSchema, { child: childHash });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "{% render payload.child, decay: 1 %}",
@@ -1110,7 +1110,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const nodeSchema = await putSchema(store, {
+      const nodeSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1118,7 +1118,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       });
       const nodeHash = store.cas.put(nodeSchema, { name: "世界" });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const template = store.cas.put(
         templateSchema,
         "你好: {{ payload.name }} 🌍",
@@ -1143,7 +1143,7 @@ describe("Suite 8: Performance & Scalability", () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
-      const itemSchema = await putSchema(store, {
+      const itemSchema = putSchema(store, {
         type: "object",
         properties: {
           value: { type: "number" },
@@ -1156,7 +1156,7 @@ describe("Suite 8: Performance & Scalability", () => {
         children.push(hash);
       }
 
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           items: {
@@ -1167,7 +1167,7 @@ describe("Suite 8: Performance & Scalability", () => {
       });
       const parentHash = store.cas.put(parentSchema, { items: children });
 
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplate = store.cas.put(
         templateSchema,
         "{% for child in payload.items %}{% render child %}{% endfor %}",
@@ -1199,7 +1199,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema for person object
-      const personSchema = await putSchema(store, {
+      const personSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1214,7 +1214,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template using direct property access (incorrect syntax)
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Name: {{ name }}, Age: {{ age }}",
@@ -1239,7 +1239,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema for person object
-      const personSchema = await putSchema(store, {
+      const personSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1254,7 +1254,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template using correct payload. prefix
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Name: {{ payload.name }}, Age: {{ payload.age }}",
@@ -1279,7 +1279,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema and node
-      const personSchema = await putSchema(store, {
+      const personSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1293,7 +1293,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "User: {{ payload.name }}, Age: {{ payload.age }}",
@@ -1319,13 +1319,13 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema for simple string
-      const stringSchema = await putSchema(store, { type: "string" });
+      const stringSchema = putSchema(store, { type: "string" });
 
       // Create node with string payload
       const stringHash = store.cas.put(stringSchema, "Hello World");
 
       // Register template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Value is: {{ payload }}",
@@ -1350,13 +1350,13 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema for number
-      const numberSchema = await putSchema(store, { type: "number" });
+      const numberSchema = putSchema(store, { type: "number" });
 
       // Create node with number payload
       const numberHash = store.cas.put(numberSchema, 42);
 
       // Register template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "The answer is {{ payload }}",
@@ -1381,7 +1381,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema for nested object
-      const userSchema = await putSchema(store, {
+      const userSchema = putSchema(store, {
         type: "object",
         properties: {
           user: {
@@ -1410,7 +1410,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template with deep property access
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "User {{ payload.user.name }} lives in {{ payload.user.address.city }}",
@@ -1435,7 +1435,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema with array
-      const tagsSchema = await putSchema(store, {
+      const tagsSchema = putSchema(store, {
         type: "object",
         properties: {
           tags: {
@@ -1451,7 +1451,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template with array iteration
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Tags: {% for tag in payload.tags %}{{ tag }}{% unless forloop.last %}, {% endunless %}{% endfor %}",
@@ -1476,7 +1476,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema
-      const personSchema = await putSchema(store, {
+      const personSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1489,7 +1489,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template that references missing property
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Name: {{ payload.name }}, Age: {{ payload.age }}",
@@ -1514,7 +1514,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema allowing null
-      const personSchema = await putSchema(store, {
+      const personSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1529,7 +1529,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Name: {{ payload.name }}, Email: {{ payload.email }}",
@@ -1554,7 +1554,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema with boolean
-      const userSchema = await putSchema(store, {
+      const userSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1569,7 +1569,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template with conditional
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "User {{ payload.name }} is {% if payload.active %}active{% else %}inactive{% endif %}",
@@ -1594,7 +1594,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema
-      const dataSchema = await putSchema(store, {
+      const dataSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1609,7 +1609,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Name: '{{ payload.name }}', Count: {{ payload.count }}",
@@ -1634,7 +1634,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
 
     try {
       // Create schema
-      const textSchema = await putSchema(store, {
+      const textSchema = putSchema(store, {
         type: "object",
         properties: {
           text: { type: "string" },
@@ -1647,7 +1647,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       });
 
       // Register template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
         "Text: {{ payload.text }}",
@@ -1674,7 +1674,7 @@ describe("Suite 10: Context Variable Completeness", () => {
 
     try {
       // Create child schema and node
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1683,7 +1683,7 @@ describe("Suite 10: Context Variable Completeness", () => {
       const childHash = store.cas.put(childSchema, { name: "child" });
 
       // Create parent schema and node
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           name: { type: "string" },
@@ -1696,7 +1696,7 @@ describe("Suite 10: Context Variable Completeness", () => {
       });
 
       // Register parent template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplateHash = store.cas.put(
         templateSchema,
         "Parent: {{ payload.name }}\n{% render payload.child %}",
@@ -1731,7 +1731,7 @@ describe("Suite 10: Context Variable Completeness", () => {
 
     try {
       // Create child schema and node
-      const childSchema = await putSchema(store, {
+      const childSchema = putSchema(store, {
         type: "object",
         properties: {
           custom: { type: "string" },
@@ -1742,7 +1742,7 @@ describe("Suite 10: Context Variable Completeness", () => {
       });
 
       // Create parent schema and node
-      const parentSchema = await putSchema(store, {
+      const parentSchema = putSchema(store, {
         type: "object",
         properties: {
           custom: { type: "string" },
@@ -1755,7 +1755,7 @@ describe("Suite 10: Context Variable Completeness", () => {
       });
 
       // Register parent template
-      const templateSchema = await putSchema(store, { type: "string" });
+      const templateSchema = putSchema(store, { type: "string" });
       const parentTemplateHash = store.cas.put(
         templateSchema,
         "Parent custom: {{ payload.custom }}\n{% render payload.child %}",

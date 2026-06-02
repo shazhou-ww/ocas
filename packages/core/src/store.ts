@@ -2,13 +2,7 @@ import {
   BOOTSTRAP_STORE,
   type BootstrapCapableStore,
 } from "./bootstrap-capable.js";
-import {
-  CasNodeNotFoundError,
-  MAX_HISTORY,
-  SchemaMismatchError,
-  TagLabelConflictError,
-  VariableNotFoundError,
-} from "./errors.js";
+import { SchemaMismatchError, VariableNotFoundError } from "./errors.js";
 import { computeHashSync, computeSelfHashSync, initHasher } from "./hash.js";
 import { applyListOptions, casListEntry } from "./list-utils.js";
 import type {
@@ -18,7 +12,7 @@ import type {
   HistoryEntry,
   ListEntry,
   ListOptions,
-  OcasStore,
+  Store,
   Tag,
   TagOp,
   TagStore,
@@ -27,6 +21,16 @@ import type {
   VarStore,
 } from "./types.js";
 import { validateName } from "./validation.js";
+import {
+  addNameIndex,
+  checkTagLabelConflict,
+  cloneVarRecord,
+  extractSchema,
+  pushHistory,
+  removeNameIndex,
+  type VarRecord,
+  varKey,
+} from "./var-store-helpers.js";
 import type { Variable } from "./variable.js";
 
 // Initialise the xxhash WASM instance once at module load. This allows the
@@ -34,7 +38,7 @@ import type { Variable } from "./variable.js";
 await initHasher();
 
 /**
- * The cas sub-store of an in-memory `OcasStore` — also satisfies the legacy
+ * The cas sub-store of an in-memory `Store` — also satisfies the legacy
  * `BootstrapCapableStore` interface so that helpers that have not yet been
  * refactored (e.g. bootstrap, gc, render) continue to work against
  * `store.cas`.
@@ -142,32 +146,9 @@ function createCasStore(): MemoryCasStore {
   return store;
 }
 
-type VarRecord = {
-  name: string;
-  schema: Hash;
-  value: Hash;
-  created: number;
-  updated: number;
-  tags: Record<string, string>;
-  labels: string[];
-  history: HistoryEntry[];
-};
-
-function cloneVar(rec: VarRecord): Variable {
-  return {
-    name: rec.name,
-    schema: rec.schema,
-    value: rec.value,
-    created: rec.created,
-    updated: rec.updated,
-    tags: { ...rec.tags },
-    labels: [...rec.labels],
-  };
-}
-
 /**
  * Build an in-memory `VarStore` backed by the supplied CAS store. Exposed so
- * non-Memory CAS stores (e.g. the FS store) can compose a full `OcasStore`
+ * non-Memory CAS stores (e.g. the FS store) can compose a full `Store`
  * without re-implementing variable storage.
  */
 export function createMemoryVarStoreFor(cas: CasStore): VarStore {
@@ -175,73 +156,18 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
   const records = new Map<string, VarRecord>();
   const byName = new Map<string, Set<string>>(); // name -> set of composite keys
 
-  function key(name: string, schema: Hash): string {
-    return `${name}\u0000${schema}`;
-  }
-
-  function addIndex(name: string, k: string): void {
-    let set = byName.get(name);
-    if (!set) {
-      set = new Set();
-      byName.set(name, set);
-    }
-    set.add(k);
-  }
-
-  function removeIndex(name: string, k: string): void {
-    const set = byName.get(name);
-    if (!set) return;
-    set.delete(k);
-    if (set.size === 0) byName.delete(name);
-  }
-
-  function extractSchema(hash: Hash): Hash {
-    const node = cas.get(hash);
-    if (node === null) {
-      throw new CasNodeNotFoundError(hash);
-    }
-    return node.type;
-  }
-
-  function checkConflict(tags: Record<string, string>, labels: string[]): void {
-    for (const tk of Object.keys(tags)) {
-      if (labels.includes(tk)) {
-        throw new TagLabelConflictError(tk, "label", "tag");
-      }
-    }
-  }
-
-  function pushHistory(rec: VarRecord, value: Hash, now: number): boolean {
-    if (rec.history.length > 0 && rec.history[0]?.value === value) {
-      return false;
-    }
-    const existingIdx = rec.history.findIndex((e) => e.value === value);
-    if (existingIdx > 0) {
-      rec.history.splice(existingIdx, 1);
-    }
-    rec.history.unshift({ value, position: 0, setAt: now });
-    if (rec.history.length > MAX_HISTORY) {
-      rec.history.length = MAX_HISTORY;
-    }
-    for (let i = 0; i < rec.history.length; i++) {
-      const entry = rec.history[i];
-      if (entry !== undefined) entry.position = i;
-    }
-    return true;
-  }
-
   const varStore: VarStore = {
     set(name: string, hash: Hash, options?: VarSetOptions): Variable {
       validateName(name);
-      const schema = extractSchema(hash);
-      const k = key(name, schema);
+      const schema = extractSchema(cas, hash);
+      const k = varKey(name, schema);
       const existing = records.get(k);
       const now = Date.now();
 
       if (existing) {
         const tags = options?.tags ?? existing.tags;
         const labels = options?.labels ?? existing.labels;
-        if (options !== undefined) checkConflict(tags, labels);
+        if (options !== undefined) checkTagLabelConflict(tags, labels);
         const changed = pushHistory(existing, hash, now);
         if (changed) {
           existing.value = hash;
@@ -251,12 +177,12 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
           existing.tags = { ...tags };
           existing.labels = [...labels];
         }
-        return cloneVar(existing);
+        return cloneVarRecord(existing);
       }
 
       const tags = options?.tags ?? {};
       const labels = options?.labels ?? [];
-      checkConflict(tags, labels);
+      checkTagLabelConflict(tags, labels);
       const rec: VarRecord = {
         name,
         schema,
@@ -268,14 +194,14 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
         history: [{ value: hash, position: 0, setAt: now }],
       };
       records.set(k, rec);
-      addIndex(name, k);
-      return cloneVar(rec);
+      addNameIndex(byName, name, k);
+      return cloneVarRecord(rec);
     },
 
     get(name: string, schema?: Hash): Variable | null {
       if (schema !== undefined) {
-        const rec = records.get(key(name, schema));
-        return rec ? cloneVar(rec) : null;
+        const rec = records.get(varKey(name, schema));
+        return rec ? cloneVarRecord(rec) : null;
       }
       // No schema: if exactly one variant, return it; otherwise null
       const set = byName.get(name);
@@ -283,17 +209,17 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       const onlyKey = set.values().next().value;
       if (onlyKey === undefined) return null;
       const rec = records.get(onlyKey);
-      return rec ? cloneVar(rec) : null;
+      return rec ? cloneVarRecord(rec) : null;
     },
 
     remove(name: string, schema?: Hash): Variable[] {
       if (schema !== undefined) {
-        const k = key(name, schema);
+        const k = varKey(name, schema);
         const rec = records.get(k);
         if (!rec) return [];
         records.delete(k);
-        removeIndex(name, k);
-        return [cloneVar(rec)];
+        removeNameIndex(byName, name, k);
+        return [cloneVarRecord(rec)];
       }
       const set = byName.get(name);
       if (!set) return [];
@@ -301,7 +227,7 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       for (const k of [...set]) {
         const rec = records.get(k);
         if (rec) {
-          removed.push(cloneVar(rec));
+          removed.push(cloneVarRecord(rec));
           records.delete(k);
         }
       }
@@ -311,14 +237,14 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
 
     update(name: string, hash: Hash, options?: VarSetOptions): Variable {
       validateName(name);
-      const newSchema = extractSchema(hash);
+      const newSchema = extractSchema(cas, hash);
       // Find existing record by name; require existing schema match new schema
       const set = byName.get(name);
       if (!set || set.size === 0) {
         throw new VariableNotFoundError(name, newSchema);
       }
       // find a record matching newSchema
-      const k = key(name, newSchema);
+      const k = varKey(name, newSchema);
       const existing = records.get(k);
       if (!existing) {
         // Find any existing — schema mismatch
@@ -333,7 +259,7 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       const now = Date.now();
       const tags = options?.tags ?? existing.tags;
       const labels = options?.labels ?? existing.labels;
-      if (options !== undefined) checkConflict(tags, labels);
+      if (options !== undefined) checkTagLabelConflict(tags, labels);
       const changed = pushHistory(existing, hash, now);
       if (changed) {
         existing.value = hash;
@@ -343,7 +269,7 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
         existing.tags = { ...tags };
         existing.labels = [...labels];
       }
-      return cloneVar(existing);
+      return cloneVarRecord(existing);
     },
 
     list(options?: VarListOptions): Variable[] {
@@ -400,12 +326,12 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
 
       if (offset > 0) results = results.slice(offset);
       if (limit !== undefined) results = results.slice(0, limit);
-      return results.map(cloneVar);
+      return results.map(cloneVarRecord);
     },
 
     history(name: string, schema?: Hash): HistoryEntry[] {
       if (schema !== undefined) {
-        const rec = records.get(key(name, schema));
+        const rec = records.get(varKey(name, schema));
         return rec ? rec.history.map((e) => ({ ...e })) : [];
       }
       const set = byName.get(name);
@@ -535,14 +461,14 @@ export function createMemoryTagStoreImpl(): TagStore {
 }
 
 /**
- * Create an in-memory `OcasStore` with three sub-stores: `cas`, `var`, `tag`.
+ * Create an in-memory `Store` with three sub-stores: `cas`, `var`, `tag`.
  *
  * The `cas` sub-store also satisfies the legacy `BootstrapCapableStore`
  * contract — it carries a `[BOOTSTRAP_STORE]` callable and a `listAll()`
  * helper — so existing helpers (`bootstrap`, `gc`, `render`, …) can be
  * called with `store.cas` until they are migrated to the unified surface.
  */
-export function createMemoryStore(): OcasStore & {
+export function createMemoryStore(): Store & {
   cas: MemoryCasStore;
 } {
   const cas = createCasStore();

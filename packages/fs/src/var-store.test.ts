@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash, OcasStore } from "@ocas/core";
+import type { Hash, Store } from "@ocas/core";
 import {
   CasNodeNotFoundError,
   InvalidVariableNameError,
@@ -16,7 +16,7 @@ import { openStore } from "./store.js";
 const META_TYPE_KEY = Symbol.for("@ocas/core/bootstrap-store");
 
 async function setupStore(dir: string): Promise<{
-  store: OcasStore;
+  store: Store;
   schema: Hash;
   put: (payload: unknown) => Hash;
 }> {

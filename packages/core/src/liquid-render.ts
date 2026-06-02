@@ -1,7 +1,7 @@
 import { type Context, Liquid, type TagToken } from "liquidjs";
 import type { RenderOptions } from "./render.js";
 import { putSchema } from "./schema.js";
-import type { Hash, OcasStore } from "./types.js";
+import type { Hash, Store } from "./types.js";
 
 const DEFAULT_RESOLUTION = 1.0;
 const DEFAULT_DECAY = 0.5;
@@ -13,7 +13,7 @@ const FLOAT_TOLERANCE = 1e-10;
  * Templates are discovered via variables: @ocas/template/text/<type-hash>
  */
 export async function renderWithTemplate(
-  store: OcasStore,
+  store: Store,
   hash: Hash,
   options?: RenderOptions,
 ): Promise<string> {
@@ -43,7 +43,7 @@ export async function renderWithTemplate(
 /**
  * Create a Liquid engine instance with custom render tag
  */
-function createLiquidEngine(store: OcasStore, globalDecay: number): Liquid {
+function createLiquidEngine(store: Store, globalDecay: number): Liquid {
   const engine = new Liquid({
     strictFilters: false,
     strictVariables: false,
@@ -141,7 +141,7 @@ function createLiquidEngine(store: OcasStore, globalDecay: number): Liquid {
  */
 async function renderNode(
   engine: Liquid,
-  store: OcasStore,
+  store: Store,
   hash: Hash,
   currentResolution: number,
   epsilon: number,
@@ -200,14 +200,14 @@ async function renderNode(
  * Find a template for a given type hash
  */
 async function findTemplate(
-  store: OcasStore,
+  store: Store,
   typeHash: Hash,
 ): Promise<string | null> {
   const varName = `@ocas/template/text/${typeHash}`;
 
   try {
     // Find the string schema hash (we need this to query variables)
-    const stringSchema = await putSchema(store, { type: "string" });
+    const stringSchema = putSchema(store, { type: "string" });
 
     const variable = store.var.get(varName, stringSchema);
     if (variable === null) {

@@ -47,23 +47,7 @@ export type ListEntry = {
 };
 
 /**
- * Content-addressable store interface.
- * Self-referencing nodes are created only via bootstrap().
- */
-export type Store = {
-  put(typeHash: Hash, payload: unknown): Hash | Promise<Hash>;
-  get(hash: Hash): CasNode | null;
-  has(hash: Hash): boolean;
-  listByType(typeHash: Hash, options?: ListOptions): ListEntry[];
-  listAll(): Hash[];
-  listMeta(options?: ListOptions): ListEntry[];
-  listSchemas(options?: ListOptions): ListEntry[];
-  delete(hash: Hash): void;
-};
-
-/**
- * Synchronous content-addressable store interface (new unified design).
- * Unlike legacy `Store`, `put` returns the hash synchronously.
+ * Synchronous content-addressable store interface.
  */
 export type CasStore = {
   get(hash: Hash): CasNode | null;
@@ -149,9 +133,8 @@ export type TagStore = {
 
 /**
  * Aggregate OCAS store: bundles CAS, variable, and tag stores.
- * Named `OcasStore` to avoid colliding with the legacy `Store` export.
  */
-export type OcasStore = {
+export type Store = {
   cas: CasStore;
   var: VarStore;
   tag: TagStore;

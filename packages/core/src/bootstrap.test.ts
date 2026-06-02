@@ -35,7 +35,7 @@ const OUTPUT_ALIASES = [
 describe("bootstrap - Built-in Schemas", () => {
   test("should return map of 30 built-in schema aliases to hashes", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     // Should return object with 9 primitive + 21 output aliases = 30
     expect(builtinSchemas).toHaveProperty("@ocas/schema");
@@ -63,7 +63,7 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("should register @ocas/schema as meta-schema alias", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     const metaHash = builtinSchemas["@ocas/schema"];
     if (!metaHash) throw new Error("@ocas/schema not found");
@@ -76,7 +76,7 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("should register @ocas/string schema correctly", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     const stringHash = builtinSchemas["@ocas/string"];
     if (!stringHash) throw new Error("@ocas/string not found");
@@ -87,7 +87,7 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("should register @ocas/number schema correctly", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     const numberHash = builtinSchemas["@ocas/number"];
     if (!numberHash) throw new Error("@ocas/number not found");
@@ -98,7 +98,7 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("should register @ocas/object schema correctly", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     const objectHash = builtinSchemas["@ocas/object"];
     if (!objectHash) throw new Error("@ocas/object not found");
@@ -109,7 +109,7 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("should register @ocas/array schema correctly", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     const arrayHash = builtinSchemas["@ocas/array"];
     if (!arrayHash) throw new Error("@ocas/array not found");
@@ -120,7 +120,7 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("should register @ocas/bool schema correctly", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     const boolHash = builtinSchemas["@ocas/bool"];
     if (!boolHash) throw new Error("@ocas/bool not found");
@@ -131,8 +131,8 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("should return same hashes on repeated bootstrap calls", async () => {
     const store = createMemoryStore();
-    const first = await bootstrap(store);
-    const second = await bootstrap(store);
+    const first = bootstrap(store);
+    const second = bootstrap(store);
 
     expect(first).toEqual(second);
 
@@ -147,7 +147,7 @@ describe("bootstrap - Built-in Schemas", () => {
 
   test("all built-in schemas should be typed by meta-schema", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
 
     const metaHash = builtinSchemas["@ocas/schema"];
     if (!metaHash) throw new Error("@ocas/schema not found");
@@ -169,7 +169,7 @@ describe("bootstrap - Built-in Schemas", () => {
 describe("bootstrap - @ocas/output/* Schemas", () => {
   test("each @ocas/output/* schema has a title", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     for (const alias of OUTPUT_ALIASES) {
       const hash = aliases[alias];
@@ -184,7 +184,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/put schema describes a ocas_ref string", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/put"];
     if (!hash) throw new Error("@ocas/output/put not found");
 
@@ -198,7 +198,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/get schema describes object with type, payload, timestamp", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/get"];
     if (!hash) throw new Error("@ocas/output/get not found");
 
@@ -214,7 +214,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/has schema describes a boolean", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/has"];
     if (!hash) throw new Error("@ocas/output/has not found");
 
@@ -226,7 +226,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/verify schema describes enum of ok|corrupted|invalid", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/verify"];
     if (!hash) throw new Error("@ocas/output/verify not found");
 
@@ -240,7 +240,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/refs schema describes array of ocas_ref strings", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/refs"];
     if (!hash) throw new Error("@ocas/output/refs not found");
 
@@ -253,7 +253,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/gc schema describes object with gc stats fields", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/gc"];
     if (!hash) throw new Error("@ocas/output/gc not found");
 
@@ -270,7 +270,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/var-set schema describes a Variable object", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/var-set"];
     if (!hash) throw new Error("@ocas/output/var-set not found");
 
@@ -286,7 +286,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/var-list schema describes array of Variable objects", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/var-list"];
     if (!hash) throw new Error("@ocas/output/var-list not found");
 
@@ -302,7 +302,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("@ocas/output/template-delete schema describes object with deleted boolean", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const hash = aliases["@ocas/output/template-delete"];
     if (!hash) throw new Error("@ocas/output/template-delete not found");
 
@@ -315,7 +315,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 
   test("all @ocas/output/* schemas are distinct hashes", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     const outputHashes = OUTPUT_ALIASES.map((alias) => aliases[alias]);
     const uniqueHashes = new Set(outputHashes);
@@ -326,7 +326,7 @@ describe("bootstrap - @ocas/output/* Schemas", () => {
 describe("bootstrap - meta and schemas indexes (D1)", () => {
   test("listMeta contains the bootstrap meta-schema hash", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const metaHash = aliases["@ocas/schema"];
     expect(store.cas.listMeta().map((e) => e.hash)).toContain(
       metaHash as string,
@@ -335,7 +335,7 @@ describe("bootstrap - meta and schemas indexes (D1)", () => {
 
   test("listSchemas contains meta-schema and all built-in schemas", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
     const schemas = store.cas.listSchemas().map((e) => e.hash);
 
     for (const [, hash] of Object.entries(aliases)) {
