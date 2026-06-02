@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe("list-meta CLI command", () => {
   test("E1. list-meta on bootstrapped store contains exactly the meta-schema hash", async () => {
-    // First, get @schema hash by calling has on it (also triggers bootstrap)
+    // First, get @ocas/schema hash by calling has on it (also triggers bootstrap)
     const { stdout: hashOut, exitCode: hashCode } = await runCli(
       ["hash", "@ocas/schema", "--pipe"],
       storePath,
@@ -28,7 +28,7 @@ describe("list-meta CLI command", () => {
     void hashOut;
     void hashCode;
 
-    // Bootstrap fully via 'list --type @schema'
+    // Bootstrap fully via 'list --type @ocas/schema'
     const { stdout: schemaListOut } = await runCli(
       ["list", "--type", "@ocas/schema"],
       storePath,
@@ -119,7 +119,7 @@ describe("F1. output schemas registered", () => {
 });
 
 describe("E4. list-schema vs list --type with multiple meta-schema versions", () => {
-  test("list-schema includes schemas typed by older meta-schemas; list --type @schema does not", async () => {
+  test("list-schema includes schemas typed by older meta-schemas; list --type @ocas/schema does not", async () => {
     // Set up two distinct meta-schemas via the library
     const store = await openFsStore(storePath);
     const m1 = await store[BOOTSTRAP_STORE]({

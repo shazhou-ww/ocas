@@ -76,7 +76,7 @@ async function runCli(...args: string[]): Promise<{
 }
 
 /**
- * Get bootstrap @string type hash
+ * Get bootstrap @ocas/string type hash
  */
 async function getStringHash(store: Store): Promise<Hash> {
   const builtinSchemas = await bootstrap(store);

@@ -67,7 +67,7 @@ function envValue(json: string): unknown {
 }
 
 describe("@ Alias Resolution - put", () => {
-  test("ocas put @string <file> should resolve alias", async () => {
+  test("ocas put @ocas/string <file> should resolve alias", async () => {
     await runCliAlias("init");
 
     const payloadFile = join(testDir, "payload.json");
@@ -85,7 +85,7 @@ describe("@ Alias Resolution - put", () => {
     expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 
-  test("ocas put @number <file> should resolve alias", async () => {
+  test("ocas put @ocas/number <file> should resolve alias", async () => {
     await runCliAlias("init");
 
     const payloadFile = join(testDir, "payload.json");
@@ -101,7 +101,7 @@ describe("@ Alias Resolution - put", () => {
     expect(envValue(stdout)).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 
-  test("ocas put @object <file> should resolve alias", async () => {
+  test("ocas put @ocas/object <file> should resolve alias", async () => {
     await runCliAlias("init");
 
     const payloadFile = join(testDir, "payload.json");
@@ -133,7 +133,7 @@ describe("@ Alias Resolution - put", () => {
     expect(stderr.length).toBeGreaterThan(0);
   });
 
-  test("ocas put @schema with nested type constraints should succeed", async () => {
+  test("ocas put @ocas/schema with nested type constraints should succeed", async () => {
     await runCliAlias("init");
 
     const schemaFile = join(testDir, "constrained-schema.json");
@@ -168,7 +168,7 @@ describe("@ Alias Resolution - put", () => {
 });
 
 describe("@ Alias Resolution - hash", () => {
-  test("ocas hash @string <file> should compute hash without storing", async () => {
+  test("ocas hash @ocas/string <file> should compute hash without storing", async () => {
     await runCliAlias("init");
 
     const payloadFile = join(testDir, "payload.json");

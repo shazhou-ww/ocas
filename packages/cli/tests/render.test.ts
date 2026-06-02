@@ -421,7 +421,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
     try {
       await runCli(["init"], tmpStore);
 
-      // Get @string type hash via bootstrap
+      // Get @ocas/string type hash via bootstrap
       const store = createFsStore(tmpStore);
       const types = await bootstrap(store);
       const stringType = types["@ocas/string"];
@@ -456,7 +456,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
     try {
       await runCli(["init"], tmpStore);
 
-      // Get @string type hash via bootstrap
+      // Get @ocas/string type hash via bootstrap
       const store = createFsStore(tmpStore);
       const types = await bootstrap(store);
       const stringType = types["@ocas/string"];

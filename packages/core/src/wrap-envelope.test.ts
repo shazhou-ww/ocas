@@ -39,7 +39,7 @@ describe("wrapEnvelope", () => {
     expect(envelope.value).toEqual(gcStats);
   });
 
-  test("resolves primitive alias @string", async () => {
+  test("resolves primitive alias @ocas/string", async () => {
     const store = createMemoryStore();
     const aliases = await bootstrap(store);
 

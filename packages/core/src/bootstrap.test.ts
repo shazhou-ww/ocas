@@ -61,12 +61,12 @@ describe("bootstrap - Built-in Schemas", () => {
     }
   });
 
-  test("should register @schema as meta-schema alias", async () => {
+  test("should register @ocas/schema as meta-schema alias", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
     const metaHash = builtinSchemas["@ocas/schema"];
-    if (!metaHash) throw new Error("@schema not found");
+    if (!metaHash) throw new Error("@ocas/schema not found");
 
     const metaSchema = getSchema(store, metaHash);
     expect(metaSchema).not.toBeNull();
@@ -74,45 +74,45 @@ describe("bootstrap - Built-in Schemas", () => {
     expect(metaSchema?.description).toBe("ocas JSON Schema meta-schema");
   });
 
-  test("should register @string schema correctly", async () => {
+  test("should register @ocas/string schema correctly", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
     const stringHash = builtinSchemas["@ocas/string"];
-    if (!stringHash) throw new Error("@string not found");
+    if (!stringHash) throw new Error("@ocas/string not found");
 
     const stringSchema = getSchema(store, stringHash);
     expect(stringSchema).toEqual({ type: "string" });
   });
 
-  test("should register @number schema correctly", async () => {
+  test("should register @ocas/number schema correctly", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
     const numberHash = builtinSchemas["@ocas/number"];
-    if (!numberHash) throw new Error("@number not found");
+    if (!numberHash) throw new Error("@ocas/number not found");
 
     const numberSchema = getSchema(store, numberHash);
     expect(numberSchema).toEqual({ type: "number" });
   });
 
-  test("should register @object schema correctly", async () => {
+  test("should register @ocas/object schema correctly", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
     const objectHash = builtinSchemas["@ocas/object"];
-    if (!objectHash) throw new Error("@object not found");
+    if (!objectHash) throw new Error("@ocas/object not found");
 
     const objectSchema = getSchema(store, objectHash);
     expect(objectSchema).toEqual({ type: "object" });
   });
 
-  test("should register @array schema correctly", async () => {
+  test("should register @ocas/array schema correctly", async () => {
     const store = createMemoryStore();
     const builtinSchemas = await bootstrap(store);
 
     const arrayHash = builtinSchemas["@ocas/array"];
-    if (!arrayHash) throw new Error("@array not found");
+    if (!arrayHash) throw new Error("@ocas/array not found");
 
     const arraySchema = getSchema(store, arrayHash);
     expect(arraySchema).toEqual({ type: "array" });
@@ -150,7 +150,7 @@ describe("bootstrap - Built-in Schemas", () => {
     const builtinSchemas = await bootstrap(store);
 
     const metaHash = builtinSchemas["@ocas/schema"];
-    if (!metaHash) throw new Error("@schema not found");
+    if (!metaHash) throw new Error("@ocas/schema not found");
 
     for (const [alias, hash] of Object.entries(builtinSchemas)) {
       if (alias === "@ocas/schema") continue; // meta-schema is self-typed

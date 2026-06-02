@@ -65,7 +65,7 @@ describe("registerOutputTemplates", () => {
     await registerOutputTemplates(store, varStore);
 
     const stringHash = aliases["@ocas/string"];
-    if (!stringHash) throw new Error("@string not found");
+    if (!stringHash) throw new Error("@ocas/string not found");
 
     for (const alias of OUTPUT_ALIASES) {
       const schemaHash = aliases[alias];
@@ -105,7 +105,7 @@ describe("registerOutputTemplates", () => {
     const putHash = aliases["@ocas/output/put"];
     if (!putHash) throw new Error("@ocas/output/put not found");
     const stringHash = aliases["@ocas/string"];
-    if (!stringHash) throw new Error("@string not found");
+    if (!stringHash) throw new Error("@ocas/string not found");
 
     const variable = varStore.get(`@ocas/template/text/${putHash}`, stringHash);
     if (variable === null)

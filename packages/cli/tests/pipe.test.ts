@@ -101,7 +101,7 @@ describe("Phase 8: Pipe Composition", () => {
     expect(stdout).toContain("Bob");
   });
 
-  test("8.3 list --type @schema emits a parseable envelope of hashes", async () => {
+  test("8.3 list --type @ocas/schema emits a parseable envelope of hashes", async () => {
     const { stdout, exitCode } = await runCli([
       "list",
       "--type",
@@ -117,7 +117,7 @@ describe("Phase 8: Pipe Composition", () => {
     }
   });
 
-  test("8.4 list --type @schema | render -p expands the schema list", async () => {
+  test("8.4 list --type @ocas/schema | render -p expands the schema list", async () => {
     const { stdout: listOut } = await runCli([
       "list",
       "--type",

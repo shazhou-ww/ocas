@@ -60,7 +60,7 @@ async function runCli(
 }
 
 describe("Phase 1: CAS Core", () => {
-  test("1.1 init + put with @object bootstraps store", async () => {
+  test("1.1 init + put with @ocas/object bootstraps store", async () => {
     expect(typeHash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
 

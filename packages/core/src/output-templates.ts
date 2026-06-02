@@ -58,7 +58,7 @@ const DEFAULT_TEMPLATES: ReadonlyArray<
 
 /**
  * Register default LiquidJS templates for all @ocas/output/* schemas.
- * Each template is stored as a @string CAS node and bound to
+ * Each template is stored as a @ocas/string CAS node and bound to
  * the variable `@ocas/template/text/<schema-hash>`.
  *
  * Idempotent: safe to call multiple times.
@@ -70,7 +70,7 @@ export async function registerOutputTemplates(
   const aliases = await bootstrap(store);
   const stringHash = aliases["@ocas/string"];
   if (stringHash === undefined) {
-    throw new Error("@string schema not found in bootstrap result");
+    throw new Error("@ocas/string schema not found in bootstrap result");
   }
 
   const registered: Record<string, Hash> = {};
