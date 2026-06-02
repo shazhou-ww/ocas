@@ -10,3 +10,7 @@
 - Updated dependencies:
   - @ocas/core@0.1.1
   - @ocas/fs@0.1.1
+
+## 0.1.0
+
+Initial release as `@ocas/cli`. CLI tool for OCAS with put, get, list, render, verify, gc, var, and template commands. Envelope output format with pipe composition support.
