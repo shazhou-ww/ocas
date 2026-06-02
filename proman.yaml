@@ -1,0 +1,15 @@
+name: "@ocas/workspace"
+runtime: bun
+packages:
+  - name: "@ocas/core"
+    path: packages/core
+  - name: "@ocas/fs"
+    path: packages/fs
+  - name: "@ocas/cli"
+    path: packages/cli
+changeset:
+  fixed: true
+release:
+  registry: https://registry.npmjs.org
+  access: public
+  gitTagPrefix: v
