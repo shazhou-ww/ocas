@@ -1,6 +1,10 @@
-# @uncaged/json-cas
+# @ocas/core
 
 ## 0.1.1
+
+### Patch Changes
+
+- Internal improvements for v0.1.1 release.
 
 ## 0.6.0
 

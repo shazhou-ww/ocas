@@ -1,12 +1,13 @@
-# @uncaged/cli-json-cas
+# @ocas/cli
 
 ## 0.1.1
 
 ### Patch Changes
 
-- [`ec9e04c`](https://github.com/shazhou-ww/ocas/commit/ec9e04c5c621946ccc75979cf0c4f1a3bb1aebaa) - Add `ocas prompt usage` and `ocas prompt setup` commands for agent skill management. Prompt content is bundled with the CLI and versioned with it.
+- Add `ocas prompt usage` and `ocas prompt setup` commands for agent skill management. Prompt content is bundled with the CLI and versioned with it.
+- Add `--version` flag to display CLI version.
 
-- Updated dependencies []:
+- Updated dependencies:
   - @ocas/core@0.1.1
   - @ocas/fs@0.1.1
 
