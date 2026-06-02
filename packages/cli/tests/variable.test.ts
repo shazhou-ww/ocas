@@ -183,7 +183,12 @@ describe("var set", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Update with hash2
-    const { stdout, exitCode } = await runCli("var", "set", "@test/config", hash2);
+    const { stdout, exitCode } = await runCli(
+      "var",
+      "set",
+      "@test/config",
+      hash2,
+    );
 
     expect(exitCode).toBe(0);
 
@@ -203,7 +208,12 @@ describe("var set", () => {
     await runCli("var", "set", "@test/config", hash1);
 
     // Create second variant with different schema
-    const { stdout, exitCode } = await runCli("var", "set", "@test/config", hash2);
+    const { stdout, exitCode } = await runCli(
+      "var",
+      "set",
+      "@test/config",
+      hash2,
+    );
 
     expect(exitCode).toBe(0);
 
@@ -364,13 +374,25 @@ describe("var get", () => {
     await runCli("var", "set", "@test/config", hash2);
 
     // Get first variant
-    const result1 = await runCli("var", "get", "@test/config", "--schema", typeHash1);
+    const result1 = await runCli(
+      "var",
+      "get",
+      "@test/config",
+      "--schema",
+      typeHash1,
+    );
     expect(result1.exitCode).toBe(0);
     const envelope1 = JSON.parse(result1.stdout);
     expect(envelope1.value.value).toBe(hash1);
 
     // Get second variant
-    const result2 = await runCli("var", "get", "@test/config", "--schema", typeHash2);
+    const result2 = await runCli(
+      "var",
+      "get",
+      "@test/config",
+      "--schema",
+      typeHash2,
+    );
     expect(result2.exitCode).toBe(0);
     const envelope2 = JSON.parse(result2.stdout);
     expect(envelope2.value.value).toBe(hash2);
@@ -399,10 +421,22 @@ describe("var delete", () => {
     expect(envelope.value.length).toBe(2);
 
     // Verify both are deleted
-    const result1 = await runCli("var", "get", "@test/config", "--schema", typeHash1);
+    const result1 = await runCli(
+      "var",
+      "get",
+      "@test/config",
+      "--schema",
+      typeHash1,
+    );
     expect(result1.exitCode).toBe(1);
 
-    const result2 = await runCli("var", "get", "@test/config", "--schema", typeHash2);
+    const result2 = await runCli(
+      "var",
+      "get",
+      "@test/config",
+      "--schema",
+      typeHash2,
+    );
     expect(result2.exitCode).toBe(1);
   });
 
@@ -432,16 +466,32 @@ describe("var delete", () => {
     expect(envelope.value.schema).toBe(typeHash1);
 
     // Verify first is deleted
-    const result1 = await runCli("var", "get", "@test/config", "--schema", typeHash1);
+    const result1 = await runCli(
+      "var",
+      "get",
+      "@test/config",
+      "--schema",
+      typeHash1,
+    );
     expect(result1.exitCode).toBe(1);
 
     // Verify second still exists
-    const result2 = await runCli("var", "get", "@test/config", "--schema", typeHash2);
+    const result2 = await runCli(
+      "var",
+      "get",
+      "@test/config",
+      "--schema",
+      typeHash2,
+    );
     expect(result2.exitCode).toBe(0);
   });
 
   test("return empty array when name not found", async () => {
-    const { stdout, exitCode } = await runCli("var", "delete", "@test/nonexistent");
+    const { stdout, exitCode } = await runCli(
+      "var",
+      "delete",
+      "@test/nonexistent",
+    );
 
     expect(exitCode).toBe(0);
 
@@ -825,7 +875,16 @@ describe("var tag", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Create variable with labels
-    await runCli("var", "set", "@test/x", hash, "--tag", "stable", "--tag", "beta");
+    await runCli(
+      "var",
+      "set",
+      "@test/x",
+      hash,
+      "--tag",
+      "stable",
+      "--tag",
+      "beta",
+    );
 
     // Delete label
     const { stdout, exitCode } = await runCli(
@@ -912,7 +971,12 @@ describe("var tag", () => {
   });
 
   test("error when --schema missing", async () => {
-    const { stderr, exitCode } = await runCli("var", "tag", "@test/x", "env:prod");
+    const { stderr, exitCode } = await runCli(
+      "var",
+      "tag",
+      "@test/x",
+      "env:prod",
+    );
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(

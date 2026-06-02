@@ -1261,7 +1261,9 @@ switch (cmd) {
         break;
       }
       default:
-        die(`Unknown prompt subcommand: ${sub ?? "(none)"}. Available: usage, setup`);
+        die(
+          `Unknown prompt subcommand: ${sub ?? "(none)"}. Available: usage, setup`,
+        );
     }
     break;
   }
