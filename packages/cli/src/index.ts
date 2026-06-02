@@ -92,6 +92,14 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
 
 const { flags, positional } = parseArgs(process.argv.slice(2));
 
+// --- Handle --version early ---
+if (flags.version === true) {
+  const pkgPath = join(import.meta.dir, "..", "package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+  process.stdout.write(`${pkg.version}\n`);
+  process.exit(0);
+}
+
 const defaultStorePath = join(homedir(), ".ocas");
 const storePath =
   typeof flags.home === "string"
