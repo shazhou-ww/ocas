@@ -198,7 +198,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
       );
 
       expect(exitCode).toBe(0);
-      expect(output).toBe("Hello Alice!");
+      expect(output).toBe("Hello Alice!\n");
     } finally {
       rmSync(tmpStore, { recursive: true, force: true });
     }
@@ -321,7 +321,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
       );
 
       expect(exitCode).toBe(0);
-      expect(output).toBe("Greetings Bob!");
+      expect(output).toBe("Greetings Bob!\n");
     } finally {
       rmSync(tmpStore, { recursive: true, force: true });
     }
