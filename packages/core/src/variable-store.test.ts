@@ -274,8 +274,12 @@ describe("VariableStore - set() Upsert Method", () => {
     expect(varA.value).not.toBe(varB.value);
 
     // Verify both exist independently
-    expect((varStore.get("@test/config", schemaA) as Variable).value).toBe(hashA);
-    expect((varStore.get("@test/config", schemaB) as Variable).value).toBe(hashB);
+    expect((varStore.get("@test/config", schemaA) as Variable).value).toBe(
+      hashA,
+    );
+    expect((varStore.get("@test/config", schemaB) as Variable).value).toBe(
+      hashB,
+    );
 
     varStore.close();
   });
@@ -866,7 +870,9 @@ describe("VariableStore - Name Validation", () => {
     expect(() =>
       varStore.set("@test/deeply/nested/path/to/var", dataHash),
     ).not.toThrow();
-    expect(() => varStore.set("@test/uwf.thread.id_123", dataHash)).not.toThrow();
+    expect(() =>
+      varStore.set("@test/uwf.thread.id_123", dataHash),
+    ).not.toThrow();
 
     varStore.close();
   });
@@ -939,7 +945,9 @@ describe("VariableStore - Name Validation", () => {
     expect(() => varStore.set("a//b", dataHash)).toThrow(
       InvalidVariableNameError,
     );
-    expect(() => varStore.set("a//b", dataHash)).toThrow(/must follow @scope\/name|empty segment/i);
+    expect(() => varStore.set("a//b", dataHash)).toThrow(
+      /must follow @scope\/name|empty segment/i,
+    );
 
     // Triple slash
     expect(() => varStore.set("a///b", dataHash)).toThrow(
@@ -962,13 +970,17 @@ describe("VariableStore - Name Validation", () => {
     expect(() => varStore.set("/abc", dataHash)).toThrow(
       InvalidVariableNameError,
     );
-    expect(() => varStore.set("/abc", dataHash)).toThrow(/must follow @scope\/name|leading slash/i);
+    expect(() => varStore.set("/abc", dataHash)).toThrow(
+      /must follow @scope\/name|leading slash/i,
+    );
 
     // Trailing slash
     expect(() => varStore.set("abc/", dataHash)).toThrow(
       InvalidVariableNameError,
     );
-    expect(() => varStore.set("abc/", dataHash)).toThrow(/must follow @scope\/name|trailing slash/i);
+    expect(() => varStore.set("abc/", dataHash)).toThrow(
+      /must follow @scope\/name|trailing slash/i,
+    );
 
     // Both
     expect(() => varStore.set("/abc/", dataHash)).toThrow(
@@ -1095,7 +1107,9 @@ describe("VariableStore - validateName() Error Messages", () => {
     } catch (e) {
       expect(e).toBeInstanceOf(InvalidVariableNameError);
       const error = e as InvalidVariableNameError;
-      expect(error.reason).toMatch(/empty segment|consecutive|leading|start|begins/i);
+      expect(error.reason).toMatch(
+        /empty segment|consecutive|leading|start|begins/i,
+      );
       expect(error.reason).not.toMatch(/trailing|end/i);
     }
 
@@ -1124,8 +1138,12 @@ describe("VariableStore - validateName() Error Messages", () => {
     expect(() => varStore.set("@test/app.config", dataHash)).not.toThrow();
     expect(() => varStore.set("@test/my_variable", dataHash)).not.toThrow();
     expect(() => varStore.set("@test/test-name", dataHash)).not.toThrow();
-    expect(() => varStore.set("@test/path/to/config.json", dataHash)).not.toThrow();
-    expect(() => varStore.set("@test/v1.2.3-alpha_001", dataHash)).not.toThrow();
+    expect(() =>
+      varStore.set("@test/path/to/config.json", dataHash),
+    ).not.toThrow();
+    expect(() =>
+      varStore.set("@test/v1.2.3-alpha_001", dataHash),
+    ).not.toThrow();
   });
 });
 
@@ -1335,7 +1353,10 @@ describe("VariableStore - List Operation", () => {
     const vars = varStore.list();
 
     expect(vars.length).toBe(2);
-    expect(vars.map((v) => v.name).sort()).toEqual(["@test/var1", "@test/var2"]);
+    expect(vars.map((v) => v.name).sort()).toEqual([
+      "@test/var1",
+      "@test/var2",
+    ]);
 
     varStore.close();
   });
@@ -1436,7 +1457,10 @@ describe("VariableStore - list() with exactName", () => {
     varStore.set("@test/config", valueB);
 
     // When: Filter by both exactName and schema
-    const results = varStore.list({ exactName: "@test/config", schema: schemaA });
+    const results = varStore.list({
+      exactName: "@test/config",
+      schema: schemaA,
+    });
 
     // Then: Returns only schemaA variant
     expect(results.length).toBe(1);
