@@ -129,7 +129,7 @@ async function out(data: unknown, store?: Store): Promise<void> {
     // varStore is intentionally omitted — inline render uses YAML fallback
     // only, custom templates require the full `ocas render` command.
     const output = renderDirect(envelope.type as Hash, envelope.value, s, null);
-    process.stdout.write(output);
+    process.stdout.write(output + "\n");
     return;
   }
   console.log(compact ? JSON.stringify(data) : JSON.stringify(data, null, 2));
@@ -508,15 +508,7 @@ async function cmdRender(args: string[]): Promise<void> {
     );
   }
 
-  let store: Store;
-  let varStore: VariableStore | undefined;
-  if (isPipe) {
-    store = await openStore();
-  } else {
-    const opened = await openStoreAndVarStore();
-    store = opened.store;
-    varStore = opened.varStore;
-  }
+  const { store, varStore } = await openStoreAndVarStore();
 
   // Parse numeric options
   const resolution =
@@ -579,35 +571,42 @@ async function cmdRender(args: string[]): Promise<void> {
         );
       }
 
-      const output = renderDirect(
-        envelope.type as Hash,
-        envelope.value,
-        store,
-        {
-          resolution,
-          decay,
-          epsilon,
-        },
-      );
-      process.stdout.write(output);
-    } else {
-      if (varStore === undefined) {
-        die("Internal error: varStore not initialized");
-      }
-      try {
-        const hash = resolveHash(input as string, varStore);
-        const output = await renderAsync(store, hash, {
+      // If the envelope value is a hash string (e.g. from `put` output),
+      // resolve it through renderAsync to apply templates and expand refs.
+      // Otherwise, use renderDirect for inline rendering of the envelope value.
+      if (typeof envelope.value === "string" && isHash(envelope.value)) {
+        const output = await renderAsync(store, envelope.value as Hash, {
           resolution,
           decay,
           epsilon,
           varStore,
         });
-        // Output to stdout without JSON wrapping (raw output)
-        process.stdout.write(output);
-      } finally {
-        varStore.close();
+        process.stdout.write(output + "\n");
+      } else {
+        const output = renderDirect(
+          envelope.type as Hash,
+          envelope.value,
+          store,
+          {
+            resolution,
+            decay,
+            epsilon,
+          },
+        );
+        process.stdout.write(output + "\n");
       }
+    } else {
+      const hash = resolveHash(input as string, varStore);
+      const output = await renderAsync(store, hash, {
+        resolution,
+        decay,
+        epsilon,
+        varStore,
+      });
+      // Output to stdout without JSON wrapping (raw output)
+      process.stdout.write(output + "\n");
     }
+    varStore.close();
   } catch (error) {
     if (error instanceof CasNodeNotFoundError) {
       die(`Error: Node not found: ${error.hash}`);
