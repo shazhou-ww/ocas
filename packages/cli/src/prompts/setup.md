@@ -11,12 +11,19 @@ so that you know how to use the `ocas` CLI.
    ```
    If not installed: `bun add -g @ocas/cli`
 
-2. **Get the usage skill content:**
+2. **Clean up old versions of the skill** (if any exist):
+   - Look for any existing OCAS/ocas skill files in your skill directories
+     (e.g. `~/.hermes/skills/ocas/SKILL.md` or similar paths).
+   - If a skill exists, read its `version` from the YAML frontmatter.
+   - If the version matches the current CLI version (`ocas --version`), you're done — no update needed.
+   - If the version is older, **delete the old skill file** before proceeding.
+
+3. **Get the usage skill content:**
    ```bash
    ocas prompt usage
    ```
 
-3. **Create a SKILL.md file** in your skill directory (e.g. `~/.hermes/skills/ocas/SKILL.md`).
+4. **Create a SKILL.md file** in your skill directory (e.g. `~/.hermes/skills/ocas/SKILL.md`).
    The output of `ocas prompt usage` is the skill body WITHOUT frontmatter.
    You must prepend the following YAML frontmatter:
 
@@ -33,10 +40,7 @@ so that you know how to use the `ocas` CLI.
    ---
    ```
 
-   Replace `<VERSION>` with the installed CLI version (from `ocas prompt usage` header or `ocas --help`).
-
-4. **If updating an existing skill**, compare the `version` in your current SKILL.md
-   frontmatter with the installed CLI version. If the CLI is newer, replace the file.
+   Replace `<VERSION>` with the installed CLI version (from `ocas --version`).
 
 5. **Verify** the skill is loadable by your agent framework.
 
@@ -46,3 +50,4 @@ so that you know how to use the `ocas` CLI.
   `ocas prompt usage` to get the content matching your installed version.
 - Do NOT hand-edit the skill body. If the CLI is updated, re-run `ocas prompt setup`
   and follow the steps again.
+- When upgrading, always delete the old skill first to avoid stale instructions.

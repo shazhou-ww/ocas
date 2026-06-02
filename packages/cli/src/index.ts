@@ -1096,6 +1096,8 @@ async function cmdListSchema(_args: string[]): Promise<void> {
 }
 
 function printUsage(): void {
+  const pkgPath = join(import.meta.dir, "..", "package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
   console.log(`\
 Usage: ocas [--home <path>] [--json] <command> [args]
 
@@ -1139,7 +1141,9 @@ Flags:
   --resolution <n>    Initial resolution for render (default: 1.0)
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)
-  --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)`);
+  --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
+
+Agent: If you have not installed the ocas skill for this version (${pkg.version}), run \`ocas prompt setup\` and follow the instructions.`);
 }
 
 // ---- Dispatch ----

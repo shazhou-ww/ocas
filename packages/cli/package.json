@@ -7,7 +7,6 @@
   },
   "scripts": {
     "test": "bun test",
-    "postinstall": "bun scripts/postinstall.js || true",
     "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
