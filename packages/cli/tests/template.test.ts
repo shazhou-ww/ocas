@@ -2,15 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash, Store } from "@ocas/core";
+import type { Hash, OcasStore } from "@ocas/core";
 import { bootstrap } from "@ocas/core";
-import { createFsStore } from "@ocas/fs";
+import { openStore as openFsStore } from "@ocas/fs";
 
 // ---- Test helpers ----
 
 let testDir: string;
 let storePath: string;
-let varDbPath: string;
 let cliPath: string;
 
 beforeEach(() => {
@@ -20,7 +19,6 @@ beforeEach(() => {
     `ocas-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   storePath = join(testDir, "store");
-  varDbPath = join(testDir, "variables.db");
   cliPath = join(import.meta.dir, "../src/index.ts");
 
   mkdirSync(testDir, { recursive: true });
@@ -45,16 +43,7 @@ async function runCli(...args: string[]): Promise<{
   exitCode: number;
 }> {
   const proc = Bun.spawn(
-    [
-      "bun",
-      "run",
-      cliPath,
-      "--home",
-      storePath,
-      "--var-db",
-      varDbPath,
-      ...args,
-    ],
+    ["bun", "run", cliPath, "--home", storePath, ...args],
     {
       stdout: "pipe",
       stderr: "pipe",
@@ -78,7 +67,7 @@ async function runCli(...args: string[]): Promise<{
 /**
  * Get bootstrap @ocas/string type hash
  */
-async function getStringHash(store: Store): Promise<Hash> {
+async function getStringHash(store: OcasStore): Promise<Hash> {
   const builtinSchemas = await bootstrap(store);
   return builtinSchemas["@ocas/string"] ?? "";
 }
@@ -87,7 +76,7 @@ async function getStringHash(store: Store): Promise<Hash> {
 
 describe("template set", () => {
   test("set template from file", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const templateFile = join(testDir, "template.txt");
@@ -110,7 +99,7 @@ describe("template set", () => {
   });
 
   test("set template with --inline flag", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const { stdout, exitCode } = await runCli(
@@ -130,7 +119,7 @@ describe("template set", () => {
   });
 
   test("update existing template (idempotent)", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const templateFile = join(testDir, "template.txt");
@@ -159,7 +148,7 @@ describe("template set", () => {
   });
 
   test("error when file not found", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const { stderr, exitCode } = await runCli(
@@ -189,7 +178,7 @@ describe("template set", () => {
   });
 
   test("error when both file and --inline provided", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const templateFile = join(testDir, "template.txt");
@@ -209,7 +198,7 @@ describe("template set", () => {
   });
 
   test("support multi-line templates", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const multilineContent = "Line 1\nLine 2\nLine 3";
@@ -229,7 +218,7 @@ describe("template set", () => {
   });
 
   test("support empty templates", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const { stdout, exitCode } = await runCli(
@@ -247,7 +236,7 @@ describe("template set", () => {
   });
 
   test("error when neither file nor --inline provided", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const { stderr, exitCode } = await runCli("template", "set", stringHash);
@@ -257,7 +246,7 @@ describe("template set", () => {
   });
 
   test("support templates with special characters", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const specialContent = "Template with {{var}} and $env and @ref";
@@ -279,7 +268,7 @@ describe("template set", () => {
 
 describe("template get", () => {
   test("retrieve template as envelope value", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const content = "Hello {{name}}!";
@@ -299,7 +288,7 @@ describe("template get", () => {
   });
 
   test("error when template not found", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const { stderr, exitCode } = await runCli("template", "get", stringHash);
@@ -310,7 +299,7 @@ describe("template get", () => {
   });
 
   test("preserve exact whitespace", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     // The envelope's value preserves exact whitespace (JSON-escaped),
@@ -324,7 +313,7 @@ describe("template get", () => {
   });
 
   test("support multi-line templates", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const multiline = "Line 1\nLine 2\nLine 3";
@@ -338,7 +327,7 @@ describe("template get", () => {
 
 describe("template list", () => {
   test("list all templates", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     // Create multiple templates
@@ -361,7 +350,7 @@ describe("template list", () => {
   });
 
   test("entry contentHash matches set result", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const { stdout: setOut } = await runCli(
@@ -397,14 +386,14 @@ describe("template list", () => {
   });
 
   test("exclude non-template variables", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     // Create a template
     await runCli("template", "set", stringHash, "--inline", "Template");
 
     // Create a regular variable (not under @ocas/template/text/)
-    const hash = await store.put(stringHash, "regular var content");
+    const hash = store.cas.put(stringHash, "regular var content");
     await runCli("var", "set", "regular/var", hash);
 
     const { stdout } = await runCli("template", "list");
@@ -417,7 +406,7 @@ describe("template list", () => {
   });
 
   test("output JSON envelope with array value", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     await runCli("template", "set", stringHash, "--inline", "Test");
@@ -434,7 +423,7 @@ describe("template list", () => {
 
 describe("template delete", () => {
   test("delete template variable binding", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     await runCli("template", "set", stringHash, "--inline", "Template");
@@ -463,7 +452,7 @@ describe("template delete", () => {
   });
 
   test("error when template not found", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const { stderr, exitCode } = await runCli("template", "delete", stringHash);
@@ -474,7 +463,7 @@ describe("template delete", () => {
   });
 
   test("deletion does not affect other templates", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     // Create two templates
@@ -497,7 +486,7 @@ describe("template delete", () => {
   });
 
   test("CAS content remains after variable deletion", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     await runCli("template", "set", stringHash, "--inline", "Content");
@@ -521,7 +510,7 @@ describe("template delete", () => {
   });
 
   test("deletion is non-idempotent (second delete fails)", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     await runCli("template", "set", stringHash, "--inline", "Template");
@@ -546,7 +535,7 @@ describe("template delete", () => {
 
 describe("template integration", () => {
   test("end-to-end workflow: set→get→list→delete", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     const content = "Integration test template";
@@ -593,7 +582,7 @@ describe("template integration", () => {
   });
 
   test("templates compatible with generic var commands", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     // Set via template command
@@ -607,7 +596,7 @@ describe("template integration", () => {
   });
 
   test("multiple templates for different schemas", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const stringHash = await getStringHash(store);
 
     // Create templates for different schemas

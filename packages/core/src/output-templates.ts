@@ -1,6 +1,5 @@
 import { bootstrap } from "./bootstrap.js";
-import type { Hash, Store } from "./types.js";
-import type { VariableStore } from "./variable-store.js";
+import type { Hash, OcasStore } from "./types.js";
 
 const DEFAULT_TEMPLATES: ReadonlyArray<
   readonly [alias: string, template: string]
@@ -64,8 +63,7 @@ const DEFAULT_TEMPLATES: ReadonlyArray<
  * Idempotent: safe to call multiple times.
  */
 export async function registerOutputTemplates(
-  store: Store,
-  varStore: VariableStore,
+  store: OcasStore,
 ): Promise<Record<string, Hash>> {
   const aliases = await bootstrap(store);
   const stringHash = aliases["@ocas/string"];
@@ -81,9 +79,9 @@ export async function registerOutputTemplates(
       throw new Error(`Schema alias not found: ${alias}`);
     }
 
-    const contentHash = await store.put(stringHash, template);
+    const contentHash = store.cas.put(stringHash, template);
     const varName = `@ocas/template/text/${schemaHash}`;
-    varStore.set(varName, contentHash);
+    store.var.set(varName, contentHash);
     registered[alias] = contentHash;
   }
 

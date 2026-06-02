@@ -38,17 +38,16 @@ describe("ocas binary", () => {
 
 describe("Phase 7: Edge Cases", () => {
   let tmpStore: string;
-  let varDbPath: string;
   let typeHash: string;
   let nodeHash: string;
 
   async function runCli(
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
-      { stdout: "pipe", stderr: "pipe" },
-    );
+    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const exitCode = await proc.exited;
     const stdout = (await new Response(proc.stdout).text()).trim();
     const stderr = (await new Response(proc.stderr).text()).trim();
@@ -57,7 +56,6 @@ describe("Phase 7: Edge Cases", () => {
 
   beforeAll(async () => {
     tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
-    varDbPath = join(tmpStore, "variables.db");
 
     const schemaFile = join(tmpStore, "test-schema.json");
     writeFileSync(
@@ -134,16 +132,7 @@ describe("Phase 7: Edge Cases", () => {
     const fileAsStore = join(tmpStore, "not-a-directory");
     writeFileSync(fileAsStore, "test");
     const proc = Bun.spawn(
-      [
-        "bun",
-        entrypoint,
-        "--home",
-        fileAsStore,
-        "--var-db",
-        varDbPath,
-        "get",
-        "AAAAAAAAAAAAA",
-      ],
+      ["bun", entrypoint, "--home", fileAsStore, "get", "AAAAAAAAAAAAA"],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;
@@ -157,17 +146,16 @@ describe("Phase 7: Edge Cases", () => {
 
 describe("Phase 3: Variable System", () => {
   let tmpStore: string;
-  let varDbPath: string;
   let typeHash: string;
   let nodeHash: string;
 
   async function runCli(
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
-      { stdout: "pipe", stderr: "pipe" },
-    );
+    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const exitCode = await proc.exited;
     const stdout = (await new Response(proc.stdout).text()).trim();
     const stderr = (await new Response(proc.stderr).text()).trim();
@@ -176,7 +164,6 @@ describe("Phase 3: Variable System", () => {
 
   beforeAll(async () => {
     tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
-    varDbPath = join(tmpStore, "variables.db");
 
     const schemaFile = join(tmpStore, "test-schema.json");
     writeFileSync(
@@ -233,7 +220,11 @@ describe("Phase 3: Variable System", () => {
   test("3.3 var list shows all variables", async () => {
     const { stdout, exitCode } = await runCli(["var", "list"]);
     expect(exitCode).toBe(0);
-    expect(stripVolatile(stdout)).toMatchSnapshot();
+    const stripped = stripVolatile(stdout) as { value: { name: string }[] };
+    stripped.value.sort((a, b) =>
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+    );
+    expect(stripped).toMatchSnapshot();
     expect(stdout).toContain("@myapp/config");
   });
 
@@ -347,16 +338,15 @@ describe("Phase 3: Variable System", () => {
 
 describe("Phase 4: Template System", () => {
   let tmpStore: string;
-  let varDbPath: string;
   let typeHash: string;
 
   async function runCli(
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
-      { stdout: "pipe", stderr: "pipe" },
-    );
+    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const exitCode = await proc.exited;
     const stdout = (await new Response(proc.stdout).text()).trim();
     const stderr = (await new Response(proc.stderr).text()).trim();
@@ -365,7 +355,6 @@ describe("Phase 4: Template System", () => {
 
   beforeAll(async () => {
     tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
-    varDbPath = join(tmpStore, "variables.db");
 
     const schemaFile = join(tmpStore, "test-schema.json");
     writeFileSync(

@@ -1,7 +1,20 @@
 import {
-  BOOTSTRAP_STORE,
-  type BootstrapCapableStore,
-} from "./bootstrap-capable.js";
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { join } from "node:path";
+import type {
+  CasStore,
+  Hash,
+  HistoryEntry,
+  Tag,
+  TagStore,
+  Variable,
+  VarListOptions,
+  VarStore,
+} from "@ocas/core";
 import {
   CasNodeNotFoundError,
   InvalidVariableNameError,
@@ -9,172 +22,38 @@ import {
   SchemaMismatchError,
   TagLabelConflictError,
   VariableNotFoundError,
-} from "./errors.js";
-import { computeHashSync, computeSelfHashSync, initHasher } from "./hash.js";
-import { applyListOptions, casListEntry } from "./list-utils.js";
-import type {
-  CasNode,
-  CasStore,
-  Hash,
-  HistoryEntry,
-  ListEntry,
-  ListOptions,
-  OcasStore,
-  Tag,
-  TagOp,
-  TagStore,
-  VarListOptions,
-  VarSetOptions,
-  VarStore,
-} from "./types.js";
-import type { Variable } from "./variable.js";
+} from "@ocas/core";
 
-// Initialise the xxhash WASM instance once at module load. This allows the
-// CAS sub-store's `put` method to be synchronous (per the new CasStore type).
-await initHasher();
-
-/**
- * The cas sub-store of an in-memory `OcasStore` — also satisfies the legacy
- * `BootstrapCapableStore` interface so that helpers that have not yet been
- * refactored (e.g. bootstrap, gc, render) continue to work against
- * `store.cas`.
- */
-export type MemoryCasStore = BootstrapCapableStore & {
-  put(typeHash: Hash, payload: unknown): Hash;
-  delete(hash: Hash): boolean;
-};
+const VARS_FILE = "_vars.jsonl";
+const TAGS_FILE = "_tags.jsonl";
 
 function validateName(name: string): void {
-  if (name === "") {
+  if (name === "")
     throw new InvalidVariableNameError(name, "Name cannot be empty");
-  }
   const match = name.match(/^@([a-zA-Z][a-zA-Z0-9]*)\/(.+)$/);
-  if (!match) {
+  if (!match)
     throw new InvalidVariableNameError(
       name,
       "Name must follow @scope/name format (e.g. @myapp/config)",
     );
-  }
   const rest = match[2] as string;
-  if (rest.endsWith("/")) {
+  if (rest.endsWith("/"))
     throw new InvalidVariableNameError(
       name,
       "Name cannot end with trailing slash",
     );
-  }
-  const segments = rest.split("/");
-  for (const segment of segments) {
-    if (segment === "") {
+  for (const segment of rest.split("/")) {
+    if (segment === "")
       throw new InvalidVariableNameError(
         name,
         "Name contains empty segment (consecutive slashes //)",
       );
-    }
-    if (!/^[a-zA-Z0-9._-]+$/.test(segment)) {
+    if (!/^[a-zA-Z0-9._-]+$/.test(segment))
       throw new InvalidVariableNameError(
         name,
         `Segment "${segment}" contains invalid characters (only a-z, A-Z, 0-9, ., _, - allowed)`,
       );
-    }
   }
-}
-
-function createCasStore(): MemoryCasStore {
-  const data = new Map<Hash, CasNode>();
-  const byType = new Map<Hash, Set<Hash>>();
-  const metaSet = new Set<Hash>();
-
-  function indexHash(type: Hash, hash: Hash): void {
-    let set = byType.get(type);
-    if (!set) {
-      set = new Set();
-      byType.set(type, set);
-    }
-    set.add(hash);
-  }
-
-  function putSelfReferencing(payload: unknown): Hash {
-    const hash = computeSelfHashSync(payload);
-    if (!data.has(hash)) {
-      data.set(hash, { type: hash, payload, timestamp: Date.now() });
-      indexHash(hash, hash);
-    }
-    metaSet.add(hash);
-    return hash;
-  }
-
-  function entriesForHashes(hashes: Iterable<Hash>): ListEntry[] {
-    const result: ListEntry[] = [];
-    for (const h of hashes) {
-      const node = data.get(h);
-      if (node) result.push(casListEntry(h, node.timestamp));
-    }
-    return result;
-  }
-
-  const store: MemoryCasStore = {
-    put(typeHash: Hash, payload: unknown): Hash {
-      const hash = computeHashSync(typeHash, payload);
-      if (!data.has(hash)) {
-        data.set(hash, { type: typeHash, payload, timestamp: Date.now() });
-        indexHash(typeHash, hash);
-      }
-      return hash;
-    },
-
-    get(hash: Hash): CasNode | null {
-      return data.get(hash) ?? null;
-    },
-
-    has(hash: Hash): boolean {
-      return data.has(hash);
-    },
-
-    listByType(typeHash: Hash, options?: ListOptions): ListEntry[] {
-      const set = byType.get(typeHash);
-      if (!set) return [];
-      return applyListOptions(entriesForHashes(set), options);
-    },
-
-    listAll(): Hash[] {
-      return Array.from(data.keys());
-    },
-
-    listMeta(options?: ListOptions): ListEntry[] {
-      return applyListOptions(entriesForHashes(metaSet), options);
-    },
-
-    listSchemas(options?: ListOptions): ListEntry[] {
-      const result = new Set<Hash>();
-      for (const meta of metaSet) {
-        result.add(meta);
-        const set = byType.get(meta);
-        if (set) {
-          for (const h of set) result.add(h);
-        }
-      }
-      return applyListOptions(entriesForHashes(result), options);
-    },
-
-    delete(hash: Hash): boolean {
-      const node = data.get(hash);
-      if (!node) return false;
-      data.delete(hash);
-      const set = byType.get(node.type);
-      if (set) {
-        set.delete(hash);
-        if (set.size === 0) {
-          byType.delete(node.type);
-        }
-      }
-      metaSet.delete(hash);
-      return true;
-    },
-
-    [BOOTSTRAP_STORE]: putSelfReferencing,
-  };
-
-  return store;
 }
 
 type VarRecord = {
@@ -200,20 +79,14 @@ function cloneVar(rec: VarRecord): Variable {
   };
 }
 
-/**
- * Build an in-memory `VarStore` backed by the supplied CAS store. Exposed so
- * non-Memory CAS stores (e.g. the FS store) can compose a full `OcasStore`
- * without re-implementing variable storage.
- */
-export function createMemoryVarStoreFor(cas: CasStore): VarStore {
-  // composite key: `${name}\u0000${schema}`
+export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
   const records = new Map<string, VarRecord>();
-  const byName = new Map<string, Set<string>>(); // name -> set of composite keys
+  const byName = new Map<string, Set<string>>();
+  const path = join(dir, VARS_FILE);
 
   function key(name: string, schema: Hash): string {
     return `${name}\u0000${schema}`;
   }
-
   function addIndex(name: string, k: string): void {
     let set = byName.get(name);
     if (!set) {
@@ -222,7 +95,6 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
     }
     set.add(k);
   }
-
   function removeIndex(name: string, k: string): void {
     const set = byName.get(name);
     if (!set) return;
@@ -230,34 +102,72 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
     if (set.size === 0) byName.delete(name);
   }
 
+  // Load existing records (last record per key wins)
+  try {
+    const content = readFileSync(path, "utf8");
+    for (const line of content.split("\n")) {
+      if (line.length === 0) continue;
+      try {
+        const rec = JSON.parse(line) as VarRecord & { __op?: string };
+        if (rec.__op === "remove") {
+          const k = key(rec.name, rec.schema);
+          records.delete(k);
+          removeIndex(rec.name, k);
+        } else {
+          const k = key(rec.name, rec.schema);
+          records.set(k, rec);
+          addIndex(rec.name, k);
+        }
+      } catch {
+        // skip malformed
+      }
+    }
+  } catch {
+    // file may not exist
+  }
+
+  function persistFull(): void {
+    mkdirSync(dir, { recursive: true });
+    const lines: string[] = [];
+    for (const rec of records.values()) {
+      lines.push(JSON.stringify(rec));
+    }
+    writeFileSync(path, lines.length ? `${lines.join("\n")}\n` : "", "utf8");
+  }
+
+  function appendRecord(rec: VarRecord): void {
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(path, `${JSON.stringify(rec)}\n`, "utf8");
+  }
+
+  function appendRemoval(name: string, schema: Hash): void {
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(
+      path,
+      `${JSON.stringify({ __op: "remove", name, schema })}\n`,
+      "utf8",
+    );
+  }
+
   function extractSchema(hash: Hash): Hash {
     const node = cas.get(hash);
-    if (node === null) {
-      throw new CasNodeNotFoundError(hash);
-    }
+    if (node === null) throw new CasNodeNotFoundError(hash);
     return node.type;
   }
 
   function checkConflict(tags: Record<string, string>, labels: string[]): void {
     for (const tk of Object.keys(tags)) {
-      if (labels.includes(tk)) {
+      if (labels.includes(tk))
         throw new TagLabelConflictError(tk, "label", "tag");
-      }
     }
   }
 
   function pushHistory(rec: VarRecord, value: Hash, now: number): boolean {
-    if (rec.history.length > 0 && rec.history[0]?.value === value) {
-      return false;
-    }
+    if (rec.history.length > 0 && rec.history[0]?.value === value) return false;
     const existingIdx = rec.history.findIndex((e) => e.value === value);
-    if (existingIdx > 0) {
-      rec.history.splice(existingIdx, 1);
-    }
+    if (existingIdx > 0) rec.history.splice(existingIdx, 1);
     rec.history.unshift({ value, position: 0, setAt: now });
-    if (rec.history.length > MAX_HISTORY) {
-      rec.history.length = MAX_HISTORY;
-    }
+    if (rec.history.length > MAX_HISTORY) rec.history.length = MAX_HISTORY;
     for (let i = 0; i < rec.history.length; i++) {
       const entry = rec.history[i];
       if (entry !== undefined) entry.position = i;
@@ -265,14 +175,13 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
     return true;
   }
 
-  const varStore: VarStore = {
-    set(name: string, hash: Hash, options?: VarSetOptions): Variable {
+  return {
+    set(name, hash, options) {
       validateName(name);
       const schema = extractSchema(hash);
       const k = key(name, schema);
       const existing = records.get(k);
       const now = Date.now();
-
       if (existing) {
         const tags = options?.tags ?? existing.tags;
         const labels = options?.labels ?? existing.labels;
@@ -286,9 +195,9 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
           existing.tags = { ...tags };
           existing.labels = [...labels];
         }
+        persistFull();
         return cloneVar(existing);
       }
-
       const tags = options?.tags ?? {};
       const labels = options?.labels ?? [];
       checkConflict(tags, labels);
@@ -304,15 +213,15 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       };
       records.set(k, rec);
       addIndex(name, k);
+      appendRecord(rec);
       return cloneVar(rec);
     },
 
-    get(name: string, schema?: Hash): Variable | null {
+    get(name, schema) {
       if (schema !== undefined) {
         const rec = records.get(key(name, schema));
         return rec ? cloneVar(rec) : null;
       }
-      // No schema: if exactly one variant, return it; otherwise null
       const set = byName.get(name);
       if (!set || set.size !== 1) return null;
       const onlyKey = set.values().next().value;
@@ -321,13 +230,14 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       return rec ? cloneVar(rec) : null;
     },
 
-    remove(name: string, schema?: Hash): Variable[] {
+    remove(name, schema) {
       if (schema !== undefined) {
         const k = key(name, schema);
         const rec = records.get(k);
         if (!rec) return [];
         records.delete(k);
         removeIndex(name, k);
+        appendRemoval(name, schema);
         return [cloneVar(rec)];
       }
       const set = byName.get(name);
@@ -338,30 +248,25 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
         if (rec) {
           removed.push(cloneVar(rec));
           records.delete(k);
+          appendRemoval(rec.name, rec.schema);
         }
       }
       byName.delete(name);
       return removed;
     },
 
-    update(name: string, hash: Hash, options?: VarSetOptions): Variable {
+    update(name, hash, options) {
       validateName(name);
       const newSchema = extractSchema(hash);
-      // Find existing record by name; require existing schema match new schema
       const set = byName.get(name);
-      if (!set || set.size === 0) {
+      if (!set || set.size === 0)
         throw new VariableNotFoundError(name, newSchema);
-      }
-      // find a record matching newSchema
       const k = key(name, newSchema);
       const existing = records.get(k);
       if (!existing) {
-        // Find any existing — schema mismatch
         for (const ek of set) {
           const erec = records.get(ek);
-          if (erec) {
-            throw new SchemaMismatchError(erec.schema, newSchema);
-          }
+          if (erec) throw new SchemaMismatchError(erec.schema, newSchema);
         }
         throw new VariableNotFoundError(name, newSchema);
       }
@@ -378,10 +283,11 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
         existing.tags = { ...tags };
         existing.labels = [...labels];
       }
+      persistFull();
       return cloneVar(existing);
     },
 
-    list(options?: VarListOptions): Variable[] {
+    list(options?: VarListOptions) {
       if (
         options?.namePrefix !== undefined &&
         options?.exactName !== undefined
@@ -399,7 +305,6 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       const desc = options?.desc ?? false;
       const limit = options?.limit;
       const offset = options?.offset ?? 0;
-
       if (limit !== undefined && limit <= 0) return [];
 
       let results: VarRecord[] = [];
@@ -425,20 +330,18 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
         if (!ok) continue;
         results.push(rec);
       }
-
       results.sort((a, b) => {
         const av = sort === "updated" ? a.updated : a.created;
         const bv = sort === "updated" ? b.updated : b.created;
         if (av !== bv) return desc ? bv - av : av - bv;
         return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
       });
-
       if (offset > 0) results = results.slice(offset);
       if (limit !== undefined) results = results.slice(0, limit);
       return results.map(cloneVar);
     },
 
-    history(name: string, schema?: Hash): HistoryEntry[] {
+    history(name, schema) {
       if (schema !== undefined) {
         const rec = records.get(key(name, schema));
         return rec ? rec.history.map((e) => ({ ...e })) : [];
@@ -451,100 +354,134 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       return rec ? rec.history.map((e) => ({ ...e })) : [];
     },
 
-    close(): void {
-      // no-op for in-memory store
+    close() {
+      // no-op (synchronous file ops)
     },
   };
-
-  return varStore;
 }
 
-/**
- * Build an in-memory `TagStore`. Exposed for composition with non-Memory CAS
- * stores.
- */
-export function createMemoryTagStoreImpl(): TagStore {
-  // target -> key -> Tag
-  const byTarget = new Map<Hash, Map<string, Tag>>();
-  // key -> set of targets
-  const byKey = new Map<string, Set<Hash>>();
-  // per-target ordering (created)
-  const targetOrder = new Map<Hash, number>();
+type StoredTag = {
+  key: string;
+  value: string | null;
+  target: Hash;
+  created: number;
+};
 
-  function addKeyIndex(key: string, target: Hash): void {
-    let set = byKey.get(key);
+export function createFsTagStore(dir: string): TagStore {
+  const byTarget = new Map<Hash, Map<string, Tag>>();
+  const byKey = new Map<string, Set<Hash>>();
+  const path = join(dir, TAGS_FILE);
+
+  function addKeyIndex(k: string, target: Hash): void {
+    let set = byKey.get(k);
     if (!set) {
       set = new Set();
-      byKey.set(key, set);
+      byKey.set(k, set);
     }
     set.add(target);
   }
-
-  function removeKeyIndex(key: string, target: Hash): void {
-    const set = byKey.get(key);
+  function removeKeyIndex(k: string, target: Hash): void {
+    const set = byKey.get(k);
     if (!set) return;
-    // only remove if this target no longer has that key in any tag
     const tmap = byTarget.get(target);
-    if (tmap && tmap.has(key)) return;
+    if (tmap?.has(k)) return;
     set.delete(target);
-    if (set.size === 0) byKey.delete(key);
+    if (set.size === 0) byKey.delete(k);
+  }
+
+  // Load
+  try {
+    const content = readFileSync(path, "utf8");
+    for (const line of content.split("\n")) {
+      if (line.length === 0) continue;
+      try {
+        const ent = JSON.parse(line) as
+          | (StoredTag & { __op?: "set" | "untag" })
+          | { __op: "untag"; target: Hash; key: string };
+        if ((ent as { __op?: string }).__op === "untag") {
+          const e = ent as { target: Hash; key: string };
+          const tm = byTarget.get(e.target);
+          if (tm) {
+            tm.delete(e.key);
+            removeKeyIndex(e.key, e.target);
+            if (tm.size === 0) byTarget.delete(e.target);
+          }
+        } else {
+          const t = ent as StoredTag;
+          let tm = byTarget.get(t.target);
+          if (!tm) {
+            tm = new Map();
+            byTarget.set(t.target, tm);
+          }
+          tm.set(t.key, {
+            key: t.key,
+            value: t.value,
+            target: t.target,
+            created: t.created,
+          });
+          addKeyIndex(t.key, t.target);
+        }
+      } catch {
+        // skip
+      }
+    }
+  } catch {
+    // none
+  }
+
+  function append(line: object): void {
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(path, `${JSON.stringify(line)}\n`, "utf8");
   }
 
   return {
-    tag(target: Hash, operations: TagOp[]): Tag[] {
-      let tmap = byTarget.get(target);
-      if (!tmap) {
-        tmap = new Map();
-        byTarget.set(target, tmap);
+    tag(target, ops) {
+      let tm = byTarget.get(target);
+      if (!tm) {
+        tm = new Map();
+        byTarget.set(target, tm);
       }
       const now = Date.now();
-      for (const op of operations) {
+      for (const op of ops) {
         if (op.op === "set") {
+          const existing = tm.get(op.key);
           const tag: Tag = {
             key: op.key,
             value: op.value ?? null,
             target,
-            created: tmap.get(op.key)?.created ?? now,
+            created: existing?.created ?? now,
           };
-          tmap.set(op.key, tag);
+          tm.set(op.key, tag);
           addKeyIndex(op.key, target);
+          append(tag);
         } else {
-          tmap.delete(op.key);
+          tm.delete(op.key);
           removeKeyIndex(op.key, target);
+          append({ __op: "untag", target, key: op.key });
         }
       }
-      if (!targetOrder.has(target)) {
-        targetOrder.set(target, now);
-      }
-      // return the current tags
-      return [...tmap.values()].sort((a, b) =>
+      return [...tm.values()].sort((a, b) =>
         a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
       );
     },
-
-    untag(target: Hash, keys: string[]): void {
-      const tmap = byTarget.get(target);
-      if (!tmap) return;
+    untag(target, keys) {
+      const tm = byTarget.get(target);
+      if (!tm) return;
       for (const k of keys) {
-        tmap.delete(k);
+        tm.delete(k);
         removeKeyIndex(k, target);
+        append({ __op: "untag", target, key: k });
       }
-      if (tmap.size === 0) {
-        byTarget.delete(target);
-        targetOrder.delete(target);
-      }
+      if (tm.size === 0) byTarget.delete(target);
     },
-
-    tags(target: Hash): Tag[] {
-      const tmap = byTarget.get(target);
-      if (!tmap) return [];
-      return [...tmap.values()].sort((a, b) =>
+    tags(target) {
+      const tm = byTarget.get(target);
+      if (!tm) return [];
+      return [...tm.values()].sort((a, b) =>
         a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
       );
     },
-
-    listByTag(tag: string, options?: ListOptions): Hash[] {
-      // accept "key" or "key=value" form
+    listByTag(tag, _options) {
       let key = tag;
       let value: string | null | undefined;
       const eqIdx = tag.indexOf("=");
@@ -554,34 +491,16 @@ export function createMemoryTagStoreImpl(): TagStore {
       }
       const targets = byKey.get(key);
       if (!targets) return [];
-      let entries: ListEntry[] = [];
+      const result: Hash[] = [];
       for (const t of targets) {
-        const tmap = byTarget.get(t);
-        if (!tmap) continue;
-        const tagEntry = tmap.get(key);
+        const tm = byTarget.get(t);
+        if (!tm) continue;
+        const tagEntry = tm.get(key);
         if (!tagEntry) continue;
         if (value !== undefined && tagEntry.value !== value) continue;
-        entries.push(casListEntry(t, tagEntry.created));
+        result.push(t);
       }
-      entries = applyListOptions(entries, options);
-      return entries.map((e) => e.hash);
+      return result;
     },
   };
-}
-
-/**
- * Create an in-memory `OcasStore` with three sub-stores: `cas`, `var`, `tag`.
- *
- * The `cas` sub-store also satisfies the legacy `BootstrapCapableStore`
- * contract — it carries a `[BOOTSTRAP_STORE]` callable and a `listAll()`
- * helper — so existing helpers (`bootstrap`, `gc`, `render`, …) can be
- * called with `store.cas` until they are migrated to the unified surface.
- */
-export function createMemoryStore(): OcasStore & {
-  cas: MemoryCasStore;
-} {
-  const cas = createCasStore();
-  const varStore = createMemoryVarStoreFor(cas);
-  const tagStore = createMemoryTagStoreImpl();
-  return { cas, var: varStore, tag: tagStore };
 }

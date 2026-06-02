@@ -2,13 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash, Store } from "@ocas/core";
+import type { Hash, OcasStore } from "@ocas/core";
 import { bootstrap } from "@ocas/core";
-import { createFsStore } from "@ocas/fs";
+import { openStore as openFsStore } from "@ocas/fs";
 
 let testDir: string;
 let storePath: string;
-let varDbPath: string;
 let cliPath: string;
 
 beforeEach(() => {
@@ -17,7 +16,6 @@ beforeEach(() => {
     `ocas-history-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   storePath = join(testDir, "store");
-  varDbPath = join(testDir, "variables.db");
   cliPath = join(import.meta.dir, "../src/index.ts");
 
   mkdirSync(testDir, { recursive: true });
@@ -38,16 +36,7 @@ async function runCli(...args: string[]): Promise<{
   exitCode: number;
 }> {
   const proc = Bun.spawn(
-    [
-      "bun",
-      "run",
-      cliPath,
-      "--home",
-      storePath,
-      "--var-db",
-      varDbPath,
-      ...args,
-    ],
+    ["bun", "run", cliPath, "--home", storePath, ...args],
     {
       stdout: "pipe",
       stderr: "pipe",
@@ -72,12 +61,12 @@ async function setupSchemaAndValues(): Promise<{
   schema: Hash;
   values: Hash[];
 }> {
-  const store: Store = createFsStore(storePath);
+  const store: OcasStore = await openFsStore(storePath);
   const aliases = await bootstrap(store);
   const numberHash = aliases["@ocas/number"] as Hash;
   const values: Hash[] = [];
   for (let i = 0; i < 4; i++) {
-    values.push((await store.put(numberHash, i)) as Hash);
+    values.push(store.cas.put(numberHash, i) as Hash);
   }
   return { schema: numberHash, values };
 }
