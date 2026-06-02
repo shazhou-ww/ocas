@@ -41,18 +41,22 @@ The `@scope` prefix ensures variable names are visually distinct from 13-charact
 ## Operations
 
 ```bash
-ocas var set <name> <hash> [--tag env:prod] [--tag pinned]
+ocas var set <name> <hash>
 ocas var get <name> --schema <hash>
 ocas var delete <name> [--schema <hash>]
-ocas var list [prefix] [--schema <hash>] [--tag env:prod]
-ocas var tag <name> --schema <hash> status:active pinned :archived
+ocas var list [prefix] [--schema <hash>]
 ```
 
-`var set` is an upsert — creates or updates. Name prefix filtering replaces the old scope concept: `var list myapp/` returns all variables under `myapp/`.
+`var set` is an upsert — creates or updates. Name prefix filtering replaces the old scope concept: `var list myapp/` returns all variables under `myapp/`. Tagging is now handled by the top-level `ocas tag` / `ocas untag` commands (see [[CLI]]).
 
 ## Tags and Labels
 
-Tags and labels share a unified command (`var tag`):
+Tags and labels are managed via top-level `ocas tag` / `ocas untag` commands:
+
+```bash
+ocas tag <target> env:prod pinned    # set tag + label
+ocas untag <target> env pinned       # remove by key/label
+```
 
 - **Tags** are `key:value` pairs — same-key mutually exclusive (e.g. `env:prod` replaces `env:dev`)
 - **Labels** are bare strings (e.g. `pinned`, `important`)

@@ -32,6 +32,7 @@ ocas verify <hash>              # check integrity + schema validity
 ocas refs <hash>                # list direct ocas_ref edges
 ocas walk <hash>                # recursive DAG traversal
 ocas list --type <hash|name>    # list nodes by type
+ocas list --tag <expr>          # filter by tag
 ocas list-schema                # list all schema hashes
 ocas list-meta                  # list meta-schema hashes
 ocas gc                         # garbage collection
@@ -40,13 +41,21 @@ ocas gc                         # garbage collection
 ### [[Variable]] Management
 
 ```bash
-ocas var set <name> <hash> [--tag key:value] [--tag label]
+ocas var set <name> <hash>
 ocas var get <name> --schema <hash>
 ocas var delete <name> [--schema <hash>]
-ocas var list [prefix] [--schema <hash>] [--tag ...]
-ocas var tag <name> --schema <hash> <operations...>
+ocas var list [prefix] [--schema <hash>]
 ocas var history <name> [--schema <hash>]
 ```
+
+### Tagging
+
+```bash
+ocas tag <target> <tag>...      # attach tags (key:value) or labels (bare)
+ocas untag <target> <tag>...    # remove tags by key or label
+```
+
+Tags apply to any target (variable or node). `ocas get` and `ocas var get` include tag info in output.
 
 ### [[Render System|Template & Render]]
 
