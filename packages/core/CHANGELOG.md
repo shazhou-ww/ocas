@@ -1,5 +1,11 @@
 # @ocas/core
 
+## 0.1.2
+
+### Patch Changes
+
+- Fix TypeScript LSP errors: tsconfig `noEmit`, `exactOptionalPropertyTypes` conditional spread, `schemaHash` scope.
+
 ## 0.1.1
 
 ### Patch Changes

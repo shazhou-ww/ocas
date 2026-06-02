@@ -1,18 +1,17 @@
 {
   "name": "@ocas/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "bin": {
     "ocas": "src/index.ts"
   },
   "scripts": {
     "test": "bun test",
-    "postinstall": "bun scripts/postinstall.js || true",
     "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
   "dependencies": {
-    "@ocas/core": "workspace:*",
-    "@ocas/fs": "workspace:*"
+    "@ocas/core": "0.1.2",
+    "@ocas/fs": "0.1.2"
   },
   "repository": {
     "type": "git",

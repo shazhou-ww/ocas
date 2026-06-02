@@ -1,5 +1,17 @@
 # @ocas/cli
 
+## 0.1.2
+
+### Patch Changes
+
+- Fix render output missing trailing newline.
+- Fix TypeScript LSP errors: tsconfig `noEmit`, `exactOptionalPropertyTypes` conditional spread, `schemaHash` scope.
+- Add agent skill setup hint with version to help output. Remove postinstall script (blocked by bun security policy). Update `ocas prompt setup` to guide cleanup of old skill versions before installing new ones.
+
+- Updated dependencies:
+  - @ocas/core@0.1.2
+  - @ocas/fs@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
