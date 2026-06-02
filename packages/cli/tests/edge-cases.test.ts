@@ -18,7 +18,7 @@ describe("ocas binary", () => {
   test("T2: no legacy bin entries (json-cas, ucas)", async () => {
     const pkg = await Bun.file(pkgPath).json();
     expect(pkg.bin["json-cas"]).toBeUndefined();
-    expect(pkg.bin["ucas"]).toBeUndefined();
+    expect(pkg.bin.ucas).toBeUndefined();
     expect(Object.keys(pkg.bin)).toEqual(["ocas"]);
   });
 

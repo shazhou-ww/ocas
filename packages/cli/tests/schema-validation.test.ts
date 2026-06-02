@@ -558,7 +558,7 @@ describe("Phase 2: Schema Validation", () => {
   let tmpStore: string;
   let varDbPath: string;
   let typeHash: string;
-  let nodeHash: string;
+  let _nodeHash: string;
 
   const entrypoint = resolve(import.meta.dir, "../src/index.ts");
 
@@ -602,7 +602,7 @@ describe("Phase 2: Schema Validation", () => {
     );
     await proc.exited;
     const stdout = (await new Response(proc.stdout).text()).trim();
-    nodeHash = envValue(stdout) as string;
+    _nodeHash = envValue(stdout) as string;
   });
 
   afterAll(() => {

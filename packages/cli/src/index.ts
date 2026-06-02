@@ -129,7 +129,7 @@ async function out(data: unknown, store?: Store): Promise<void> {
     // varStore is intentionally omitted — inline render uses YAML fallback
     // only, custom templates require the full `ocas render` command.
     const output = renderDirect(envelope.type as Hash, envelope.value, s, null);
-    process.stdout.write(output + "\n");
+    process.stdout.write(`${output}\n`);
     return;
   }
   console.log(compact ? JSON.stringify(data) : JSON.stringify(data, null, 2));
@@ -581,7 +581,7 @@ async function cmdRender(args: string[]): Promise<void> {
           ...(epsilon !== undefined && { epsilon }),
           varStore,
         });
-        process.stdout.write(output + "\n");
+        process.stdout.write(`${output}\n`);
       } else {
         const output = renderDirect(
           envelope.type as Hash,
@@ -593,7 +593,7 @@ async function cmdRender(args: string[]): Promise<void> {
             ...(epsilon !== undefined && { epsilon }),
           },
         );
-        process.stdout.write(output + "\n");
+        process.stdout.write(`${output}\n`);
       }
     } else {
       const hash = resolveHash(input as string, varStore);
@@ -604,7 +604,7 @@ async function cmdRender(args: string[]): Promise<void> {
         varStore,
       });
       // Output to stdout without JSON wrapping (raw output)
-      process.stdout.write(output + "\n");
+      process.stdout.write(`${output}\n`);
     }
     varStore.close();
   } catch (error) {

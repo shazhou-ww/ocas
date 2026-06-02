@@ -71,7 +71,7 @@ describe("Phase 5: Render", () => {
     return { stdout, stderr, exitCode };
   }
 
-  async function runCliE2eWithStdin(
+  async function _runCliE2eWithStdin(
     args: string[],
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {

@@ -2,14 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { envValue, stripVolatile } from "./helpers";
+import { envValue } from "./helpers";
 
 const entrypoint = resolve(import.meta.dir, "../src/index.ts");
 
 let tmpStore: string;
 let varDbPath: string;
 let typeHash: string;
-let nodeHash: string;
+let _nodeHash: string;
 
 beforeAll(async () => {
   tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
@@ -36,7 +36,7 @@ beforeAll(async () => {
   const nodeFile = join(tmpStore, "test-node.json");
   writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
   const { stdout } = await runCli(["put", typeHash, nodeFile]);
-  nodeHash = envValue(stdout) as string;
+  _nodeHash = envValue(stdout) as string;
 
   // Set up template for render tests
   const tmplFile = join(tmpStore, "render-template.liquid");

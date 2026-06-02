@@ -23,13 +23,13 @@ export {
   walk,
 } from "./schema.js";
 export { createMemoryStore } from "./store.js";
-export {
-  type CasNode,
-  type Hash,
-  type ListEntry,
-  type ListOptions,
-  type ListSort,
-  type Store,
+export type {
+  CasNode,
+  Hash,
+  ListEntry,
+  ListOptions,
+  ListSort,
+  Store,
 } from "./types.js";
 export type { Variable } from "./variable.js";
 export {
