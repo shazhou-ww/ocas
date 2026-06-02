@@ -1,6 +1,6 @@
 {
   "name": "@ocas/cli",
-  "version": "workspace:*",
+  "version": "0.2.0",
   "type": "module",
   "bin": {
     "ocas": "src/index.ts"
