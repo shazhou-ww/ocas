@@ -237,14 +237,6 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
     },
   ],
   [
-    "@ocas/output/var-tag",
-    {
-      type: "object",
-      properties: { ...VARIABLE_PROPERTIES },
-      title: "ocas var tag result",
-    },
-  ],
-  [
     "@ocas/output/var-list",
     {
       type: "array",
@@ -265,6 +257,38 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
         },
       },
       title: "ocas var history result",
+    },
+  ],
+  [
+    "@ocas/output/tag",
+    {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          key: { type: "string" },
+          value: { type: ["string", "null"] },
+          target: { type: "string", format: "ocas_ref" },
+          created: { type: "number" },
+        },
+      },
+      title: "ocas tag result",
+    },
+  ],
+  [
+    "@ocas/output/untag",
+    {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          key: { type: "string" },
+          value: { type: ["string", "null"] },
+          target: { type: "string", format: "ocas_ref" },
+          created: { type: "number" },
+        },
+      },
+      title: "ocas untag result",
     },
   ],
   [

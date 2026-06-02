@@ -752,246 +752,6 @@ describe("var list", () => {
   });
 });
 
-describe("var tag", () => {
-  test("add new tag", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Create variable without tags
-    await runCli("var", "set", "@test/x", hash);
-
-    // Add tag
-    const { stdout, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-      "env:prod",
-    );
-
-    expect(exitCode).toBe(0);
-
-    const envelope = JSON.parse(stdout);
-    expect(envelope.value.tags).toEqual({ env: "prod" });
-  });
-
-  test("update existing tag value", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Create variable with tag
-    await runCli("var", "set", "@test/x", hash, "--tag", "env:dev");
-
-    // Update tag
-    const { stdout, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-      "env:prod",
-    );
-
-    expect(exitCode).toBe(0);
-
-    const envelope = JSON.parse(stdout);
-    expect(envelope.value.tags).toEqual({ env: "prod" });
-  });
-
-  test("add label", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Create variable without labels
-    await runCli("var", "set", "@test/x", hash);
-
-    // Add label
-    const { stdout, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-      "stable",
-    );
-
-    expect(exitCode).toBe(0);
-
-    const envelope = JSON.parse(stdout);
-    expect(envelope.value.labels).toEqual(["stable"]);
-  });
-
-  test("delete tag", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Create variable with tags
-    await runCli(
-      "var",
-      "set",
-      "@test/x",
-      hash,
-      "--tag",
-      "env:prod",
-      "--tag",
-      "version:1.0",
-    );
-
-    // Delete tag
-    const { stdout, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-      ":env",
-    );
-
-    expect(exitCode).toBe(0);
-
-    const envelope = JSON.parse(stdout);
-    expect(envelope.value.tags).toEqual({ version: "1.0" });
-  });
-
-  test("delete label", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Create variable with labels
-    await runCli(
-      "var",
-      "set",
-      "@test/x",
-      hash,
-      "--tag",
-      "stable",
-      "--tag",
-      "beta",
-    );
-
-    // Delete label
-    const { stdout, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-      ":stable",
-    );
-
-    expect(exitCode).toBe(0);
-
-    const envelope = JSON.parse(stdout);
-    expect(envelope.value.labels).toEqual(["beta"]);
-  });
-
-  test("mixed add and delete operations", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Create variable with tags and labels
-    await runCli("var", "set", "@test/x", hash, "--tag", "a:1", "--tag", "b");
-
-    // Mixed operations
-    const { stdout, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-      "c:3",
-      ":a",
-      "d",
-    );
-
-    expect(exitCode).toBe(0);
-
-    const envelope = JSON.parse(stdout);
-    expect(envelope.value.tags).toEqual({ c: "3" });
-    expect(envelope.value.labels.sort()).toEqual(["b", "d"]);
-  });
-
-  test("error on tag/label conflict", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Create variable with tag
-    await runCli("var", "set", "@test/x", hash, "--tag", "env:prod");
-
-    // Try to add same name as label
-    const { stderr, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-      "env",
-    );
-
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("Error: Conflict: 'env' already exists as a");
-  });
-
-  test("error when variable not found", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-
-    const { stderr, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/nonexistent",
-      "--schema",
-      typeHash,
-      "env:prod",
-    );
-
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain(
-      `Error: Variable not found: name=@test/nonexistent, schema=${typeHash}`,
-    );
-  });
-
-  test("error when --schema missing", async () => {
-    const { stderr, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "env:prod",
-    );
-
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain(
-      "Usage: ocas var tag <name> --schema <hash-or-name> <operations...>",
-    );
-  });
-
-  test("error when no operations provided", async () => {
-    const store = await openFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-
-    const { stderr, exitCode } = await runCli(
-      "var",
-      "tag",
-      "@test/x",
-      "--schema",
-      typeHash,
-    );
-
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain(
-      "Usage: ocas var tag <name> --schema <hash-or-name> <operations...>",
-    );
-  });
-});
-
 describe("global options", () => {
   test("--json flag for compact output", async () => {
     const store = await openFsStore(storePath);
@@ -1066,5 +826,19 @@ describe("old commands removed", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain("Unknown var subcommand: update");
+  });
+
+  test("var tag subcommand removed", async () => {
+    const { stderr, exitCode } = await runCli(
+      "var",
+      "tag",
+      "@any/name",
+      "--schema",
+      "@ocas/string",
+      "foo",
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Unknown var subcommand: tag");
   });
 });

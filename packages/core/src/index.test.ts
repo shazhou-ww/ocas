@@ -289,7 +289,7 @@ describe("bootstrap", () => {
       expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
     }
 
-    expect(Object.keys(builtinSchemas)).toHaveLength(30);
+    expect(Object.keys(builtinSchemas)).toHaveLength(31);
   });
 
   test("meta-schema node is stored and retrievable", async () => {
@@ -326,7 +326,7 @@ describe("bootstrap", () => {
     const h2 = bootstrap(store);
 
     expect(h1).toEqual(h2);
-    // All built-in schemas typed by the meta-schema (1 self + 7 unique primitives + 21 outputs)
-    expect(store.cas.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(29);
+    // All built-in schemas typed by the meta-schema (1 self + 7 unique primitives + 22 outputs)
+    expect(store.cas.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(30);
   });
 });
