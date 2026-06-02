@@ -98,54 +98,65 @@ This is resolved to real version numbers only during publishing (see below).
 
 ## Release Process
 
-Releases use a **release branch** workflow. `main` always keeps `workspace:*` for
-internal dependencies; version numbers are only fixed on the release branch.
+Releases use a **release branch** workflow with three phases: prepare → candidate → finalize.
+
+`main` always keeps `workspace:*` for internal deps; release branches fix them to real versions.
+Changeset files are **only consumed once** during finalize — prerelease (rc) never touches them.
 
 ### Adding a Changeset
 
 Add changesets alongside feature PRs on `main`:
 
-```bash
-bunx changeset        # interactive — pick packages + bump type + summary
+```markdown
+<!-- .changeset/my-change.md -->
+---
+"@ocas/cli": patch
+---
+
+Description of the change
 ```
 
-Changesets live in `.changeset/` as markdown files until consumed by `prepare-release.sh`.
+Changesets live in `.changeset/` as markdown files. Bump types: `patch` / `minor` / `major`.
+One changeset can cover multiple packages.
 
-### Prepare
+### Phase 1: Prepare (cut release branch)
 
-```bash
-./scripts/prepare-release.sh
-```
+- **Precondition:** on `main`, clean tree, `.changeset/` has pending changesets
+- **Steps:**
+  1. Determine target version (from changeset bump types or manually)
+  2. `git checkout -b release/<version>`
+  3. Fix `workspace:*` → real version numbers in all `package.json`
+  4. Commit
+- **Does NOT** run `changeset version`, does NOT write CHANGELOG
 
-This script:
-1. Checks you're on `main` with a clean tree and pending changesets
-2. Creates `release/<version>` branch
-3. Runs `changeset version` to fix versions and generate CHANGELOGs
-4. **Switches back to main and deletes consumed `.changeset/*.md` files**
-5. Runs full validation (install, build, lint, test) on the release branch
-6. Commits the version bump
+### Phase 2: Candidate (publish rc for validation)
 
-After preparation, review changes and fix any issues on the release branch.
+- **Precondition:** on `release/*` branch
+- **Steps:**
+  1. Set version to `<version>-rc.N` (first time rc.1, increment on subsequent runs)
+  2. `bun install && bun run build && bun test && bun run check`
+  3. Publish: `bun publish --tag rc` (order: core → fs → cli)
+  4. Commit + push
+- **Repeatable:** fix bugs → add new changesets on the release branch → rc.N+1
+- **Does NOT** consume changesets, does NOT write CHANGELOG
+- Install for testing: `bun add -g @ocas/cli@rc`
 
-### Prerelease
+### Phase 3: Finalize (official release)
 
-```bash
-./scripts/publish.sh --rc
-```
+- **Precondition:** on `release/*` branch, rc validated
+- **Steps:**
+  1. Consume all `.changeset/*.md` → write CHANGELOG entries (use `changeset version` or manual)
+  2. Set final version `<version>` (remove `-rc.N`)
+  3. `bun install && bun run build && bun test && bun run check`
+  4. Publish: `bun publish --tag latest` (order: core → fs → cli)
+  5. Git tag `v<version>`
+  6. Merge back to `main` (CHANGELOG comes along)
+  7. Restore `workspace:*` on `main`
+  8. Delete release branch
 
-Publishes `<version>-rc.N` with npm tag `rc`. Auto-increments the rc number.
-Install for testing: `bun add -g @ocas/cli@rc`
+### Key Rules
 
-### Final Release
-
-```bash
-./scripts/publish.sh
-```
-
-This script:
-1. Validates you're on a `release/*` branch with no pending changesets
-2. Sets the final version, fixes `workspace:*` → real versions
-3. Runs final build + test
-4. Publishes packages in order: `@ocas/core` → `@ocas/fs` → `@ocas/cli`
-5. Tags, pushes to origin + github
-6. Merges back to `main`, restores `workspace:*`, cleans up release branch
+- **Publish order** is always `@ocas/core` → `@ocas/fs` → `@ocas/cli`
+- **`workspace:*`** must be fixed before any publish — `bun publish` does NOT auto-replace them
+- **CHANGELOG** only contains official releases, never rc entries
+- **Changesets added on release branch** (bug fixes during rc) are consumed together at finalize
