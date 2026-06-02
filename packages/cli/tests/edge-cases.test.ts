@@ -246,14 +246,15 @@ describe("Phase 3: Variable System", () => {
     await runCli(["var", "set", "@myapp/config", nodeHash]);
   });
 
-  test("3.6 var tag adds kv tag and label", async () => {
+  test("3.6 var set with tag and label adds them", async () => {
     const { exitCode, stdout } = await runCli([
       "var",
-      "tag",
+      "set",
       "@myapp/config",
-      "--schema",
-      typeHash,
+      nodeHash,
+      "--tag",
       "env:prod",
+      "--tag",
       "important",
     ]);
     expect(exitCode).toBe(0);
@@ -284,14 +285,14 @@ describe("Phase 3: Variable System", () => {
     expect(stripVolatile(stdout)).toMatchSnapshot();
   });
 
-  test("3.9 var tag remove deletes label", async () => {
+  test("3.9 var set without label removes it", async () => {
     const { exitCode, stdout } = await runCli([
       "var",
-      "tag",
+      "set",
       "@myapp/config",
-      "--schema",
-      typeHash,
-      ":important",
+      nodeHash,
+      "--tag",
+      "env:prod",
     ]);
     expect(exitCode).toBe(0);
     expect(stripVolatile(stdout)).toMatchSnapshot();

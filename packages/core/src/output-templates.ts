@@ -28,12 +28,16 @@ const DEFAULT_TEMPLATES: ReadonlyArray<
     "name: {{ payload.name }}\nschema: {{ payload.schema }}\nvalue: {{ payload.value }}",
   ],
   [
-    "@ocas/output/var-tag",
-    "name: {{ payload.name }}\nschema: {{ payload.schema }}\nvalue: {{ payload.value }}",
-  ],
-  [
     "@ocas/output/var-list",
     "{% for v in payload %}name: {{ v.name }}\nschema: {{ v.schema }}\nvalue: {{ v.value }}\n{% endfor %}",
+  ],
+  [
+    "@ocas/output/tag",
+    "{% for t in payload %}{{ t.key }}{% if t.value %}:{{ t.value }}{% endif %}\n{% endfor %}",
+  ],
+  [
+    "@ocas/output/untag",
+    "{% for t in payload %}{{ t.key }}{% if t.value %}:{{ t.value }}{% endif %}\n{% endfor %}",
   ],
   [
     "@ocas/output/var-history",

@@ -15,9 +15,10 @@ const OUTPUT_ALIASES = [
   "@ocas/output/var-set",
   "@ocas/output/var-get",
   "@ocas/output/var-delete",
-  "@ocas/output/var-tag",
   "@ocas/output/var-list",
   "@ocas/output/var-history",
+  "@ocas/output/tag",
+  "@ocas/output/untag",
   "@ocas/output/template-set",
   "@ocas/output/template-get",
   "@ocas/output/template-list",
@@ -32,7 +33,7 @@ describe("registerOutputTemplates", () => {
 
     const registered = await registerOutputTemplates(store);
 
-    expect(Object.keys(registered)).toHaveLength(19);
+    expect(Object.keys(registered)).toHaveLength(20);
 
     for (const alias of OUTPUT_ALIASES) {
       expect(registered).toHaveProperty(alias);

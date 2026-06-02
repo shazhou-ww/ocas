@@ -3,13 +3,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Hash, ListOptions, Store } from "@ocas/core";
+import type { Hash, ListOptions, Store, TagOp } from "@ocas/core";
 import {
   CasNodeNotFoundError,
   computeHash,
   gc,
   getSchema,
-  InvalidTagFormatError,
   InvalidVariableNameError,
   putSchema,
   refs,
@@ -685,64 +684,51 @@ async function cmdVarDelete(args: string[]): Promise<void> {
   }
 }
 
-async function cmdVarTag(args: string[]): Promise<void> {
-  const name = args[0];
-  const schemaInput = flags.schema as string | undefined;
-
-  if (!name || !schemaInput) {
-    die("Usage: ocas var tag <name> --schema <hash-or-name> <operations...>");
-  }
-
+async function cmdTag(args: string[]): Promise<void> {
+  const targetInput = args[0];
   const tagArgs = args.slice(1);
-  if (tagArgs.length === 0) {
-    die("Usage: ocas var tag <name> --schema <hash-or-name> <operations...>");
+  if (!targetInput || tagArgs.length === 0) {
+    die("Usage: ocas tag <target> <tag>...");
   }
-
   const store = await openStore();
-
-  try {
-    const schema = resolveHash(schemaInput, store);
-    const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
-
-    // VarStore.set with options replaces all tags/labels — to express
-    // "add some / delete some / preserve the rest", merge against the current.
-    const existing = store.var.get(name, schema);
-    if (existing === null) {
-      throw new VariableNotFoundError(name, schema);
-    }
-    const newTags: Record<string, string> = { ...existing.tags };
-    const newLabels: string[] = [...existing.labels];
-    for (const k of deleteNames) {
-      delete newTags[k];
-      const idx = newLabels.indexOf(k);
-      if (idx !== -1) newLabels.splice(idx, 1);
-    }
-    for (const [k, v] of Object.entries(tags)) {
-      newTags[k] = v;
-    }
-    for (const lb of labels) {
-      if (!newLabels.includes(lb)) newLabels.push(lb);
-    }
-
-    const variable = store.var.set(name, existing.value, {
-      tags: newTags,
-      labels: newLabels,
-    });
-
-    await out(
-      await wrapEnvelope(store, "@ocas/output/var-tag", variable),
-      store,
-    );
-  } catch (e) {
-    if (
-      e instanceof VariableNotFoundError ||
-      e instanceof TagLabelConflictError ||
-      e instanceof InvalidTagFormatError
-    ) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
+  const target = resolveHash(targetInput, store);
+  const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+  if (deleteNames.length > 0) {
+    die("Error: Cannot use deletion syntax (:name) in tag (use untag)");
   }
+  const ops: TagOp[] = [
+    ...Object.entries(tags).map(
+      ([key, value]) => ({ op: "set", key, value }) as TagOp,
+    ),
+    ...labels.map((key) => ({ op: "set", key }) as TagOp),
+  ];
+  store.tag.tag(target, ops);
+  await out(
+    await wrapEnvelope(store, "@ocas/output/tag", store.tag.tags(target)),
+    store,
+  );
+}
+
+async function cmdUntag(args: string[]): Promise<void> {
+  const targetInput = args[0];
+  const tagArgs = args.slice(1);
+  if (!targetInput || tagArgs.length === 0) {
+    die("Usage: ocas untag <target> <tag>...");
+  }
+  const store = await openStore();
+  const target = resolveHash(targetInput, store);
+  const keys = tagArgs.map((a) =>
+    a.startsWith(":")
+      ? a.slice(1)
+      : a.includes(":")
+        ? a.slice(0, a.indexOf(":"))
+        : a,
+  );
+  store.tag.untag(target, keys);
+  await out(
+    await wrapEnvelope(store, "@ocas/output/untag", store.tag.tags(target)),
+    store,
+  );
 }
 
 async function cmdVarHistory(args: string[]): Promise<void> {
@@ -1043,12 +1029,13 @@ Commands:
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
   list --type <hash-or-name>        List hashes for a type (value=string[])            (@ocas/output/list)
   list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
-  list-schema                       List all schema hashes (value=string[])            (@ocas/output/list-schema)
+  list-schema                       List all schema hashes (value=string[])           (@ocas/output/list-schema)
+  tag <target> <tag>...             Apply tags/labels to a target                      (@ocas/output/tag)
+  untag <target> <tag>...           Remove tags/labels from a target                   (@ocas/output/untag)
   var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
   var get <name> --schema <hash>    Get a variable by name + schema                    (@ocas/output/var-get)
   var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
   var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
-  var tag <name> --schema <hash> <operations...> Modify tags/labels                    (@ocas/output/var-tag)
   var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
   template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
   template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
@@ -1125,6 +1112,14 @@ switch (cmd) {
     await cmdListSchema(rest);
     break;
 
+  case "tag":
+    await cmdTag(rest);
+    break;
+
+  case "untag":
+    await cmdUntag(rest);
+    break;
+
   case "var": {
     const [sub, ...subRest] = rest;
     switch (sub) {
@@ -1136,9 +1131,6 @@ switch (cmd) {
         break;
       case "delete":
         await cmdVarDelete(subRest);
-        break;
-      case "tag":
-        await cmdVarTag(subRest);
         break;
       case "list":
         await cmdVarList(subRest);

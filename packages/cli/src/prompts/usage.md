@@ -103,8 +103,8 @@ ocas var delete @myapp/config                  # remove
 ocas var list [prefix]                         # list (prefix filter)
 ocas var list @myapp/ --tag env:prod           # filter by scope + tag
 ocas var history @myapp/config                 # last 10 values (LRU)
-ocas var tag @myapp/config --schema <h> status:active   # add tag
-ocas var tag @myapp/config --schema <h> :status          # remove tag
+ocas tag @myapp/config status:active           # add tag/label to a target
+ocas untag @myapp/config status                # remove tag/label by key
 ```
 
 **Naming rules:**

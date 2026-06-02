@@ -25,12 +25,13 @@ Commands:
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
   list --type <hash-or-name>        List hashes for a type (value=string[])            (@ocas/output/list)
   list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
-  list-schema                       List all schema hashes (value=string[])            (@ocas/output/list-schema)
+  list-schema                       List all schema hashes (value=string[])           (@ocas/output/list-schema)
+  tag <target> <tag>...             Apply tags/labels to a target                      (@ocas/output/tag)
+  untag <target> <tag>...           Remove tags/labels from a target                   (@ocas/output/untag)
   var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
   var get <name> --schema <hash>    Get a variable by name + schema                    (@ocas/output/var-get)
   var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
   var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
-  var tag <name> --schema <hash> <operations...> Modify tags/labels                    (@ocas/output/var-tag)
   var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
   template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
   template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
@@ -204,6 +205,13 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
     },
     {
       "labels": [],
+      "name": "@ocas/output/tag",
+      "schema": "CTS5P6RD8HMCS",
+      "tags": {},
+      "value": "CPSWA9TB2JMWP",
+    },
+    {
+      "labels": [],
       "name": "@ocas/output/template-delete",
       "schema": "CTS5P6RD8HMCS",
       "tags": {},
@@ -229,6 +237,13 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
       "schema": "CTS5P6RD8HMCS",
       "tags": {},
       "value": "BJDHPAE4Q8TXM",
+    },
+    {
+      "labels": [],
+      "name": "@ocas/output/untag",
+      "schema": "CTS5P6RD8HMCS",
+      "tags": {},
+      "value": "BPEQMRQNJK80Z",
     },
     {
       "labels": [],
@@ -264,13 +279,6 @@ exports[`Phase 3: Variable System 3.3 var list shows all variables 1`] = `
       "schema": "CTS5P6RD8HMCS",
       "tags": {},
       "value": "0Q5EMYK4SYSS9",
-    },
-    {
-      "labels": [],
-      "name": "@ocas/output/var-tag",
-      "schema": "CTS5P6RD8HMCS",
-      "tags": {},
-      "value": "9103EYRMM949A",
     },
     {
       "labels": [],
@@ -332,9 +340,9 @@ exports[`Phase 3: Variable System 3.5 var set upsert updates existing variable 1
 }
 `;
 
-exports[`Phase 3: Variable System 3.6 var tag adds kv tag and label 1`] = `
+exports[`Phase 3: Variable System 3.6 var set with tag and label adds them 1`] = `
 {
-  "type": "9103EYRMM949A",
+  "type": "0Q5EMYK4SYSS9",
   "value": {
     "labels": [
       "important",
@@ -387,9 +395,9 @@ exports[`Phase 3: Variable System 3.8 var list --tag important filters by label 
 }
 `;
 
-exports[`Phase 3: Variable System 3.9 var tag remove deletes label 1`] = `
+exports[`Phase 3: Variable System 3.9 var set without label removes it 1`] = `
 {
-  "type": "9103EYRMM949A",
+  "type": "0Q5EMYK4SYSS9",
   "value": {
     "labels": [],
     "name": "@myapp/config",
