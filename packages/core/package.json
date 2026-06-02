@@ -15,6 +15,7 @@
     "src"
   ],
   "scripts": {
+    "build": "tsc --build",
     "test": "bun test",
     "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
   },
