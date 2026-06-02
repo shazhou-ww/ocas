@@ -10,28 +10,31 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import type {
-  BootstrapCapableStore,
-  CasNode,
-  Hash,
-  ListEntry,
-  ListOptions,
-  VariableStore,
-} from "@ocas/core";
-
 import {
   applyListOptions,
   BOOTSTRAP_STORE,
+  type BootstrapCapableStore,
   bootstrap,
+  type CasNode,
   casListEntry,
   cborEncode,
-  computeHash,
-  computeSelfHash,
+  computeHashSync,
+  computeSelfHashSync,
+  type Hash,
+  initHasher,
+  type ListEntry,
+  type ListOptions,
+  type OcasStore,
 } from "@ocas/core";
 import { decode } from "cborg";
+import { createFsTagStore, createFsVarStoreFor } from "./var-store.js";
 
 const INDEX_DIR = "_index";
 const META_FILE = "_meta";
+
+// Initialise the xxhash WASM instance once at module load so the FS CAS
+// store can use the synchronous hashing functions.
+await initHasher();
 
 function loadDir(dir: string, data: Map<Hash, CasNode>): void {
   let entries: string[];
@@ -190,15 +193,24 @@ function hashesToEntries(
   return result;
 }
 
-export function createFsStore(dir: string): BootstrapCapableStore {
+/**
+ * The CAS sub-store of an FS-backed `OcasStore` — also satisfies the legacy
+ * `BootstrapCapableStore` interface so `bootstrap()` can run against it.
+ */
+export type FsCasStore = BootstrapCapableStore & {
+  put(typeHash: Hash, payload: unknown): Hash;
+  delete(hash: Hash): boolean;
+};
+
+export function createFsStore(dir: string): FsCasStore {
   const data = new Map<Hash, CasNode>();
   loadDir(dir, data);
   const indexDir = join(dir, INDEX_DIR);
   const typeIndex = loadOrMigrateTypeIndex(dir, data);
   const metaSet = loadOrMigrateMetaSet(dir, data);
 
-  async function putSelfReferencing(payload: unknown): Promise<Hash> {
-    const hash = await computeSelfHash(payload);
+  function putSelfReferencing(payload: unknown): Hash {
+    const hash = computeSelfHashSync(payload);
     if (!data.has(hash)) {
       const node: CasNode = { type: hash, payload, timestamp: Date.now() };
       data.set(hash, node);
@@ -218,9 +230,9 @@ export function createFsStore(dir: string): BootstrapCapableStore {
     return hash;
   }
 
-  const store: BootstrapCapableStore = {
-    async put(typeHash: Hash, payload: unknown): Promise<Hash> {
-      const hash = await computeHash(typeHash, payload);
+  const store: FsCasStore = {
+    put(typeHash: Hash, payload: unknown): Hash {
+      const hash = computeHashSync(typeHash, payload);
 
       if (!data.has(hash)) {
         const node: CasNode = {
@@ -279,43 +291,43 @@ export function createFsStore(dir: string): BootstrapCapableStore {
       return applyListOptions(hashesToEntries(data, result), options);
     },
 
-    delete(hash: Hash): void {
+    delete(hash: Hash): boolean {
       const node = data.get(hash);
-      if (node) {
-        data.delete(hash);
-        // Delete file
-        try {
-          unlinkSync(join(dir, `${hash}.bin`));
-        } catch {
-          // ignore if file doesn't exist
+      if (!node) return false;
+      data.delete(hash);
+      // Delete file
+      try {
+        unlinkSync(join(dir, `${hash}.bin`));
+      } catch {
+        // ignore if file doesn't exist
+      }
+      // Remove from type index
+      const list = typeIndex.get(node.type);
+      if (list) {
+        const idx = list.indexOf(hash);
+        if (idx !== -1) {
+          list.splice(idx, 1);
         }
-        // Remove from type index
-        const list = typeIndex.get(node.type);
-        if (list) {
-          const idx = list.indexOf(hash);
-          if (idx !== -1) {
-            list.splice(idx, 1);
+        if (list.length === 0) {
+          typeIndex.delete(node.type);
+          // Delete empty index file
+          try {
+            unlinkSync(join(indexDir, node.type));
+          } catch {
+            // ignore
           }
-          if (list.length === 0) {
-            typeIndex.delete(node.type);
-            // Delete empty index file
-            try {
-              unlinkSync(join(indexDir, node.type));
-            } catch {
-              // ignore
-            }
-          } else {
-            // Rewrite index file
-            const body = `${list.join("\n")}\n`;
-            writeFileSync(join(indexDir, node.type), body, "utf8");
-          }
-        }
-        // Remove from meta set if applicable
-        if (metaSet.has(hash)) {
-          metaSet.delete(hash);
-          rewriteMetaSet(indexDir, metaSet);
+        } else {
+          // Rewrite index file
+          const body = `${list.join("\n")}\n`;
+          writeFileSync(join(indexDir, node.type), body, "utf8");
         }
       }
+      // Remove from meta set if applicable
+      if (metaSet.has(hash)) {
+        metaSet.delete(hash);
+        rewriteMetaSet(indexDir, metaSet);
+      }
+      return true;
     },
 
     [BOOTSTRAP_STORE]: putSelfReferencing,
@@ -325,19 +337,16 @@ export function createFsStore(dir: string): BootstrapCapableStore {
 }
 
 /**
- * Prepare a filesystem-backed CAS store: create the directory (if needed),
+ * Prepare a filesystem-backed CAS sub-store: create the directory (if needed),
  * validate that the path is a directory, and instantiate the store. Does NOT
  * run bootstrap — callers that want bootstrap should either use {@link openStore}
- * or call `bootstrap` themselves (useful when wiring a varStore before
- * bootstrap to avoid running it twice).
+ * or call `bootstrap` themselves.
  *
  * @param dir - The directory path for the store
- * @returns A Promise resolving to the BootstrapCapableStore
+ * @returns A Promise resolving to the FsCasStore
  * @throws Error if the path exists but is not a directory
  */
-export async function prepareStore(
-  dir: string,
-): Promise<BootstrapCapableStore> {
+export async function prepareStore(dir: string): Promise<FsCasStore> {
   // Create directory if it doesn't exist
   try {
     mkdirSync(dir, { recursive: true });
@@ -374,25 +383,21 @@ export async function prepareStore(
 }
 
 /**
- * Open a filesystem-backed CAS store with automatic directory creation and bootstrap.
- * This is an async function that:
- * 1. Creates the directory (with recursive: true) if it doesn't exist
- * 2. Validates that the path is actually a directory (not a file)
- * 3. Creates the store
- * 4. Runs bootstrap (which is idempotent)
+ * Open a filesystem-backed `OcasStore` with automatic directory creation and
+ * bootstrap. The CAS sub-store is FS-backed; the variable and tag sub-stores
+ * are in-memory (provided by `@ocas/core`).
  *
- * @param dir - The directory path for the store
- * @param varStore - Optional variable store; when provided, builtin schema
- *   aliases are written to it during bootstrap
- * @returns A Promise resolving to the BootstrapCapableStore
+ * @param dir - The directory path for the CAS store
+ * @returns A Promise resolving to the OcasStore
  * @throws Error if the path exists but is not a directory
  */
-export async function openStore(
-  dir: string,
-  varStore?: VariableStore,
-): Promise<BootstrapCapableStore> {
-  const store = await prepareStore(dir);
-  // Bootstrap (idempotent)
-  await bootstrap(store, varStore);
-  return store;
+export async function openStore(dir: string): Promise<OcasStore> {
+  const cas = await prepareStore(dir);
+  const ocas: OcasStore = {
+    cas,
+    var: createFsVarStoreFor(dir, cas),
+    tag: createFsTagStore(dir),
+  };
+  await bootstrap(ocas);
+  return ocas;
 }

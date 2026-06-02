@@ -2,15 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash, Store } from "@ocas/core";
+import type { Hash, OcasStore } from "@ocas/core";
 import { bootstrap, putSchema } from "@ocas/core";
-import { createFsStore } from "@ocas/fs";
+import { openStore as openFsStore } from "@ocas/fs";
 
 // ---- Test helpers ----
 
 let testDir: string;
 let storePath: string;
-let varDbPath: string;
 let cliPath: string;
 
 beforeEach(() => {
@@ -20,7 +19,6 @@ beforeEach(() => {
     `ocas-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   storePath = join(testDir, "store");
-  varDbPath = join(testDir, "variables.db");
   cliPath = join(import.meta.dir, "../src/index.ts");
 
   mkdirSync(testDir, { recursive: true });
@@ -45,16 +43,7 @@ async function runCli(...args: string[]): Promise<{
   exitCode: number;
 }> {
   const proc = Bun.spawn(
-    [
-      "bun",
-      "run",
-      cliPath,
-      "--home",
-      storePath,
-      "--var-db",
-      varDbPath,
-      ...args,
-    ],
+    ["bun", "run", cliPath, "--home", storePath, ...args],
     {
       stdout: "pipe",
       stderr: "pipe",
@@ -79,17 +68,17 @@ async function runCli(...args: string[]): Promise<{
  * Create a test CAS node and return its hash
  */
 async function createTestNode(
-  store: Store,
+  store: OcasStore,
   typeHash: Hash,
   payload: unknown,
 ): Promise<Hash> {
-  return await store.put(typeHash, payload);
+  return store.cas.put(typeHash, payload);
 }
 
 /**
  * Get bootstrap type hash
  */
-async function getBootstrapHash(store: Store): Promise<Hash> {
+async function getBootstrapHash(store: OcasStore): Promise<Hash> {
   const builtinSchemas = await bootstrap(store);
   return builtinSchemas["@ocas/schema"] ?? "";
 }
@@ -98,7 +87,7 @@ async function getBootstrapHash(store: Store): Promise<Hash> {
 
 describe("var set", () => {
   test("create new variable without tags/labels", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -125,7 +114,7 @@ describe("var set", () => {
   });
 
   test("create with tags", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -148,7 +137,7 @@ describe("var set", () => {
   });
 
   test("create with labels", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -171,7 +160,7 @@ describe("var set", () => {
   });
 
   test("update existing variable (same schema)", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash1 = await createTestNode(store, typeHash, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash, { test: "data2" });
@@ -198,7 +187,7 @@ describe("var set", () => {
   });
 
   test("create variant with different schema", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
     const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
@@ -227,7 +216,7 @@ describe("var set", () => {
   });
 
   test("update with new tags replaces old tags", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -264,7 +253,7 @@ describe("var set", () => {
   });
 
   test("error on invalid name format", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -290,7 +279,7 @@ describe("var set", () => {
   });
 
   test("error on tag/label name conflict", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -312,7 +301,7 @@ describe("var set", () => {
 
 describe("var get", () => {
   test("retrieve existing variable by name + schema", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -336,7 +325,7 @@ describe("var get", () => {
   });
 
   test("error when variable not found", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
 
     const { stderr, exitCode } = await runCli(
@@ -363,7 +352,7 @@ describe("var get", () => {
   });
 
   test("distinguish variants by schema", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
     const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
@@ -401,7 +390,7 @@ describe("var get", () => {
 
 describe("var delete", () => {
   test("remove all schema variants", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
     const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
@@ -441,7 +430,7 @@ describe("var delete", () => {
   });
 
   test("remove specific variant by schema", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
     const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
@@ -516,7 +505,7 @@ describe("var delete", () => {
   });
 
   test("cascade delete tags and labels", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -542,7 +531,7 @@ describe("var delete", () => {
 
 describe("var list", () => {
   test("list all variables", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash1 = await createTestNode(store, typeHash, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash, { test: "data2" });
@@ -565,7 +554,7 @@ describe("var list", () => {
   });
 
   test("filter by name prefix", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash1 = await createTestNode(store, typeHash, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash, { test: "data2" });
@@ -588,7 +577,7 @@ describe("var list", () => {
   });
 
   test("filter by schema", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const bootstrapHash = await getBootstrapHash(store);
     const typeHash1 = await putSchema(store, {
       title: "TypeA",
@@ -623,7 +612,7 @@ describe("var list", () => {
   });
 
   test("filter by tags (AND logic)", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash1 = await createTestNode(store, typeHash, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash, { test: "data2" });
@@ -670,7 +659,7 @@ describe("var list", () => {
   });
 
   test("filter by labels", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash1 = await createTestNode(store, typeHash, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash, { test: "data2" });
@@ -710,7 +699,7 @@ describe("var list", () => {
   });
 
   test("combined filters", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash1, { test: "data2" });
@@ -765,7 +754,7 @@ describe("var list", () => {
 
 describe("var tag", () => {
   test("add new tag", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -789,7 +778,7 @@ describe("var tag", () => {
   });
 
   test("update existing tag value", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -813,7 +802,7 @@ describe("var tag", () => {
   });
 
   test("add label", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -837,7 +826,7 @@ describe("var tag", () => {
   });
 
   test("delete tag", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -870,7 +859,7 @@ describe("var tag", () => {
   });
 
   test("delete label", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -903,7 +892,7 @@ describe("var tag", () => {
   });
 
   test("mixed add and delete operations", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -930,7 +919,7 @@ describe("var tag", () => {
   });
 
   test("error on tag/label conflict", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -952,7 +941,7 @@ describe("var tag", () => {
   });
 
   test("error when variable not found", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
 
     const { stderr, exitCode } = await runCli(
@@ -985,7 +974,7 @@ describe("var tag", () => {
   });
 
   test("error when no operations provided", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
 
     const { stderr, exitCode } = await runCli(
@@ -1005,7 +994,7 @@ describe("var tag", () => {
 
 describe("global options", () => {
   test("--json flag for compact output", async () => {
-    const store = createFsStore(storePath);
+    const store = await openFsStore(storePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -1029,7 +1018,7 @@ describe("global options", () => {
     const customStorePath = join(testDir, "custom-store");
     mkdirSync(customStorePath, { recursive: true });
 
-    const store = createFsStore(customStorePath);
+    const store = await openFsStore(customStorePath);
     const typeHash = await getBootstrapHash(store);
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
@@ -1041,39 +1030,6 @@ describe("global options", () => {
         cliPath,
         "--home",
         customStorePath,
-        "--var-db",
-        varDbPath,
-        "var",
-        "set",
-        "@test/x",
-        hash,
-      ],
-      {
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
-
-    await proc.exited;
-    expect(proc.exitCode).toBe(0);
-  });
-
-  test("--var-db flag for custom database path", async () => {
-    const customDbPath = join(testDir, "custom.db");
-    const store = createFsStore(storePath);
-    const typeHash = await getBootstrapHash(store);
-    const hash = await createTestNode(store, typeHash, { test: "data" });
-
-    // Override with custom db path
-    const proc = Bun.spawn(
-      [
-        "bun",
-        "run",
-        cliPath,
-        "--home",
-        storePath,
-        "--var-db",
-        customDbPath,
         "var",
         "set",
         "@test/x",

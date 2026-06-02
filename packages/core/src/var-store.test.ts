@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { createMemoryStore } from "./store.js";
-import type { Hash } from "./types.js";
 import {
   CasNodeNotFoundError,
   InvalidVariableNameError,
@@ -8,7 +6,9 @@ import {
   SchemaMismatchError,
   TagLabelConflictError,
   VariableNotFoundError,
-} from "./variable-store.js";
+} from "./errors.js";
+import { createMemoryStore } from "./store.js";
+import type { Hash } from "./types.js";
 
 function makeStoreWithSchema(): {
   store: ReturnType<typeof createMemoryStore>;

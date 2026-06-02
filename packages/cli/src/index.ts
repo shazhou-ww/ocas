@@ -3,12 +3,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Hash, ListOptions, Store, VariableStore } from "@ocas/core";
+import type { Hash, ListOptions, OcasStore } from "@ocas/core";
 import {
-  bootstrap,
   CasNodeNotFoundError,
   computeHash,
-  createVariableStore,
   gc,
   getSchema,
   InvalidTagFormatError,
@@ -24,7 +22,7 @@ import {
   walk,
   wrapEnvelope,
 } from "@ocas/core";
-import { openStore as openFsStore, prepareStore } from "@ocas/fs";
+import { openStore as openFsStore } from "@ocas/fs";
 
 // ---- Argument parsing ----
 
@@ -34,7 +32,6 @@ type Flags = Record<string, string | boolean | string[]>;
 const VALUE_FLAGS = new Set([
   "home",
   "format",
-  "var-db",
   "tag",
   "schema",
   "resolution",
@@ -107,15 +104,11 @@ const storePath =
     : (process.env.OCAS_HOME ?? defaultStorePath);
 const compact = flags.json === true;
 
-const defaultVarDbPath = join(storePath, "variables.db");
-const varDbPath =
-  typeof flags["var-db"] === "string" ? flags["var-db"] : defaultVarDbPath;
-
 // ---- Helpers ----
 
 const inlineRender = flags.render === true || flags.r === true;
 
-async function out(data: unknown, store?: Store): Promise<void> {
+async function out(data: unknown, store?: OcasStore): Promise<void> {
   if (
     inlineRender &&
     typeof data === "object" &&
@@ -126,8 +119,6 @@ async function out(data: unknown, store?: Store): Promise<void> {
     const envelope = data as { type: string; value: unknown };
     const s = store ?? (await openStore());
     // renderDirect is synchronous; passing null options uses defaults.
-    // varStore is intentionally omitted — inline render uses YAML fallback
-    // only, custom templates require the full `ocas render` command.
     const output = renderDirect(envelope.type as Hash, envelope.value, s, null);
     process.stdout.write(`${output}\n`);
     return;
@@ -165,24 +156,12 @@ async function readStdinJson(): Promise<unknown> {
 }
 
 /**
- * Open the filesystem-backed CAS store.
- * Automatically creates directory and bootstraps if needed.
- * If a varStore is provided, builtin schema variables are written to it during bootstrap.
+ * Open the filesystem-backed OcasStore. Automatically creates directory and
+ * bootstraps if needed.
  */
-async function openStore(varStore?: VariableStore): Promise<Store> {
+async function openStore(): Promise<OcasStore> {
   const fullPath = resolve(storePath);
-  return await openFsStore(fullPath, varStore);
-}
-
-async function openStoreAndVarStore(): Promise<{
-  store: Store;
-  varStore: VariableStore;
-}> {
-  const fullPath = resolve(storePath);
-  const store = await prepareStore(fullPath);
-  const varStore = createVariableStore(resolve(varDbPath), store);
-  await bootstrap(store, varStore);
-  return { store, varStore };
+  return await openFsStore(fullPath);
 }
 
 /**
@@ -194,14 +173,14 @@ function isHash(input: string): boolean {
 
 /**
  * Resolve a hash-or-name. If `input` already looks like a hash, return it as-is.
- * Otherwise, query the provided varStore for a variable with that exact name
- * and return the first match's value.
+ * Otherwise, query the store's var sub-store for a variable with that exact
+ * name and return the first match's value.
  */
-function resolveHash(input: string, varStore: VariableStore): Hash {
+function resolveHash(input: string, store: OcasStore): Hash {
   if (isHash(input)) {
     return input as Hash;
   }
-  const variants = varStore.list({ exactName: input });
+  const variants = store.var.list({ exactName: input });
   const first = variants[0];
   if (!first) {
     die(`Error: Schema not found: ${input}`);
@@ -309,165 +288,139 @@ async function cmdPut(args: string[]): Promise<void> {
     );
   if (isPipe && args[1])
     die("Cannot use --pipe/-p with a file argument. Use one or the other.");
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const typeHash = resolveHash(typeHashOrName, varStore);
-    const payload = isPipe
-      ? await readStdinJson()
-      : readJsonFile(file as string);
+  const store = await openStore();
+  const typeHash = resolveHash(typeHashOrName, store);
+  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
 
-    // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
-    // instead of ajv against meta-schema (which can't express recursive constraints)
-    const metaHash = resolveHash("@ocas/schema", varStore);
-    if (typeHash === metaHash) {
-      try {
-        const hash = await putSchema(store, payload as Record<string, unknown>);
-        await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
-      } catch (_e) {
-        console.error(
-          `Validation failed: payload in ${file} does not match schema ${typeHash}`,
-        );
-        process.exit(1);
-      }
-      return;
-    }
-
-    // Check if schema exists
-    const schema = getSchema(store, typeHash);
-    if (schema === null) {
-      console.error(`Schema not found: ${typeHash}`);
-      process.exit(1);
-    }
-
-    // Validate payload against schema before storing
-    const tempNode = { type: typeHash, payload, timestamp: Date.now() };
-    if (!validate(store, tempNode)) {
+  // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
+  // instead of ajv against meta-schema (which can't express recursive constraints)
+  const metaHash = resolveHash("@ocas/schema", store);
+  if (typeHash === metaHash) {
+    try {
+      const hash = await putSchema(store, payload as Record<string, unknown>);
+      await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
+    } catch (_e) {
       console.error(
         `Validation failed: payload in ${file} does not match schema ${typeHash}`,
       );
       process.exit(1);
     }
-
-    const hash = await store.put(typeHash, payload);
-    await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
-  } finally {
-    varStore.close();
+    return;
   }
+
+  // Check if schema exists
+  const schema = getSchema(store, typeHash);
+  if (schema === null) {
+    console.error(`Schema not found: ${typeHash}`);
+    process.exit(1);
+  }
+
+  // Validate payload against schema before storing
+  const tempNode = { type: typeHash, payload, timestamp: Date.now() };
+  if (!validate(store, tempNode)) {
+    console.error(
+      `Validation failed: payload in ${file} does not match schema ${typeHash}`,
+    );
+    process.exit(1);
+  }
+
+  const hash = store.cas.put(typeHash, payload);
+  await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
 }
 
 async function cmdGet(args: string[]): Promise<void> {
   const input = args[0];
   if (!input) die("Usage: ocas get <hash-or-name>");
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const hash = resolveHash(input, varStore);
-    const node = store.get(hash);
-    if (node === null) die(`Node not found: ${hash}`);
-    await out(await wrapEnvelope(store, "@ocas/output/get", node), store);
-  } finally {
-    varStore.close();
-  }
+  const store = await openStore();
+  const hash = resolveHash(input, store);
+  const node = store.cas.get(hash);
+  if (node === null) die(`Node not found: ${hash}`);
+  await out(await wrapEnvelope(store, "@ocas/output/get", node), store);
 }
 
 async function cmdHas(args: string[]): Promise<void> {
   const input = args[0];
   if (!input) die("Usage: ocas has <hash-or-name>");
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const hash = resolveHash(input, varStore);
-    await out(
-      await wrapEnvelope(store, "@ocas/output/has", store.has(hash)),
-      store,
-    );
-  } finally {
-    varStore.close();
-  }
+  const store = await openStore();
+  const hash = resolveHash(input, store);
+  await out(
+    await wrapEnvelope(store, "@ocas/output/has", store.cas.has(hash)),
+    store,
+  );
 }
 
 async function cmdVerify(args: string[]): Promise<void> {
   const input = args[0];
   if (!input) die("Usage: ocas verify <hash-or-name>");
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const hash = resolveHash(input, varStore);
-    const node = store.get(hash);
-    if (node === null) die(`Node not found: ${hash}`);
-    const ok = await verify(hash, node);
-    let status: string;
-    if (!ok) {
-      status = "corrupted";
-    } else {
-      status = validate(store, node) ? "ok" : "invalid";
-    }
-    await out(await wrapEnvelope(store, "@ocas/output/verify", status), store);
-  } finally {
-    varStore.close();
+  const store = await openStore();
+  const hash = resolveHash(input, store);
+  const node = store.cas.get(hash);
+  if (node === null) die(`Node not found: ${hash}`);
+  const ok = await verify(hash, node);
+  let status: string;
+  if (!ok) {
+    status = "corrupted";
+  } else {
+    status = validate(store, node) ? "ok" : "invalid";
   }
+  await out(await wrapEnvelope(store, "@ocas/output/verify", status), store);
 }
 
 async function cmdRefs(args: string[]): Promise<void> {
   const input = args[0];
   if (!input) die("Usage: ocas refs <hash-or-name>");
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const hash = resolveHash(input, varStore);
-    const node = store.get(hash);
-    if (node === null) die(`Node not found: ${hash}`);
-    const refHashes = refs(store, node);
-    await out(await wrapEnvelope(store, "@ocas/output/refs", refHashes), store);
-  } finally {
-    varStore.close();
-  }
+  const store = await openStore();
+  const hash = resolveHash(input, store);
+  const node = store.cas.get(hash);
+  if (node === null) die(`Node not found: ${hash}`);
+  const refHashes = refs(store, node);
+  await out(await wrapEnvelope(store, "@ocas/output/refs", refHashes), store);
 }
 
 async function cmdWalk(args: string[]): Promise<void> {
   const input = args[0];
   if (!input) die("Usage: ocas walk <hash-or-name> [--format tree]");
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const hash = resolveHash(input, varStore);
-    const format = flags.format;
+  const store = await openStore();
+  const hash = resolveHash(input, store);
+  const format = flags.format;
 
-    if (format === "tree") {
-      const childMap = new Map<Hash, Hash[]>();
-      walk(store, hash, (h, node) => {
-        childMap.set(h, refs(store, node));
-      });
+  if (format === "tree") {
+    const childMap = new Map<Hash, Hash[]>();
+    walk(store, hash, (h, node) => {
+      childMap.set(h, refs(store, node));
+    });
 
-      const printed = new Set<Hash>();
-      const lines: string[] = [];
+    const printed = new Set<Hash>();
+    const lines: string[] = [];
 
-      function printNode(h: Hash, prefix: string, isLast: boolean): void {
-        const connector = prefix === "" ? "" : isLast ? "└── " : "├── ";
-        if (printed.has(h)) {
-          lines.push(`${prefix}${connector}${h} (seen)`);
-          return;
-        }
-        printed.add(h);
-        lines.push(`${prefix}${connector}${h}`);
-
-        const kids = childMap.get(h) ?? [];
-        const childPrefix =
-          prefix === "" ? "" : prefix + (isLast ? "    " : "│   ");
-        for (let i = 0; i < kids.length; i++) {
-          printNode(kids[i] as Hash, childPrefix, i === kids.length - 1);
-        }
+    function printNode(h: Hash, prefix: string, isLast: boolean): void {
+      const connector = prefix === "" ? "" : isLast ? "└── " : "├── ";
+      if (printed.has(h)) {
+        lines.push(`${prefix}${connector}${h} (seen)`);
+        return;
       }
+      printed.add(h);
+      lines.push(`${prefix}${connector}${h}`);
 
-      printNode(hash, "", true);
-      await out(
-        await wrapEnvelope(store, "@ocas/output/walk", lines.join("\n")),
-        store,
-      );
-    } else {
-      const hashes: Hash[] = [];
-      walk(store, hash, (h) => {
-        hashes.push(h);
-      });
-      await out(await wrapEnvelope(store, "@ocas/output/walk", hashes), store);
+      const kids = childMap.get(h) ?? [];
+      const childPrefix =
+        prefix === "" ? "" : prefix + (isLast ? "    " : "│   ");
+      for (let i = 0; i < kids.length; i++) {
+        printNode(kids[i] as Hash, childPrefix, i === kids.length - 1);
+      }
     }
-  } finally {
-    varStore.close();
+
+    printNode(hash, "", true);
+    await out(
+      await wrapEnvelope(store, "@ocas/output/walk", lines.join("\n")),
+      store,
+    );
+  } else {
+    const hashes: Hash[] = [];
+    walk(store, hash, (h) => {
+      hashes.push(h);
+    });
+    await out(await wrapEnvelope(store, "@ocas/output/walk", hashes), store);
   }
 }
 
@@ -481,17 +434,11 @@ async function cmdHash(args: string[]): Promise<void> {
     );
   if (isPipe && args[1])
     die("Cannot use --pipe/-p with a file argument. Use one or the other.");
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const typeHash = resolveHash(typeHashOrName, varStore);
-    const payload = isPipe
-      ? await readStdinJson()
-      : readJsonFile(file as string);
-    const hash = await computeHash(typeHash, payload);
-    await out(await wrapEnvelope(store, "@ocas/output/hash", hash), store);
-  } finally {
-    varStore.close();
-  }
+  const store = await openStore();
+  const typeHash = resolveHash(typeHashOrName, store);
+  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
+  const hash = await computeHash(typeHash, payload);
+  await out(await wrapEnvelope(store, "@ocas/output/hash", hash), store);
 }
 
 async function cmdRender(args: string[]): Promise<void> {
@@ -508,7 +455,7 @@ async function cmdRender(args: string[]): Promise<void> {
     );
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
 
   // Parse numeric options
   const resolution =
@@ -579,7 +526,6 @@ async function cmdRender(args: string[]): Promise<void> {
           ...(resolution !== undefined && { resolution }),
           ...(decay !== undefined && { decay }),
           ...(epsilon !== undefined && { epsilon }),
-          varStore,
         });
         process.stdout.write(`${output}\n`);
       } else {
@@ -596,17 +542,15 @@ async function cmdRender(args: string[]): Promise<void> {
         process.stdout.write(`${output}\n`);
       }
     } else {
-      const hash = resolveHash(input as string, varStore);
+      const hash = resolveHash(input as string, store);
       const output = await renderAsync(store, hash, {
         ...(resolution !== undefined && { resolution }),
         ...(decay !== undefined && { decay }),
         ...(epsilon !== undefined && { epsilon }),
-        varStore,
       });
       // Output to stdout without JSON wrapping (raw output)
       process.stdout.write(`${output}\n`);
     }
-    varStore.close();
   } catch (error) {
     if (error instanceof CasNodeNotFoundError) {
       die(`Error: Node not found: ${error.hash}`);
@@ -634,7 +578,6 @@ async function cmdVarSet(args: string[]): Promise<void> {
   }
 
   const store = await openStore();
-  const varStore = createVariableStore(resolve(varDbPath), store);
 
   try {
     // Parse tags/labels from --tag flags
@@ -660,7 +603,7 @@ async function cmdVarSet(args: string[]): Promise<void> {
           }
         : undefined;
 
-    const variable = varStore.set(name, value, options);
+    const variable = store.var.set(name, value as Hash, options);
     await out(
       await wrapEnvelope(store, "@ocas/output/var-set", variable),
       store,
@@ -674,8 +617,6 @@ async function cmdVarSet(args: string[]): Promise<void> {
       die(`Error: ${e.message}`);
     }
     throw e;
-  } finally {
-    varStore.close();
   }
 }
 
@@ -687,21 +628,13 @@ async function cmdVarGet(args: string[]): Promise<void> {
     die("Usage: ocas var get <name> --schema <hash-or-name>");
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
-
-  try {
-    const schema = resolveHash(schemaInput, varStore);
-    const variable = varStore.get(name, schema);
-    if (variable === null) {
-      die(`Error: Variable not found: name=${name}, schema=${schema}`);
-    }
-    await out(
-      await wrapEnvelope(store, "@ocas/output/var-get", variable),
-      store,
-    );
-  } finally {
-    varStore.close();
+  const store = await openStore();
+  const schema = resolveHash(schemaInput, store);
+  const variable = store.var.get(name, schema);
+  if (variable === null) {
+    die(`Error: Variable not found: name=${name}, schema=${schema}`);
   }
+  await out(await wrapEnvelope(store, "@ocas/output/var-get", variable), store);
 }
 
 async function cmdVarDelete(args: string[]): Promise<void> {
@@ -718,20 +651,27 @@ async function cmdVarDelete(args: string[]): Promise<void> {
     );
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
 
   try {
     if (schemaInput !== undefined) {
-      const schema = resolveHash(schemaInput, varStore);
+      const schema = resolveHash(schemaInput, store);
       // Precise deletion: remove specific (name, schema) variant
-      const variable = varStore.remove(name, schema);
+      const variables = store.var.remove(name, schema);
+      if (variables.length === 0) {
+        throw new VariableNotFoundError(name, schema);
+      }
       await out(
-        await wrapEnvelope(store, "@ocas/output/var-delete", variable),
+        await wrapEnvelope(
+          store,
+          "@ocas/output/var-delete",
+          variables[0] as unknown,
+        ),
         store,
       );
     } else {
       // Batch deletion: remove all variants for this name
-      const variables = varStore.remove(name);
+      const variables = store.var.remove(name);
       await out(
         await wrapEnvelope(store, "@ocas/output/var-delete", variables),
         store,
@@ -742,8 +682,6 @@ async function cmdVarDelete(args: string[]): Promise<void> {
       die(`Error: ${e.message}`);
     }
     throw e;
-  } finally {
-    varStore.close();
   }
 }
 
@@ -760,16 +698,35 @@ async function cmdVarTag(args: string[]): Promise<void> {
     die("Usage: ocas var tag <name> --schema <hash-or-name> <operations...>");
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
 
   try {
-    const schema = resolveHash(schemaInput, varStore);
+    const schema = resolveHash(schemaInput, store);
     const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
 
-    const variable = varStore.tag(name, schema, {
-      ...(Object.keys(tags).length > 0 && { add: tags }),
-      ...(labels.length > 0 && { addLabels: labels }),
-      ...(deleteNames.length > 0 && { delete: deleteNames }),
+    // VarStore.set with options replaces all tags/labels — to express
+    // "add some / delete some / preserve the rest", merge against the current.
+    const existing = store.var.get(name, schema);
+    if (existing === null) {
+      throw new VariableNotFoundError(name, schema);
+    }
+    const newTags: Record<string, string> = { ...existing.tags };
+    const newLabels: string[] = [...existing.labels];
+    for (const k of deleteNames) {
+      delete newTags[k];
+      const idx = newLabels.indexOf(k);
+      if (idx !== -1) newLabels.splice(idx, 1);
+    }
+    for (const [k, v] of Object.entries(tags)) {
+      newTags[k] = v;
+    }
+    for (const lb of labels) {
+      if (!newLabels.includes(lb)) newLabels.push(lb);
+    }
+
+    const variable = store.var.set(name, existing.value, {
+      tags: newTags,
+      labels: newLabels,
     });
 
     await out(
@@ -785,8 +742,6 @@ async function cmdVarTag(args: string[]): Promise<void> {
       die(`Error: ${e.message}`);
     }
     throw e;
-  } finally {
-    varStore.close();
   }
 }
 
@@ -798,41 +753,37 @@ async function cmdVarHistory(args: string[]): Promise<void> {
     die("Usage: ocas var history <name> [--schema <hash-or-name>]");
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
-
-  try {
-    let schema: Hash;
-    if (schemaInput !== undefined) {
-      schema = resolveHash(schemaInput, varStore);
-    } else {
-      const variants = varStore.list({ exactName: name });
-      if (variants.length === 0) {
-        die(`Error: Variable not found: ${name}`);
-      }
-      if (variants.length > 1) {
-        die(
-          `Error: Multiple schema variants for "${name}"; use --schema to disambiguate`,
-        );
-      }
-      schema = (variants[0] as { schema: string }).schema as Hash;
+  const store = await openStore();
+  let schema: Hash;
+  if (schemaInput !== undefined) {
+    schema = resolveHash(schemaInput, store);
+  } else {
+    const variants = store.var.list({ exactName: name });
+    if (variants.length === 0) {
+      die(`Error: Variable not found: ${name}`);
     }
-
-    const values = varStore.history(name, schema);
-    if (values.length === 0) {
-      die(`Error: Variable not found: name=${name}, schema=${schema}`);
+    if (variants.length > 1) {
+      die(
+        `Error: Multiple schema variants for "${name}"; use --schema to disambiguate`,
+      );
     }
-
-    await out(
-      await wrapEnvelope(store, "@ocas/output/var-history", {
-        name,
-        schema,
-        values,
-      }),
-      store,
-    );
-  } finally {
-    varStore.close();
+    schema = (variants[0] as { schema: string }).schema as Hash;
   }
+
+  const entries = store.var.history(name, schema);
+  if (entries.length === 0) {
+    die(`Error: Variable not found: name=${name}, schema=${schema}`);
+  }
+
+  const values = entries.map((e) => e.value);
+  await out(
+    await wrapEnvelope(store, "@ocas/output/var-history", {
+      name,
+      schema,
+      values,
+    }),
+    store,
+  );
 }
 
 async function cmdVarList(args: string[]): Promise<void> {
@@ -841,13 +792,11 @@ async function cmdVarList(args: string[]): Promise<void> {
   const tagFlags = flags.tag;
   const listOpts = parseListOptions();
 
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
 
   try {
     const schema =
-      schemaInput !== undefined
-        ? resolveHash(schemaInput, varStore)
-        : undefined;
+      schemaInput !== undefined ? resolveHash(schemaInput, store) : undefined;
     // Parse tags/labels from --tag flags
     const tagArgs = Array.isArray(tagFlags)
       ? tagFlags
@@ -861,7 +810,7 @@ async function cmdVarList(args: string[]): Promise<void> {
       die("Error: Cannot use deletion syntax (:name) in var list filters");
     }
 
-    const variables = varStore.list({
+    const variables = store.var.list({
       namePrefix,
       ...(schema !== undefined ? { schema } : {}),
       ...(Object.keys(tags).length > 0 ? { tags } : {}),
@@ -877,8 +826,6 @@ async function cmdVarList(args: string[]): Promise<void> {
       die(`Error: ${e.message}`);
     }
     throw e;
-  } finally {
-    varStore.close();
   }
 }
 
@@ -892,12 +839,12 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     );
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
 
   try {
-    const schemaHash = resolveHash(schemaInput, varStore);
+    const schemaHash = resolveHash(schemaInput, store);
     // Validate schema hash exists in CAS
-    if (!store.has(schemaHash)) {
+    if (!store.cas.has(schemaHash)) {
       die(`Error: Schema hash not found in CAS: ${schemaHash}`);
     }
 
@@ -931,12 +878,12 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     }
 
     // Store content in CAS under @string schema
-    const stringHash = resolveHash("@ocas/string", varStore);
-    const contentHash = await store.put(stringHash, content);
+    const stringHash = resolveHash("@ocas/string", store);
+    const contentHash = store.cas.put(stringHash, content);
 
     // Create variable binding: @ocas/template/text/<schema-hash>
     const varName = `@ocas/template/text/${schemaHash}`;
-    varStore.set(varName, contentHash);
+    store.var.set(varName, contentHash);
 
     await out(
       await wrapEnvelope(store, "@ocas/output/template-set", {
@@ -950,8 +897,6 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
       die(`Error: ${e.message}`);
     }
     throw e;
-  } finally {
-    varStore.close();
   }
 }
 
@@ -962,59 +907,49 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
     die("Usage: ocas template get <schema-hash-or-name>");
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
+  const schemaHash = resolveHash(schemaInput, store);
+  const varName = `@ocas/template/text/${schemaHash}`;
+  const stringHash = resolveHash("@ocas/string", store);
+  const variable = store.var.get(varName, stringHash);
 
-  try {
-    const schemaHash = resolveHash(schemaInput, varStore);
-    const varName = `@ocas/template/text/${schemaHash}`;
-    const stringHash = resolveHash("@ocas/string", varStore);
-    const variable = varStore.get(varName, stringHash);
-
-    if (variable === null) {
-      die(`Error: Template not found for schema: ${schemaHash}`);
-    }
-
-    // Get the content from CAS
-    const node = store.get(variable.value);
-    if (node === null) {
-      die(`Error: Content not found in CAS: ${variable.value}`);
-    }
-
-    await out(
-      await wrapEnvelope(
-        store,
-        "@ocas/output/template-get",
-        node.payload as string,
-      ),
-      store,
-    );
-  } finally {
-    varStore.close();
+  if (variable === null) {
+    die(`Error: Template not found for schema: ${schemaHash}`);
   }
+
+  // Get the content from CAS
+  const node = store.cas.get(variable.value);
+  if (node === null) {
+    die(`Error: Content not found in CAS: ${variable.value}`);
+  }
+
+  await out(
+    await wrapEnvelope(
+      store,
+      "@ocas/output/template-get",
+      node.payload as string,
+    ),
+    store,
+  );
 }
 
 async function cmdTemplateList(_args: string[]): Promise<void> {
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
+  const stringHash = resolveHash("@ocas/string", store);
+  const variables = store.var.list({
+    namePrefix: "@ocas/template/text/",
+    schema: stringHash,
+  });
 
-  try {
-    const stringHash = resolveHash("@ocas/string", varStore);
-    const variables = varStore.list({
-      namePrefix: "@ocas/template/text/",
-      schema: stringHash,
-    });
+  const templates = variables.map((v) => ({
+    schemaHash: v.name.replace("@ocas/template/text/", ""),
+    contentHash: v.value,
+  }));
 
-    const templates = variables.map((v) => ({
-      schemaHash: v.name.replace("@ocas/template/text/", ""),
-      contentHash: v.value,
-    }));
-
-    await out(
-      await wrapEnvelope(store, "@ocas/output/template-list", templates),
-      store,
-    );
-  } finally {
-    varStore.close();
-  }
+  await out(
+    await wrapEnvelope(store, "@ocas/output/template-list", templates),
+    store,
+  );
 }
 
 async function cmdTemplateDelete(args: string[]): Promise<void> {
@@ -1024,13 +959,16 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
     die("Usage: ocas template delete <schema-hash-or-name>");
   }
 
-  const { store, varStore } = await openStoreAndVarStore();
+  const store = await openStore();
 
   try {
-    const schemaHash = resolveHash(schemaInput, varStore);
+    const schemaHash = resolveHash(schemaInput, store);
     const varName = `@ocas/template/text/${schemaHash}`;
-    const stringHash = resolveHash("@ocas/string", varStore);
-    varStore.remove(varName, stringHash);
+    const stringHash = resolveHash("@ocas/string", store);
+    const removed = store.var.remove(varName, stringHash);
+    if (removed.length === 0) {
+      throw new VariableNotFoundError(varName, stringHash);
+    }
 
     await out(
       await wrapEnvelope(store, "@ocas/output/template-delete", {
@@ -1043,21 +981,13 @@ async function cmdTemplateDelete(args: string[]): Promise<void> {
       die(`Error: Template not found for schema: ${schemaInput}`);
     }
     throw e;
-  } finally {
-    varStore.close();
   }
 }
 
 async function cmdGc(_args: string[]): Promise<void> {
   const store = await openStore();
-  const varStore = createVariableStore(varDbPath, store);
-
-  try {
-    const stats = gc(store, varStore);
-    await out(await wrapEnvelope(store, "@ocas/output/gc", stats), store);
-  } finally {
-    varStore.close();
-  }
+  const stats = gc(store);
+  await out(await wrapEnvelope(store, "@ocas/output/gc", stats), store);
 }
 
 async function cmdList(_args: string[]): Promise<void> {
@@ -1065,20 +995,16 @@ async function cmdList(_args: string[]): Promise<void> {
   if (typeof typeFlag !== "string")
     die("Usage: ocas list --type <hash-or-name>");
   const opts = parseListOptions();
-  const { store, varStore } = await openStoreAndVarStore();
-  try {
-    const typeHash = resolveHash(typeFlag, varStore);
-    const entries = store.listByType(typeHash, opts);
-    await out(await wrapEnvelope(store, "@ocas/output/list", entries), store);
-  } finally {
-    varStore.close();
-  }
+  const store = await openStore();
+  const typeHash = resolveHash(typeFlag, store);
+  const entries = store.cas.listByType(typeHash, opts);
+  await out(await wrapEnvelope(store, "@ocas/output/list", entries), store);
 }
 
 async function cmdListMeta(_args: string[]): Promise<void> {
   const opts = parseListOptions();
   const store = await openStore();
-  const entries = store.listMeta(opts);
+  const entries = store.cas.listMeta(opts);
   await out(
     await wrapEnvelope(store, "@ocas/output/list-meta", entries),
     store,
@@ -1088,7 +1014,7 @@ async function cmdListMeta(_args: string[]): Promise<void> {
 async function cmdListSchema(_args: string[]): Promise<void> {
   const opts = parseListOptions();
   const store = await openStore();
-  const entries = store.listSchemas(opts);
+  const entries = store.cas.listSchemas(opts);
   await out(
     await wrapEnvelope(store, "@ocas/output/list-schema", entries),
     store,
@@ -1132,7 +1058,6 @@ Commands:
 
 Flags:
   --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
-  --var-db <path>     Variable database path (default: <store>/variables.db)
   --json              Compact JSON output
   --render, -r        Render output inline (equivalent to | ocas render -p)
   --schema <hash>     Schema hash filter for var get/delete/tag/list

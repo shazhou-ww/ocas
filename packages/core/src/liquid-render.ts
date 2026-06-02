@@ -1,8 +1,7 @@
 import { type Context, Liquid, type TagToken } from "liquidjs";
 import type { RenderOptions } from "./render.js";
 import { putSchema } from "./schema.js";
-import type { Hash, Store } from "./types.js";
-import type { VariableStore } from "./variable-store.js";
+import type { Hash, OcasStore } from "./types.js";
 
 const DEFAULT_RESOLUTION = 1.0;
 const DEFAULT_DECAY = 0.5;
@@ -14,8 +13,7 @@ const FLOAT_TOLERANCE = 1e-10;
  * Templates are discovered via variables: @ocas/template/text/<type-hash>
  */
 export async function renderWithTemplate(
-  store: Store,
-  varStore: VariableStore,
+  store: OcasStore,
   hash: Hash,
   options?: RenderOptions,
 ): Promise<string> {
@@ -37,27 +35,15 @@ export async function renderWithTemplate(
   const visited = new Set<Hash>();
 
   // Create Liquid engine
-  const engine = createLiquidEngine(store, varStore, decay);
+  const engine = createLiquidEngine(store, decay);
 
-  return await renderNode(
-    engine,
-    store,
-    varStore,
-    hash,
-    resolution,
-    epsilon,
-    visited,
-  );
+  return await renderNode(engine, store, hash, resolution, epsilon, visited);
 }
 
 /**
  * Create a Liquid engine instance with custom render tag
  */
-function createLiquidEngine(
-  store: Store,
-  varStore: VariableStore,
-  globalDecay: number,
-): Liquid {
+function createLiquidEngine(store: OcasStore, globalDecay: number): Liquid {
   const engine = new Liquid({
     strictFilters: false,
     strictVariables: false,
@@ -70,7 +56,7 @@ function createLiquidEngine(
   };
 
   // Register custom {% render %} tag
-  // Capture store, varStore, globalDecay in closure
+  // Capture store, globalDecay in closure
   engine.registerTag("render", {
     parse(token: TagToken) {
       // Parse "variable" or "variable, decay: 0.7" syntax
@@ -137,7 +123,6 @@ function createLiquidEngine(
       const output = await renderNode(
         engine,
         store,
-        varStore,
         nodeHash,
         childResolution,
         currentEpsilon,
@@ -156,8 +141,7 @@ function createLiquidEngine(
  */
 async function renderNode(
   engine: Liquid,
-  store: Store,
-  varStore: VariableStore,
+  store: OcasStore,
   hash: Hash,
   currentResolution: number,
   epsilon: number,
@@ -169,7 +153,7 @@ async function renderNode(
   }
 
   // Fetch the node
-  const node = store.get(hash);
+  const node = store.cas.get(hash);
   if (node === null) {
     return `cas:${hash}`;
   }
@@ -182,13 +166,13 @@ async function renderNode(
 
   try {
     // Try to find a template for this node's type
-    const template = await findTemplate(store, varStore, node.type);
+    const template = await findTemplate(store, node.type);
 
     if (template === null) {
       // No template found - this is handled by the caller (fallback to YAML)
       // For now, return a simple representation
       visited.delete(hash);
-      return renderFallback(store, node.payload);
+      return renderFallback(node.payload);
     }
 
     // Render using the template
@@ -216,8 +200,7 @@ async function renderNode(
  * Find a template for a given type hash
  */
 async function findTemplate(
-  store: Store,
-  varStore: VariableStore,
+  store: OcasStore,
   typeHash: Hash,
 ): Promise<string | null> {
   const varName = `@ocas/template/text/${typeHash}`;
@@ -226,12 +209,12 @@ async function findTemplate(
     // Find the string schema hash (we need this to query variables)
     const stringSchema = await putSchema(store, { type: "string" });
 
-    const variable = varStore.get(varName, stringSchema);
+    const variable = store.var.get(varName, stringSchema);
     if (variable === null) {
       return null;
     }
 
-    const templateNode = store.get(variable.value);
+    const templateNode = store.cas.get(variable.value);
     if (templateNode === null) {
       return null;
     }
@@ -250,7 +233,7 @@ async function findTemplate(
 /**
  * Fallback renderer for nodes without templates
  */
-function renderFallback(_store: Store, payload: unknown): string {
+function renderFallback(payload: unknown): string {
   // Simple YAML-like representation
   if (payload === null) {
     return "null\n";

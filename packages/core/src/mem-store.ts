@@ -1,51 +1,37 @@
-import type { BootstrapCapableStore } from "./bootstrap-capable.js";
-import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import { createMemoryStore } from "./store.js";
-import type { CasNode, Hash, ListEntry, ListOptions } from "./types.js";
+import type { CasStore, OcasStore, TagStore, VarStore } from "./types.js";
 
-/** In-memory store wrapper used by schema validation tests. Wraps the
- * `cas` sub-store of an `OcasStore` and exposes the legacy
- * `BootstrapCapableStore` interface (async `put`, etc.). */
-export class MemStore implements BootstrapCapableStore {
-  readonly #inner: ReturnType<typeof createMemoryStore>["cas"];
+/**
+ * In-memory `OcasStore` used by schema validation tests. It exposes the
+ * `cas`, `var`, and `tag` sub-stores of an `OcasStore` plus a few legacy
+ * pass-through helpers (`get`, `put`, `has`, …) that some older tests still
+ * use directly.
+ */
+export class MemStore implements OcasStore {
+  readonly cas: CasStore;
+  readonly var: VarStore;
+  readonly tag: TagStore;
 
   constructor() {
-    this.#inner = createMemoryStore().cas;
+    const store = createMemoryStore();
+    this.cas = store.cas;
+    this.var = store.var;
+    this.tag = store.tag;
   }
 
-  async put(typeHash: Hash, payload: unknown): Promise<Hash> {
-    return this.#inner.put(typeHash, payload);
-  }
-
-  get(hash: Hash): CasNode | null {
-    return this.#inner.get(hash);
-  }
-
-  has(hash: Hash): boolean {
-    return this.#inner.has(hash);
-  }
-
-  listByType(typeHash: Hash, options?: ListOptions): ListEntry[] {
-    return this.#inner.listByType(typeHash, options);
-  }
-
-  listAll(): Hash[] {
-    return this.#inner.listAll();
-  }
-
-  listMeta(options?: ListOptions): ListEntry[] {
-    return this.#inner.listMeta(options);
-  }
-
-  listSchemas(options?: ListOptions): ListEntry[] {
-    return this.#inner.listSchemas(options);
-  }
-
-  delete(hash: Hash): void {
-    this.#inner.delete(hash);
-  }
-
-  async [BOOTSTRAP_STORE](payload: unknown): Promise<Hash> {
-    return this.#inner[BOOTSTRAP_STORE](payload);
-  }
+  // Legacy convenience pass-throughs ----------------------------------------
+  get = (hash: Parameters<CasStore["get"]>[0]): ReturnType<CasStore["get"]> =>
+    this.cas.get(hash);
+  has = (hash: Parameters<CasStore["has"]>[0]): ReturnType<CasStore["has"]> =>
+    this.cas.has(hash);
+  put = (
+    typeHash: Parameters<CasStore["put"]>[0],
+    payload: unknown,
+  ): ReturnType<CasStore["put"]> => this.cas.put(typeHash, payload);
+  listByType: CasStore["listByType"] = (typeHash, options) =>
+    this.cas.listByType(typeHash, options);
+  listAll: CasStore["listAll"] = () => this.cas.listAll();
+  listMeta: CasStore["listMeta"] = (options) => this.cas.listMeta(options);
+  listSchemas: CasStore["listSchemas"] = (options) =>
+    this.cas.listSchemas(options);
 }

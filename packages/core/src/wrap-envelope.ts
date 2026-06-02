@@ -1,12 +1,12 @@
 import { bootstrap } from "./bootstrap.js";
-import type { Hash, Store } from "./types.js";
+import type { Hash, OcasStore } from "./types.js";
 
 /**
  * Resolve a schema alias (e.g. "@ocas/output/put") to its hash via bootstrap,
- * then return a typed envelope ready for store.put() or direct rendering.
+ * then return a typed envelope ready for store.cas.put() or direct rendering.
  */
 export async function wrapEnvelope(
-  store: Store,
+  store: OcasStore,
   schemaAlias: string,
   value: unknown,
 ): Promise<{ type: Hash; value: unknown }> {

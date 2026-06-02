@@ -50,24 +50,24 @@ describe("createFsStore – init and bootstrap", () => {
   });
 
   test("bootstrap returns a valid 13-char self-referencing hash", async () => {
-    const store = createFsStore(dir);
+    const store = await openStore(dir);
     const builtinSchemas = await bootstrap(store);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     expect(hash).toHaveLength(13);
     expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
 
-    const node = store.get(hash) as CasNode;
+    const node = store.cas.get(hash) as CasNode;
     expect(node.type).toBe(hash);
   });
 
   test("bootstrap is idempotent across calls", async () => {
-    const store = createFsStore(dir);
+    const store = await openStore(dir);
     const h1 = await bootstrap(store);
     const h2 = await bootstrap(store);
 
     expect(h1).toEqual(h2);
-    expect(store.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(29);
+    expect(store.cas.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(29);
   });
 });
 
@@ -112,7 +112,7 @@ describe("createFsStore – persistence round-trip", () => {
   });
 
   test("bootstrap survives round-trip: self-referencing node reloads correctly", async () => {
-    const store1 = createFsStore(dir);
+    const store1 = await openStore(dir);
     const builtinSchemas = await bootstrap(store1);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
@@ -260,7 +260,7 @@ describe("createFsStore – listByType", () => {
   });
 
   test("bootstrap node is listed under its self type after reload", async () => {
-    const store1 = createFsStore(dir);
+    const store1 = await openStore(dir);
     const builtinSchemas = await bootstrap(store1);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
@@ -294,7 +294,7 @@ describe("createFsStore – verify on disk-loaded nodes", () => {
   });
 
   test("verify passes on a disk-loaded bootstrap node", async () => {
-    const store1 = createFsStore(dir);
+    const store1 = await openStore(dir);
     const builtinSchemas = await bootstrap(store1);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
@@ -336,8 +336,8 @@ describe("openStore – async with auto-bootstrap", () => {
   test("openStore returns Promise<Store>", async () => {
     const store = await openStore(dir);
     expect(store).toBeDefined();
-    expect(typeof store.put).toBe("function");
-    expect(typeof store.get).toBe("function");
+    expect(typeof store.cas.put).toBe("function");
+    expect(typeof store.cas.get).toBe("function");
   });
 
   test("openStore auto-creates directory when it doesn't exist", async () => {
@@ -349,19 +349,19 @@ describe("openStore – async with auto-bootstrap", () => {
 
     // Verify store works
     const typeHash = await computeSelfHash({ name: "t" });
-    const hash = await store.put(typeHash, { x: 1 });
-    expect(store.has(hash)).toBe(true);
+    const hash = store.cas.put(typeHash, { x: 1 });
+    expect(store.cas.has(hash)).toBe(true);
   });
 
   test("openStore works when directory already exists", async () => {
     // Pre-create the directory
     const store1 = await openStore(dir);
     const typeHash = await computeSelfHash({ name: "t" });
-    await store1.put(typeHash, { x: 1 });
+    store1.cas.put(typeHash, { x: 1 });
 
     // Open again
     const store2 = await openStore(dir);
-    expect(store2.listByType(typeHash)).toHaveLength(1);
+    expect(store2.cas.listByType(typeHash)).toHaveLength(1);
   });
 
   test("openStore throws error when path exists but is not a directory", async () => {
@@ -379,25 +379,25 @@ describe("openStore – async with auto-bootstrap", () => {
     const metaHash = builtinSchemas["@ocas/schema"];
 
     expect(metaHash).toBeDefined();
-    expect(store.has(metaHash as string)).toBe(true);
+    expect(store.cas.has(metaHash as string)).toBe(true);
 
     // Verify all core schemas exist
-    expect(store.has(builtinSchemas["@ocas/string"] as string)).toBe(true);
-    expect(store.has(builtinSchemas["@ocas/number"] as string)).toBe(true);
-    expect(store.has(builtinSchemas["@ocas/object"] as string)).toBe(true);
-    expect(store.has(builtinSchemas["@ocas/array"] as string)).toBe(true);
-    expect(store.has(builtinSchemas["@ocas/bool"] as string)).toBe(true);
-    expect(store.has(builtinSchemas["@ocas/schema"] as string)).toBe(true);
+    expect(store.cas.has(builtinSchemas["@ocas/string"] as string)).toBe(true);
+    expect(store.cas.has(builtinSchemas["@ocas/number"] as string)).toBe(true);
+    expect(store.cas.has(builtinSchemas["@ocas/object"] as string)).toBe(true);
+    expect(store.cas.has(builtinSchemas["@ocas/array"] as string)).toBe(true);
+    expect(store.cas.has(builtinSchemas["@ocas/bool"] as string)).toBe(true);
+    expect(store.cas.has(builtinSchemas["@ocas/schema"] as string)).toBe(true);
   });
 
   test("openStore bootstrap is idempotent on subsequent opens", async () => {
     const store1 = await openStore(dir);
     const schemas1 = await bootstrap(store1);
-    const count1 = store1.listAll().length;
+    const count1 = store1.cas.listAll().length;
 
     const store2 = await openStore(dir);
     const schemas2 = await bootstrap(store2);
-    const count2 = store2.listAll().length;
+    const count2 = store2.cas.listAll().length;
 
     // Same schemas, same count
     expect(schemas1).toEqual(schemas2);
@@ -405,11 +405,11 @@ describe("openStore – async with auto-bootstrap", () => {
   });
 
   test("openStore works on already-bootstrapped store", async () => {
-    // Bootstrap manually first
-    const store1 = createFsStore(dir);
+    // Open + bootstrap
+    const store1 = await openStore(dir);
     const schemas1 = await bootstrap(store1);
 
-    // Open with openStore
+    // Open again
     const store2 = await openStore(dir);
     const schemas2 = await bootstrap(store2);
 
@@ -417,18 +417,18 @@ describe("openStore – async with auto-bootstrap", () => {
   });
 
   test("openStore auto-bootstraps old store without bootstrap", async () => {
-    // Create a store with some data but no bootstrap
-    const store1 = createFsStore(dir);
+    // Create a CAS store with some data but no bootstrap
+    const cas1 = createFsStore(dir);
     const typeHash = await computeSelfHash({ name: "custom" });
-    await store1.put(typeHash, { data: "old" });
+    cas1.put(typeHash, { data: "old" });
 
     // Open with openStore - should auto-bootstrap
     const store2 = await openStore(dir);
     const schemas = await bootstrap(store2);
 
-    expect(store2.has(schemas["@ocas/schema"] as string)).toBe(true);
+    expect(store2.cas.has(schemas["@ocas/schema"] as string)).toBe(true);
     // Old data still exists
-    expect(store2.listByType(typeHash)).toHaveLength(1);
+    expect(store2.cas.listByType(typeHash)).toHaveLength(1);
   });
 });
 

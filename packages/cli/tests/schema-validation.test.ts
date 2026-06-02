@@ -556,7 +556,6 @@ describe("Issue #50: Schema Validation in put", () => {
 // e2e Phase 2 tests
 describe("Phase 2: Schema Validation", () => {
   let tmpStore: string;
-  let varDbPath: string;
   let typeHash: string;
   let _nodeHash: string;
 
@@ -564,7 +563,6 @@ describe("Phase 2: Schema Validation", () => {
 
   beforeAll(async () => {
     tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
-    varDbPath = join(tmpStore, "variables.db");
 
     const schemaFile = join(tmpStore, "test-schema.json");
     writeFileSync(
@@ -587,17 +585,7 @@ describe("Phase 2: Schema Validation", () => {
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
     const proc = Bun.spawn(
-      [
-        "bun",
-        entrypoint,
-        "--home",
-        tmpStore,
-        "--var-db",
-        varDbPath,
-        "put",
-        typeHash,
-        nodeFile,
-      ],
+      ["bun", entrypoint, "--home", tmpStore, "put", typeHash, nodeFile],
       { stdout: "pipe", stderr: "pipe" },
     );
     await proc.exited;
@@ -613,17 +601,7 @@ describe("Phase 2: Schema Validation", () => {
     const badFile = join(tmpStore, "bad-node.json");
     writeFileSync(badFile, JSON.stringify({ name: 123 }));
     const proc = Bun.spawn(
-      [
-        "bun",
-        entrypoint,
-        "--home",
-        tmpStore,
-        "--var-db",
-        varDbPath,
-        "put",
-        typeHash,
-        badFile,
-      ],
+      ["bun", entrypoint, "--home", tmpStore, "put", typeHash, badFile],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;
@@ -638,17 +616,7 @@ describe("Phase 2: Schema Validation", () => {
   test("2.3 put against non-existent schema hash fails", async () => {
     const nodeFile = join(tmpStore, "test-node.json");
     const proc = Bun.spawn(
-      [
-        "bun",
-        entrypoint,
-        "--home",
-        tmpStore,
-        "--var-db",
-        varDbPath,
-        "put",
-        "AAAAAAAAAAAAA",
-        nodeFile,
-      ],
+      ["bun", entrypoint, "--home", tmpStore, "put", "AAAAAAAAAAAAA", nodeFile],
       { stdout: "pipe", stderr: "pipe" },
     );
     const exitCode = await proc.exited;

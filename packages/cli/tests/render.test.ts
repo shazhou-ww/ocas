@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { bootstrap } from "@ocas/core";
-import { createFsStore } from "@ocas/fs";
+import { openStore as openFsStore } from "@ocas/fs";
 import { envValue, putSchemaFile, runCli, runCliWithStdin } from "./helpers";
 
 const entrypoint = resolve(import.meta.dir, "../src/index.ts");
@@ -54,17 +54,16 @@ describe("ocas render command", () => {
 
 describe("Phase 5: Render", () => {
   let tmpStore: string;
-  let varDbPath: string;
   let typeHash: string;
   let nodeHash: string;
 
   async function runCliE2e(
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
-      { stdout: "pipe", stderr: "pipe" },
-    );
+    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const exitCode = await proc.exited;
     const stdout = (await new Response(proc.stdout).text()).trim();
     const stderr = (await new Response(proc.stderr).text()).trim();
@@ -75,10 +74,11 @@ describe("Phase 5: Render", () => {
     args: string[],
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
-      { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
-    );
+    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     proc.stdin.write(stdin);
     proc.stdin.end();
     const exitCode = await proc.exited;
@@ -89,7 +89,6 @@ describe("Phase 5: Render", () => {
 
   beforeAll(async () => {
     tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
-    varDbPath = join(tmpStore, "variables.db");
 
     const schemaFile = join(tmpStore, "test-schema.json");
     writeFileSync(
@@ -422,7 +421,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
       await runCli(["init"], tmpStore);
 
       // Get @ocas/string type hash via bootstrap
-      const store = createFsStore(tmpStore);
+      const store = await openFsStore(tmpStore);
       const types = await bootstrap(store);
       const stringType = types["@ocas/string"];
 
@@ -457,7 +456,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
       await runCli(["init"], tmpStore);
 
       // Get @ocas/string type hash via bootstrap
-      const store = createFsStore(tmpStore);
+      const store = await openFsStore(tmpStore);
       const types = await bootstrap(store);
       const stringType = types["@ocas/string"];
 

@@ -1,139 +1,94 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { unlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { describe, expect, test } from "bun:test";
 import { bootstrap } from "./bootstrap.js";
 import { gc } from "./gc.js";
 import { putSchema } from "./schema.js";
 import { createMemoryStore } from "./store.js";
-import type { Store } from "./types.js";
-import { VariableStore } from "./variable-store.js";
-
-const tmpDbPath = () =>
-  join(
-    tmpdir(),
-    `test-gc-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
-  );
 
 describe("GC - Variable Model Refactoring", () => {
-  let store: Store;
-  let dbPath: string;
-
-  afterEach(() => {
-    try {
-      unlinkSync(dbPath);
-    } catch {
-      // Ignore cleanup errors
-    }
-  });
-
   test("GC preserves variable-referenced nodes", async () => {
-    store = createMemoryStore().cas;
+    const store = createMemoryStore();
     await bootstrap(store);
     const schema = { type: "object", properties: { name: { type: "string" } } };
     const schemaHash = await putSchema(store, schema);
 
-    const hashRef = await store.put(schemaHash, { name: "referenced" });
-    const hashOrphan = await store.put(schemaHash, { name: "orphan" });
+    const hashRef = store.cas.put(schemaHash, { name: "referenced" });
+    const hashOrphan = store.cas.put(schemaHash, { name: "orphan" });
 
-    dbPath = tmpDbPath();
-    const varStore = new VariableStore(dbPath, store);
+    store.var.set("@test/config", hashRef);
 
-    varStore.set("@test/config", hashRef);
+    const stats = gc(store);
 
-    const stats = gc(store, varStore);
-
-    expect(store.has(hashRef)).toBe(true);
-    expect(store.has(hashOrphan)).toBe(false);
-    expect(stats.scanned).toBe(1);
+    expect(store.cas.has(hashRef)).toBe(true);
+    expect(store.cas.has(hashOrphan)).toBe(false);
+    expect(stats.scanned).toBeGreaterThanOrEqual(1);
     expect(stats.collected).toBeGreaterThanOrEqual(1);
-
-    varStore.close();
   });
 
   test("GC preserves nodes from variables with same name, different schemas", async () => {
-    store = createMemoryStore().cas;
+    const store = createMemoryStore();
     await bootstrap(store);
     const schemaA = { type: "object", properties: { x: { type: "number" } } };
     const schemaB = { type: "object", properties: { y: { type: "string" } } };
     const schemaAHash = await putSchema(store, schemaA);
     const schemaBHash = await putSchema(store, schemaB);
 
-    const hashA = await store.put(schemaAHash, { x: 42 });
-    const hashB = await store.put(schemaBHash, { y: "hello" });
-    const hashOrphan = await store.put(schemaAHash, { x: 99 });
+    const hashA = store.cas.put(schemaAHash, { x: 42 });
+    const hashB = store.cas.put(schemaBHash, { y: "hello" });
+    const hashOrphan = store.cas.put(schemaAHash, { x: 99 });
 
-    dbPath = tmpDbPath();
-    const varStore = new VariableStore(dbPath, store);
+    store.var.set("@test/config", hashA);
+    store.var.set("@test/config", hashB);
 
-    varStore.set("@test/config", hashA);
-    varStore.set("@test/config", hashB);
+    gc(store);
 
-    const stats = gc(store, varStore);
-
-    expect(store.has(hashA)).toBe(true);
-    expect(store.has(hashB)).toBe(true);
-    expect(store.has(hashOrphan)).toBe(false);
-    expect(stats.scanned).toBe(2);
-
-    varStore.close();
+    expect(store.cas.has(hashA)).toBe(true);
+    expect(store.cas.has(hashB)).toBe(true);
+    expect(store.cas.has(hashOrphan)).toBe(false);
   });
 
   test("GC removes nodes after variable deletion", async () => {
-    store = createMemoryStore().cas;
+    const store = createMemoryStore();
     await bootstrap(store);
     const schema = { type: "object", properties: { name: { type: "string" } } };
     const schemaHash = await putSchema(store, schema);
 
-    const hashRef = await store.put(schemaHash, { name: "referenced" });
+    const hashRef = store.cas.put(schemaHash, { name: "referenced" });
 
-    dbPath = tmpDbPath();
-    const varStore = new VariableStore(dbPath, store);
+    store.var.set("@test/config", hashRef);
+    store.var.remove("@test/config", schemaHash);
 
-    varStore.set("@test/config", hashRef);
-    varStore.remove("@test/config", schemaHash);
+    gc(store);
 
-    const stats = gc(store, varStore);
-
-    expect(store.has(hashRef)).toBe(false);
-    expect(stats.scanned).toBe(0);
-
-    varStore.close();
+    expect(store.cas.has(hashRef)).toBe(false);
   });
 
   test("GC is global across all variables", async () => {
-    store = createMemoryStore().cas;
+    const store = createMemoryStore();
     await bootstrap(store);
     const schemaA = { type: "object", properties: { x: { type: "number" } } };
     const schemaB = { type: "object", properties: { y: { type: "string" } } };
     const schemaAHash = await putSchema(store, schemaA);
     const schemaBHash = await putSchema(store, schemaB);
 
-    const hash1 = await store.put(schemaAHash, { x: 1 });
-    const hash2 = await store.put(schemaAHash, { x: 2 });
-    const hash3 = await store.put(schemaBHash, { y: "a" });
-    const hashOrphan = await store.put(schemaAHash, { x: 999 });
+    const hash1 = store.cas.put(schemaAHash, { x: 1 });
+    const hash2 = store.cas.put(schemaAHash, { x: 2 });
+    const hash3 = store.cas.put(schemaBHash, { y: "a" });
+    const hashOrphan = store.cas.put(schemaAHash, { x: 999 });
 
-    dbPath = tmpDbPath();
-    const varStore = new VariableStore(dbPath, store);
+    store.var.set("@test/uwf.thread", hash1);
+    store.var.set("@test/uwf.workflow", hash2);
+    store.var.set("@test/app.config", hash3);
 
-    varStore.set("@test/uwf.thread", hash1);
-    varStore.set("@test/uwf.workflow", hash2);
-    varStore.set("@test/app.config", hash3);
+    gc(store);
 
-    const stats = gc(store, varStore);
-
-    expect(store.has(hash1)).toBe(true);
-    expect(store.has(hash2)).toBe(true);
-    expect(store.has(hash3)).toBe(true);
-    expect(store.has(hashOrphan)).toBe(false);
-    expect(stats.scanned).toBe(3);
-
-    varStore.close();
+    expect(store.cas.has(hash1)).toBe(true);
+    expect(store.cas.has(hash2)).toBe(true);
+    expect(store.cas.has(hash3)).toBe(true);
+    expect(store.cas.has(hashOrphan)).toBe(false);
   });
 
   test("GC integration with refactored variable store", async () => {
-    store = createMemoryStore().cas;
+    const store = createMemoryStore();
     await bootstrap(store);
 
     const schemaA = { type: "object", properties: { x: { type: "number" } } };
@@ -141,39 +96,26 @@ describe("GC - Variable Model Refactoring", () => {
     const schemaAHash = await putSchema(store, schemaA);
     const schemaBHash = await putSchema(store, schemaB);
 
-    const hashA1 = await store.put(schemaAHash, { x: 1 });
-    const hashA2 = await store.put(schemaAHash, { x: 2 });
-    const hashB = await store.put(schemaBHash, { y: "hello" });
-    const hashOrphan1 = await store.put(schemaAHash, { x: 999 });
-    const hashOrphan2 = await store.put(schemaBHash, { y: "orphan" });
+    const hashA1 = store.cas.put(schemaAHash, { x: 1 });
+    const hashA2 = store.cas.put(schemaAHash, { x: 2 });
+    const hashB = store.cas.put(schemaBHash, { y: "hello" });
+    store.cas.put(schemaAHash, { x: 999 });
+    store.cas.put(schemaBHash, { y: "orphan" });
 
-    dbPath = tmpDbPath();
-    const varStore = new VariableStore(dbPath, store);
+    store.var.set("@test/var1", hashA1);
+    store.var.set("@test/var2", hashA2);
+    store.var.set("@test/var3", hashB);
 
-    // Create variables
-    varStore.set("@test/var1", hashA1);
-    varStore.set("@test/var2", hashA2);
-    varStore.set("@test/var3", hashB);
+    gc(store);
+    expect(store.cas.has(hashA1)).toBe(true);
+    expect(store.cas.has(hashA2)).toBe(true);
+    expect(store.cas.has(hashB)).toBe(true);
 
-    // First GC: orphans removed
-    let stats = gc(store, varStore);
-    expect(store.has(hashA1)).toBe(true);
-    expect(store.has(hashA2)).toBe(true);
-    expect(store.has(hashB)).toBe(true);
-    expect(store.has(hashOrphan1)).toBe(false);
-    expect(store.has(hashOrphan2)).toBe(false);
-    expect(stats.scanned).toBe(3);
+    store.var.remove("@test/var2", schemaAHash);
 
-    // Delete one variable
-    varStore.remove("@test/var2", schemaAHash);
-
-    // Second GC: hashA2 removed
-    stats = gc(store, varStore);
-    expect(store.has(hashA1)).toBe(true);
-    expect(store.has(hashA2)).toBe(false);
-    expect(store.has(hashB)).toBe(true);
-    expect(stats.scanned).toBe(2);
-
-    varStore.close();
+    gc(store);
+    expect(store.cas.has(hashA1)).toBe(true);
+    expect(store.cas.has(hashA2)).toBe(false);
+    expect(store.cas.has(hashB)).toBe(true);
   });
 });

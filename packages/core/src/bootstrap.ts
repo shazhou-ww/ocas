@@ -2,8 +2,7 @@ import {
   BOOTSTRAP_STORE,
   isBootstrapCapableStore,
 } from "./bootstrap-capable.js";
-import type { Hash, Store } from "./types.js";
-import type { VariableStore } from "./variable-store.js";
+import type { Hash, OcasStore } from "./types.js";
 
 const JSON_SCHEMA_TYPES = [
   "string",
@@ -326,29 +325,28 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
  * and @ocas/output/* schemas.
  * Idempotent: calling bootstrap multiple times returns the same hashes.
  *
- * If a varStore is provided, all aliases are also written to it via
- * varStore.set(name, hash). This bypasses @ocas/ namespace protection
- * (protection is enforced only at the CLI layer).
+ * All aliases are written to `store.var` via `var.set(name, hash)`, bypassing
+ * @ocas/ namespace protection (protection is enforced only at the CLI layer).
  */
 export async function bootstrap(
-  store: Store,
-  varStore?: VariableStore,
+  store: OcasStore,
 ): Promise<Record<string, Hash>> {
-  if (!isBootstrapCapableStore(store)) {
+  const cas = store.cas;
+  if (!isBootstrapCapableStore(cas)) {
     throw new Error("Store does not support bootstrap");
   }
 
   // 1. Bootstrap the meta-schema (self-referential)
-  const metaHash = await store[BOOTSTRAP_STORE](BOOTSTRAP_PAYLOAD);
+  const metaHash = await cas[BOOTSTRAP_STORE](BOOTSTRAP_PAYLOAD);
 
   // 2. Register built-in primitive schemas directly (without putSchema to avoid recursion)
-  const stringHash = await store.put(metaHash, { type: "string" });
-  const numberHash = await store.put(metaHash, { type: "number" });
-  const integerHash = await store.put(metaHash, { type: "integer" });
-  const boolHash = await store.put(metaHash, { type: "boolean" });
-  const objectHash = await store.put(metaHash, { type: "object" });
-  const arrayHash = await store.put(metaHash, { type: "array" });
-  const nullHash = await store.put(metaHash, { type: "null" });
+  const stringHash = await cas.put(metaHash, { type: "string" });
+  const numberHash = await cas.put(metaHash, { type: "number" });
+  const integerHash = await cas.put(metaHash, { type: "integer" });
+  const boolHash = await cas.put(metaHash, { type: "boolean" });
+  const objectHash = await cas.put(metaHash, { type: "object" });
+  const arrayHash = await cas.put(metaHash, { type: "array" });
+  const nullHash = await cas.put(metaHash, { type: "null" });
 
   // 3. Register @ocas/output/* schemas
   const aliases: Record<string, Hash> = {
@@ -364,16 +362,14 @@ export async function bootstrap(
   };
 
   for (const [alias, schema] of OUTPUT_SCHEMAS) {
-    aliases[alias] = await store.put(metaHash, schema);
+    aliases[alias] = await cas.put(metaHash, schema);
   }
 
-  // 4. Write all aliases to varStore (when provided).
-  // Idempotent: VariableStore.set is an upsert. Bypasses @ocas/ namespace
-  // protection — protection is only enforced on the CLI `var set` command.
-  if (varStore !== undefined) {
-    for (const [name, hash] of Object.entries(aliases)) {
-      varStore.set(name, hash);
-    }
+  // 4. Write all aliases to the var store. Idempotent: VarStore.set is an
+  // upsert. Bypasses @ocas/ namespace protection — protection is enforced
+  // only on the CLI `var set` command.
+  for (const [name, hash] of Object.entries(aliases)) {
+    store.var.set(name, hash);
   }
 
   return aliases;

@@ -73,6 +73,7 @@ export type CasStore = {
   listByType(typeHash: Hash, options?: ListOptions): ListEntry[];
   listMeta(options?: ListOptions): ListEntry[];
   listSchemas(options?: ListOptions): ListEntry[];
+  listAll(): Hash[];
 };
 
 /**

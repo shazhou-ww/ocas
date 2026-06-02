@@ -7,13 +7,11 @@ import { envValue } from "./helpers";
 const entrypoint = resolve(import.meta.dir, "../src/index.ts");
 
 let tmpStore: string;
-let varDbPath: string;
 let typeHash: string;
 let _nodeHash: string;
 
 beforeAll(async () => {
   tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
-  varDbPath = join(tmpStore, "variables.db");
 
   const schemaFile = join(tmpStore, "test-schema.json");
   writeFileSync(
@@ -51,10 +49,10 @@ afterAll(() => {
 async function runCli(
   args: string[],
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const proc = Bun.spawn(
-    ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
-    { stdout: "pipe", stderr: "pipe" },
-  );
+  const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   const exitCode = await proc.exited;
   const stdout = (await new Response(proc.stdout).text()).trim();
   const stderr = (await new Response(proc.stderr).text()).trim();
@@ -65,10 +63,11 @@ async function runCliWithStdin(
   args: string[],
   stdin: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const proc = Bun.spawn(
-    ["bun", entrypoint, "--home", tmpStore, "--var-db", varDbPath, ...args],
-    { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
-  );
+  const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   proc.stdin.write(stdin);
   proc.stdin.end();
   const exitCode = await proc.exited;
