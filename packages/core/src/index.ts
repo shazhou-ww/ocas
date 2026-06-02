@@ -25,11 +25,20 @@ export {
 export { createMemoryStore } from "./store.js";
 export type {
   CasNode,
+  CasStore,
   Hash,
+  HistoryEntry,
   ListEntry,
   ListOptions,
   ListSort,
+  OcasStore,
   Store,
+  Tag,
+  TagOp,
+  TagStore,
+  VarListOptions,
+  VarSetOptions,
+  VarStore,
 } from "./types.js";
 export type { Variable } from "./variable.js";
 export {
