@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash, OcasStore } from "@ocas/core";
+import type { Hash, Store } from "@ocas/core";
 import { bootstrap, putSchema } from "@ocas/core";
 import { openStore as openFsStore } from "@ocas/fs";
 
@@ -68,7 +68,7 @@ async function runCli(...args: string[]): Promise<{
  * Create a test CAS node and return its hash
  */
 async function createTestNode(
-  store: OcasStore,
+  store: Store,
   typeHash: Hash,
   payload: unknown,
 ): Promise<Hash> {
@@ -78,8 +78,8 @@ async function createTestNode(
 /**
  * Get bootstrap type hash
  */
-async function getBootstrapHash(store: OcasStore): Promise<Hash> {
-  const builtinSchemas = await bootstrap(store);
+async function getBootstrapHash(store: Store): Promise<Hash> {
+  const builtinSchemas = bootstrap(store);
   return builtinSchemas["@ocas/schema"] ?? "";
 }
 
@@ -189,7 +189,7 @@ describe("var set", () => {
   test("create variant with different schema", async () => {
     const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
-    const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
+    const typeHash2 = putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
@@ -354,7 +354,7 @@ describe("var get", () => {
   test("distinguish variants by schema", async () => {
     const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
-    const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
+    const typeHash2 = putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
@@ -392,7 +392,7 @@ describe("var delete", () => {
   test("remove all schema variants", async () => {
     const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
-    const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
+    const typeHash2 = putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
@@ -432,7 +432,7 @@ describe("var delete", () => {
   test("remove specific variant by schema", async () => {
     const store = await openFsStore(storePath);
     const typeHash1 = await getBootstrapHash(store);
-    const typeHash2 = await putSchema(store, { title: "Test", type: "object" });
+    const typeHash2 = putSchema(store, { title: "Test", type: "object" });
     const hash1 = await createTestNode(store, typeHash1, { test: "data1" });
     const hash2 = await createTestNode(store, typeHash2, { test: "data2" });
 
@@ -579,11 +579,11 @@ describe("var list", () => {
   test("filter by schema", async () => {
     const store = await openFsStore(storePath);
     const bootstrapHash = await getBootstrapHash(store);
-    const typeHash1 = await putSchema(store, {
+    const typeHash1 = putSchema(store, {
       title: "TypeA",
       type: "object",
     });
-    const typeHash2 = await putSchema(store, {
+    const typeHash2 = putSchema(store, {
       title: "TypeB",
       type: "object",
     });

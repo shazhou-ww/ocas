@@ -15,7 +15,7 @@ import type { CasNode } from "../src/types.js";
 describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
   test("1.1: Meta-schema is a valid JSON Schema", async () => {
     const store = new MemStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaNode = store.get(metaHash);
 
@@ -26,7 +26,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.2: Meta-schema self-validates", async () => {
     const store = new MemStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaNode = store.get(metaHash);
 
@@ -36,7 +36,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.3: Meta-schema defines all supported keywords", async () => {
     const store = new MemStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
@@ -60,7 +60,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.4: Meta-schema does not include unsupported keywords", async () => {
     const store = new MemStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
@@ -98,7 +98,7 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 
   test("1.5: Meta-schema node type equals its own hash", async () => {
     const store = new MemStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaNode = store.get(metaHash);
 
@@ -110,22 +110,22 @@ describe("Test Suite 1: Meta-Schema Structure and Self-Validation", () => {
 describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
   test("2.1: Accept minimal valid schema (empty object)", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {});
+    bootstrap(store);
+    const hash = putSchema(store, {});
     expect(hash).toBeTruthy();
   });
 
   test("2.2: Accept schema with type constraint", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, { type: "string" });
+    bootstrap(store);
+    const hash = putSchema(store, { type: "string" });
     expect(hash).toBeTruthy();
   });
 
   test("2.3: Accept schema with properties", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "object",
       properties: { name: { type: "string" } },
     });
@@ -134,8 +134,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.4: Accept schema with required fields", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "object",
       required: ["id"],
       properties: { id: { type: "string" } },
@@ -145,8 +145,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.5: Accept schema with additionalProperties = false", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "object",
       additionalProperties: false,
     });
@@ -155,8 +155,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.6: Accept schema with additionalProperties = schema", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "object",
       additionalProperties: { type: "string" },
     });
@@ -165,8 +165,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.7: Accept schema with anyOf", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       anyOf: [{ type: "string" }, { type: "null" }],
     });
     expect(hash).toBeTruthy();
@@ -174,8 +174,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.7b: Accept schema with oneOf", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       oneOf: [
         { properties: { status: { const: "ready" } }, required: ["status"] },
         { properties: { status: { const: "failed" } }, required: ["status"] },
@@ -186,8 +186,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.8: Accept schema with array items", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "array",
       items: { type: "number" },
     });
@@ -196,8 +196,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.9: Accept schema with format constraint", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "string",
       format: "ocas_ref",
     });
@@ -206,8 +206,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.10: Accept schema with enum", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "string",
       enum: ["red", "green", "blue"],
     });
@@ -216,15 +216,15 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.11: Accept schema with const", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, { const: "FIXED_VALUE" });
+    bootstrap(store);
+    const hash = putSchema(store, { const: "FIXED_VALUE" });
     expect(hash).toBeTruthy();
   });
 
   test("2.12: Accept schema with title and description", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "string",
       title: "User Name",
       description: "The user's full name",
@@ -234,8 +234,8 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 
   test("2.13: Accept complex nested schema", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    const hash = await putSchema(store, {
+    bootstrap(store);
+    const hash = putSchema(store, {
       type: "object",
       required: ["type", "payload"],
       properties: {
@@ -257,183 +257,169 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
 describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
   test("3.1: Reject schema with invalid type value", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(async () => await putSchema(store, { type: "garbage" })).toThrow();
+    bootstrap(store);
+    expect(async () => putSchema(store, { type: "garbage" })).toThrow();
   });
 
   test("3.2: Reject schema with type as number", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, { type: 123 } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, { type: 123 } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.3: Reject schema with properties not an object", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "object",
-          properties: "not-an-object",
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "object",
+        properties: "not-an-object",
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.4: Reject schema with required not an array", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "object",
-          required: "name",
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "object",
+        required: "name",
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.5: Reject schema with required containing non-strings", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "object",
-          required: ["name", 123, true],
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "object",
+        required: ["name", 123, true],
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.6: Reject schema with additionalProperties as string", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "object",
-          additionalProperties: "yes",
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "object",
+        additionalProperties: "yes",
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.7: Reject schema with anyOf not an array", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          anyOf: { type: "string" },
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        anyOf: { type: "string" },
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.8: Reject schema with empty anyOf array", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(async () => await putSchema(store, { anyOf: [] })).toThrow();
+    bootstrap(store);
+    expect(async () => putSchema(store, { anyOf: [] })).toThrow();
   });
 
   test("3.9: Reject schema with items not an object", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "array",
-          items: "string",
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "array",
+        items: "string",
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.10: Reject schema with format not a string", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "string",
-          format: 123,
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "string",
+        format: 123,
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.11: Reject schema with enum not an array", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "string",
-          enum: "red",
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "string",
+        enum: "red",
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.12: Reject schema with empty enum array", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () => await putSchema(store, { type: "string", enum: [] }),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, { type: "string", enum: [] }),
     ).toThrow();
   });
 
   test("3.13: Reject schema with title not a string", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "string",
-          title: 123,
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "string",
+        title: 123,
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.14: Reject schema with description not a string", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "string",
-          description: ["not a string"],
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "string",
+        description: ["not a string"],
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.15: Reject schema with unsupported $ref keyword", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          $ref: "#/definitions/user",
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        $ref: "#/definitions/user",
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.16: Reject completely invalid data (non-object)", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, "not-a-schema" as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, "not-a-schema" as unknown as JSONSchema),
     ).toThrow();
   });
 
   test("3.17: Reject nested invalid schema in properties", async () => {
     const store = new MemStore();
-    await bootstrap(store);
-    expect(
-      async () =>
-        await putSchema(store, {
-          type: "object",
-          properties: {
-            name: { type: "invalid-type" },
-          },
-        } as unknown as JSONSchema),
+    bootstrap(store);
+    expect(async () =>
+      putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "invalid-type" },
+        },
+      } as unknown as JSONSchema),
     ).toThrow();
   });
 });
@@ -441,9 +427,9 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
 describe("Test Suite 4: Error Messages and Debugging", () => {
   test("4.1: Error includes schema validation details", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
     try {
-      await putSchema(store, { type: 123 } as unknown as JSONSchema);
+      putSchema(store, { type: 123 } as unknown as JSONSchema);
       expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(SchemaValidationError);
@@ -453,9 +439,9 @@ describe("Test Suite 4: Error Messages and Debugging", () => {
 
   test("4.2: Error distinguishes schema validation from data validation", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
     try {
-      await putSchema(store, { type: "invalid-type" } as unknown as JSONSchema);
+      putSchema(store, { type: "invalid-type" } as unknown as JSONSchema);
       expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(SchemaValidationError);
@@ -468,7 +454,7 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
   test("5.1: Bootstrap hash changes (breaking change)", async () => {
     // This is a documentation test - the old hash was different
     const store = new MemStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const newMetaHash = builtinSchemas["@ocas/schema"] ?? "";
 
     // The new hash should be different from the old system metadata hash
@@ -479,10 +465,10 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
   test("5.2: Existing tests compatibility", async () => {
     // This test ensures our changes don't break existing valid schema usage
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     // This is the kind of schema that existed before
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         name: { type: "string" },
@@ -494,9 +480,9 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
 
   test("5.3: Data nodes with valid schemas still validate", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       required: ["name"],
       properties: {
@@ -512,9 +498,9 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
 
   test("5.4: Invalid data still fails validation", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       required: ["name"],
       properties: {
@@ -534,10 +520,10 @@ describe("Test Suite 5: Backward Compatibility and Migration", () => {
 describe("Test Suite 6: Integration with Existing Functionality", () => {
   test("6.1: getSchema works with validated schemas", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     const originalSchema = { type: "string", title: "Test" };
-    const schemaHash = await putSchema(store, originalSchema);
+    const schemaHash = putSchema(store, originalSchema);
     const retrieved = getSchema(store, schemaHash);
 
     expect(retrieved).toEqual(originalSchema);
@@ -545,9 +531,9 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
 
   test("6.2: validate() works with schemas validated by meta-schema", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
-    const schemaHash = await putSchema(store, { type: "number" });
+    const schemaHash = putSchema(store, { type: "number" });
     const validNode = store.get(await store.put(schemaHash, 42));
     const invalidNode = store.get(await store.put(schemaHash, "not a number"));
 
@@ -557,9 +543,9 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
 
   test("6.3: refs() works with validated schemas containing ocas_ref", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         ref: { type: "string", format: "ocas_ref" },
@@ -575,9 +561,9 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
 
   test("6.4: walk() works with graphs using validated schemas", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         next: {
@@ -598,11 +584,11 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
 
   test("6.5: Idempotency preserved for putSchema", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     const schema = { type: "string", title: "Test" };
-    const hash1 = await putSchema(store, schema);
-    const hash2 = await putSchema(store, schema);
+    const hash1 = putSchema(store, schema);
+    const hash2 = putSchema(store, schema);
 
     expect(hash1).toBe(hash2);
   });
@@ -611,7 +597,7 @@ describe("Test Suite 6: Integration with Existing Functionality", () => {
 describe("Test Suite 7: Meta-Schema Content Validation", () => {
   test("7.1: Meta-schema allows recursive schema definitions", async () => {
     const store = new MemStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaSchema = getSchema(store, metaHash);
 
@@ -624,11 +610,11 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
 
   test("7.2: Meta-schema restricts additionalProperties", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     // Schema with unknown keyword should be rejected if meta-schema is strict
     try {
-      await putSchema(store, {
+      putSchema(store, {
         type: "string",
         unknownKeyword: "value",
       } as unknown as JSONSchema);
@@ -642,22 +628,21 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
 
   test("7.3: Meta-schema validates type as string OR array", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     // Single string type
-    const hash1 = await putSchema(store, { type: "string" });
+    const hash1 = putSchema(store, { type: "string" });
     expect(hash1).toBeTruthy();
 
     // Array of types
-    const hash2 = await putSchema(store, {
+    const hash2 = putSchema(store, {
       type: ["string", "null"],
     } as unknown as JSONSchema);
     expect(hash2).toBeTruthy();
 
     // Invalid type (number)
-    expect(
-      async () =>
-        await putSchema(store, { type: 123 } as unknown as JSONSchema),
+    expect(async () =>
+      putSchema(store, { type: 123 } as unknown as JSONSchema),
     ).toThrow();
   });
 });
@@ -665,7 +650,7 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
 describe("Test Suite 8: Performance and Edge Cases", () => {
   test("8.1: Validation performance is acceptable", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     const complexSchema = {
       type: "object",
@@ -686,7 +671,7 @@ describe("Test Suite 8: Performance and Edge Cases", () => {
 
     const start = performance.now();
     for (let i = 0; i < 100; i++) {
-      await putSchema(store, complexSchema);
+      putSchema(store, complexSchema);
     }
     const duration = performance.now() - start;
 
@@ -696,7 +681,7 @@ describe("Test Suite 8: Performance and Edge Cases", () => {
 
   test("8.2: Large schemas are handled correctly", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     const largeSchema: Record<string, unknown> = {
       type: "object",
@@ -709,13 +694,13 @@ describe("Test Suite 8: Performance and Edge Cases", () => {
       props[`prop${i}`] = { type: "string" };
     }
 
-    const hash = await putSchema(store, largeSchema);
+    const hash = putSchema(store, largeSchema);
     expect(hash).toBeTruthy();
   });
 
   test("8.3: Deeply nested schemas validate correctly", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     // Build a 5-level deep schema
     let schema: Record<string, unknown> = { type: "string" };
@@ -726,13 +711,13 @@ describe("Test Suite 8: Performance and Edge Cases", () => {
       };
     }
 
-    const hash = await putSchema(store, schema);
+    const hash = putSchema(store, schema);
     expect(hash).toBeTruthy();
   });
 
   test("8.4: Circular-like schemas don't cause infinite loops", async () => {
     const store = new MemStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     // Schema where additionalProperties has same structure as parent
     const schema = {
@@ -748,7 +733,7 @@ describe("Test Suite 8: Performance and Edge Cases", () => {
       },
     };
 
-    const hash = await putSchema(store, schema);
+    const hash = putSchema(store, schema);
     expect(hash).toBeTruthy();
   });
 });

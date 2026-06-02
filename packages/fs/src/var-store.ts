@@ -8,7 +8,6 @@ import { join } from "node:path";
 import type {
   CasStore,
   Hash,
-  HistoryEntry,
   ListEntry,
   Tag,
   TagStore,
@@ -17,64 +16,28 @@ import type {
   VarStore,
 } from "@ocas/core";
 import {
+  addNameIndex,
   applyListOptions,
-  CasNodeNotFoundError,
   casListEntry,
-  MAX_HISTORY,
+  checkTagLabelConflict,
+  cloneVarRecord,
+  extractSchema,
+  pushHistory,
+  removeNameIndex,
   SchemaMismatchError,
-  TagLabelConflictError,
   VariableNotFoundError,
+  type VarRecord,
   validateName,
+  varKey,
 } from "@ocas/core";
 
 const VARS_FILE = "_vars.jsonl";
 const TAGS_FILE = "_tags.jsonl";
 
-type VarRecord = {
-  name: string;
-  schema: Hash;
-  value: Hash;
-  created: number;
-  updated: number;
-  tags: Record<string, string>;
-  labels: string[];
-  history: HistoryEntry[];
-};
-
-function cloneVar(rec: VarRecord): Variable {
-  return {
-    name: rec.name,
-    schema: rec.schema,
-    value: rec.value,
-    created: rec.created,
-    updated: rec.updated,
-    tags: { ...rec.tags },
-    labels: [...rec.labels],
-  };
-}
-
 export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
   const records = new Map<string, VarRecord>();
   const byName = new Map<string, Set<string>>();
   const path = join(dir, VARS_FILE);
-
-  function key(name: string, schema: Hash): string {
-    return `${name}\u0000${schema}`;
-  }
-  function addIndex(name: string, k: string): void {
-    let set = byName.get(name);
-    if (!set) {
-      set = new Set();
-      byName.set(name, set);
-    }
-    set.add(k);
-  }
-  function removeIndex(name: string, k: string): void {
-    const set = byName.get(name);
-    if (!set) return;
-    set.delete(k);
-    if (set.size === 0) byName.delete(name);
-  }
 
   // Load existing records (last record per key wins)
   try {
@@ -84,13 +47,13 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
       try {
         const rec = JSON.parse(line) as VarRecord & { __op?: string };
         if (rec.__op === "remove") {
-          const k = key(rec.name, rec.schema);
+          const k = varKey(rec.name, rec.schema);
           records.delete(k);
-          removeIndex(rec.name, k);
+          removeNameIndex(byName, rec.name, k);
         } else {
-          const k = key(rec.name, rec.schema);
+          const k = varKey(rec.name, rec.schema);
           records.set(k, rec);
-          addIndex(rec.name, k);
+          addNameIndex(byName, rec.name, k);
         }
       } catch {
         // skip malformed
@@ -123,43 +86,17 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
     );
   }
 
-  function extractSchema(hash: Hash): Hash {
-    const node = cas.get(hash);
-    if (node === null) throw new CasNodeNotFoundError(hash);
-    return node.type;
-  }
-
-  function checkConflict(tags: Record<string, string>, labels: string[]): void {
-    for (const tk of Object.keys(tags)) {
-      if (labels.includes(tk))
-        throw new TagLabelConflictError(tk, "label", "tag");
-    }
-  }
-
-  function pushHistory(rec: VarRecord, value: Hash, now: number): boolean {
-    if (rec.history.length > 0 && rec.history[0]?.value === value) return false;
-    const existingIdx = rec.history.findIndex((e) => e.value === value);
-    if (existingIdx > 0) rec.history.splice(existingIdx, 1);
-    rec.history.unshift({ value, position: 0, setAt: now });
-    if (rec.history.length > MAX_HISTORY) rec.history.length = MAX_HISTORY;
-    for (let i = 0; i < rec.history.length; i++) {
-      const entry = rec.history[i];
-      if (entry !== undefined) entry.position = i;
-    }
-    return true;
-  }
-
   return {
     set(name, hash, options) {
       validateName(name);
-      const schema = extractSchema(hash);
-      const k = key(name, schema);
+      const schema = extractSchema(cas, hash);
+      const k = varKey(name, schema);
       const existing = records.get(k);
       const now = Date.now();
       if (existing) {
         const tags = options?.tags ?? existing.tags;
         const labels = options?.labels ?? existing.labels;
-        if (options !== undefined) checkConflict(tags, labels);
+        if (options !== undefined) checkTagLabelConflict(tags, labels);
         const changed = pushHistory(existing, hash, now);
         if (changed) {
           existing.value = hash;
@@ -170,11 +107,11 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
           existing.labels = [...labels];
         }
         persistFull();
-        return cloneVar(existing);
+        return cloneVarRecord(existing);
       }
       const tags = options?.tags ?? {};
       const labels = options?.labels ?? [];
-      checkConflict(tags, labels);
+      checkTagLabelConflict(tags, labels);
       const rec: VarRecord = {
         name,
         schema,
@@ -186,33 +123,33 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
         history: [{ value: hash, position: 0, setAt: now }],
       };
       records.set(k, rec);
-      addIndex(name, k);
+      addNameIndex(byName, name, k);
       appendRecord(rec);
-      return cloneVar(rec);
+      return cloneVarRecord(rec);
     },
 
     get(name, schema) {
       if (schema !== undefined) {
-        const rec = records.get(key(name, schema));
-        return rec ? cloneVar(rec) : null;
+        const rec = records.get(varKey(name, schema));
+        return rec ? cloneVarRecord(rec) : null;
       }
       const set = byName.get(name);
       if (!set || set.size !== 1) return null;
       const onlyKey = set.values().next().value;
       if (onlyKey === undefined) return null;
       const rec = records.get(onlyKey);
-      return rec ? cloneVar(rec) : null;
+      return rec ? cloneVarRecord(rec) : null;
     },
 
     remove(name, schema) {
       if (schema !== undefined) {
-        const k = key(name, schema);
+        const k = varKey(name, schema);
         const rec = records.get(k);
         if (!rec) return [];
         records.delete(k);
-        removeIndex(name, k);
+        removeNameIndex(byName, name, k);
         appendRemoval(name, schema);
-        return [cloneVar(rec)];
+        return [cloneVarRecord(rec)];
       }
       const set = byName.get(name);
       if (!set) return [];
@@ -220,7 +157,7 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
       for (const k of [...set]) {
         const rec = records.get(k);
         if (rec) {
-          removed.push(cloneVar(rec));
+          removed.push(cloneVarRecord(rec));
           records.delete(k);
           appendRemoval(rec.name, rec.schema);
         }
@@ -231,11 +168,11 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
 
     update(name, hash, options) {
       validateName(name);
-      const newSchema = extractSchema(hash);
+      const newSchema = extractSchema(cas, hash);
       const set = byName.get(name);
       if (!set || set.size === 0)
         throw new VariableNotFoundError(name, newSchema);
-      const k = key(name, newSchema);
+      const k = varKey(name, newSchema);
       const existing = records.get(k);
       if (!existing) {
         for (const ek of set) {
@@ -247,7 +184,7 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
       const now = Date.now();
       const tags = options?.tags ?? existing.tags;
       const labels = options?.labels ?? existing.labels;
-      if (options !== undefined) checkConflict(tags, labels);
+      if (options !== undefined) checkTagLabelConflict(tags, labels);
       const changed = pushHistory(existing, hash, now);
       if (changed) {
         existing.value = hash;
@@ -258,7 +195,7 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
         existing.labels = [...labels];
       }
       persistFull();
-      return cloneVar(existing);
+      return cloneVarRecord(existing);
     },
 
     list(options?: VarListOptions) {
@@ -312,12 +249,12 @@ export function createFsVarStoreFor(dir: string, cas: CasStore): VarStore {
       });
       if (offset > 0) results = results.slice(offset);
       if (limit !== undefined) results = results.slice(0, limit);
-      return results.map(cloneVar);
+      return results.map(cloneVarRecord);
     },
 
     history(name, schema) {
       if (schema !== undefined) {
-        const rec = records.get(key(name, schema));
+        const rec = records.get(varKey(name, schema));
         return rec ? rec.history.map((e) => ({ ...e })) : [];
       }
       const set = byName.get(name);

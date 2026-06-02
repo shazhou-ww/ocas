@@ -1,5 +1,5 @@
 import { bootstrap } from "./bootstrap.js";
-import type { Hash, OcasStore } from "./types.js";
+import type { Hash, Store } from "./types.js";
 
 const DEFAULT_TEMPLATES: ReadonlyArray<
   readonly [alias: string, template: string]
@@ -63,9 +63,9 @@ const DEFAULT_TEMPLATES: ReadonlyArray<
  * Idempotent: safe to call multiple times.
  */
 export async function registerOutputTemplates(
-  store: OcasStore,
+  store: Store,
 ): Promise<Record<string, Hash>> {
-  const aliases = await bootstrap(store);
+  const aliases = bootstrap(store);
   const stringHash = aliases["@ocas/string"];
   if (stringHash === undefined) {
     throw new Error("@ocas/string schema not found in bootstrap result");

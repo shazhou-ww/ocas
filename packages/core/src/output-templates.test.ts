@@ -28,7 +28,7 @@ const OUTPUT_ALIASES = [
 describe("registerOutputTemplates", () => {
   test("registers a template for every @ocas/output/* schema", async () => {
     const store = createMemoryStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     const registered = await registerOutputTemplates(store);
 
@@ -41,7 +41,7 @@ describe("registerOutputTemplates", () => {
 
   test("each template is retrievable via @ocas/template/text/<hash>", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     await registerOutputTemplates(store);
 
@@ -65,7 +65,7 @@ describe("registerOutputTemplates", () => {
 
   test("is idempotent — safe to call multiple times", async () => {
     const store = createMemoryStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     const first = await registerOutputTemplates(store);
     const second = await registerOutputTemplates(store);
@@ -75,7 +75,7 @@ describe("registerOutputTemplates", () => {
 
   test("@ocas/output/put template contains payload reference", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     await registerOutputTemplates(store);
 

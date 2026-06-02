@@ -1,5 +1,5 @@
 import { walk } from "./schema.js";
-import type { Hash, OcasStore } from "./types.js";
+import type { Hash, Store } from "./types.js";
 
 export interface GcStats {
   total: number; // Total CAS nodes before GC
@@ -15,7 +15,7 @@ export interface GcStats {
  * - Sweep: delete unmarked nodes
  * - Schema preservation: schemas of reachable nodes are also marked
  */
-export function gc(store: OcasStore): GcStats {
+export function gc(store: Store): GcStats {
   // Get all variables (no filters → global). Omit `limit` so the full
   // variable set is returned for use as gc roots.
   const variables = store.var.list();

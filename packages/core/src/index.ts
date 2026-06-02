@@ -50,7 +50,6 @@ export type {
   ListEntry,
   ListOptions,
   ListSort,
-  OcasStore,
   Store,
   Tag,
   TagOp,
@@ -60,6 +59,16 @@ export type {
   VarStore,
 } from "./types.js";
 export { validateName } from "./validation.js";
+export {
+  addNameIndex,
+  checkTagLabelConflict,
+  cloneVarRecord,
+  extractSchema,
+  pushHistory,
+  removeNameIndex,
+  type VarRecord,
+  varKey,
+} from "./var-store-helpers.js";
 export type { Variable } from "./variable.js";
 export { verify } from "./verify.js";
 export { wrapEnvelope } from "./wrap-envelope.js";

@@ -1,7 +1,7 @@
 import { CasNodeNotFoundError } from "./errors.js";
 import { renderWithTemplate } from "./liquid-render.js";
 import { collectRefs, getSchema, putSchema, refs } from "./schema.js";
-import type { Hash, OcasStore } from "./types.js";
+import type { Hash, Store } from "./types.js";
 
 export type RenderOptions = {
   resolution?: number; // (0, 1], default 1.0
@@ -47,7 +47,7 @@ function validateAndExtractOptions(options: RenderOptions | null | undefined): {
  * For template support, use renderAsync().
  */
 export function render(
-  store: OcasStore,
+  store: Store,
   hash: Hash,
   options?: RenderOptions,
 ): string {
@@ -68,7 +68,7 @@ export function render(
  * Attempts to use LiquidJS templates first, falling back to YAML.
  */
 export async function renderAsync(
-  store: OcasStore,
+  store: Store,
   hash: Hash,
   options?: RenderOptions,
 ): Promise<string> {
@@ -111,7 +111,7 @@ export async function renderAsync(
 export function renderDirect(
   typeHash: Hash,
   value: unknown,
-  store: OcasStore | null,
+  store: Store | null,
   options: RenderOptions | null,
 ): string {
   const { resolution, decay, epsilon } = validateAndExtractOptions(options);
@@ -142,10 +142,10 @@ export function renderDirect(
 /**
  * Check if a template exists for a given type
  */
-async function hasTemplate(store: OcasStore, typeHash: Hash): Promise<boolean> {
+async function hasTemplate(store: Store, typeHash: Hash): Promise<boolean> {
   const varName = `@ocas/template/text/${typeHash}`;
   try {
-    const stringSchema = await putSchema(store, { type: "string" });
+    const stringSchema = putSchema(store, { type: "string" });
     const variable = store.var.get(varName, stringSchema);
     return variable !== null;
   } catch {
@@ -154,7 +154,7 @@ async function hasTemplate(store: OcasStore, typeHash: Hash): Promise<boolean> {
 }
 
 function renderNode(
-  store: OcasStore | null,
+  store: Store | null,
   hash: Hash,
   currentResolution: number,
   decay: number,
@@ -203,7 +203,7 @@ function renderNode(
 }
 
 function renderValue(
-  store: OcasStore | null,
+  store: Store | null,
   value: unknown,
   refHashes: Set<Hash>,
   childResolution: number,

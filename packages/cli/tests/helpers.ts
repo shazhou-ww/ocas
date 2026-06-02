@@ -42,7 +42,7 @@ export async function putSchemaFile(
   const schema = JSON.parse(
     readFileSync(schemaFilePath, "utf-8"),
   ) as JSONSchema;
-  const hash = await putSchema(store, schema);
+  const hash = putSchema(store, schema);
   return hash;
 }
 

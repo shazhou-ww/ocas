@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash, OcasStore } from "@ocas/core";
+import type { Hash, Store } from "@ocas/core";
 import { bootstrap } from "@ocas/core";
 import { openStore as openFsStore } from "@ocas/fs";
 
@@ -67,8 +67,8 @@ async function runCli(...args: string[]): Promise<{
 /**
  * Get bootstrap @ocas/string type hash
  */
-async function getStringHash(store: OcasStore): Promise<Hash> {
-  const builtinSchemas = await bootstrap(store);
+async function getStringHash(store: Store): Promise<Hash> {
+  const builtinSchemas = bootstrap(store);
   return builtinSchemas["@ocas/string"] ?? "";
 }
 

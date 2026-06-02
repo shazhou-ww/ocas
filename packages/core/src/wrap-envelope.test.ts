@@ -6,7 +6,7 @@ import { wrapEnvelope } from "./wrap-envelope.js";
 describe("wrapEnvelope", () => {
   test("resolves @ocas/output/put alias and returns envelope", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     const envelope = await wrapEnvelope(
       store,
@@ -20,7 +20,7 @@ describe("wrapEnvelope", () => {
 
   test("resolves @ocas/output/has alias with boolean value", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     const envelope = await wrapEnvelope(store, "@ocas/output/has", true);
 
@@ -30,7 +30,7 @@ describe("wrapEnvelope", () => {
 
   test("resolves @ocas/output/gc alias with object value", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     const gcStats = { total: 100, reachable: 80, collected: 20, scanned: 5 };
     const envelope = await wrapEnvelope(store, "@ocas/output/gc", gcStats);
@@ -41,7 +41,7 @@ describe("wrapEnvelope", () => {
 
   test("resolves primitive alias @ocas/string", async () => {
     const store = createMemoryStore();
-    const aliases = await bootstrap(store);
+    const aliases = bootstrap(store);
 
     const envelope = await wrapEnvelope(store, "@ocas/string", "hello");
 
@@ -51,7 +51,7 @@ describe("wrapEnvelope", () => {
 
   test("throws for unknown alias", async () => {
     const store = createMemoryStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     await expect(
       wrapEnvelope(store, "@ocas/output/nonexistent", "value"),
@@ -75,7 +75,7 @@ describe("wrapEnvelope", () => {
 
   test("preserves complex object values without mutation", async () => {
     const store = createMemoryStore();
-    await bootstrap(store);
+    bootstrap(store);
 
     const original = {
       name: "test",

@@ -51,7 +51,7 @@ describe("createFsStore – init and bootstrap", () => {
 
   test("bootstrap returns a valid 13-char self-referencing hash", async () => {
     const store = await openStore(dir);
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     expect(hash).toHaveLength(13);
@@ -63,8 +63,8 @@ describe("createFsStore – init and bootstrap", () => {
 
   test("bootstrap is idempotent across calls", async () => {
     const store = await openStore(dir);
-    const h1 = await bootstrap(store);
-    const h2 = await bootstrap(store);
+    const h1 = bootstrap(store);
+    const h2 = bootstrap(store);
 
     expect(h1).toEqual(h2);
     expect(store.cas.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(29);
@@ -113,7 +113,7 @@ describe("createFsStore – persistence round-trip", () => {
 
   test("bootstrap survives round-trip: self-referencing node reloads correctly", async () => {
     const store1 = await openStore(dir);
-    const builtinSchemas = await bootstrap(store1);
+    const builtinSchemas = bootstrap(store1);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     const store2 = createFsStore(dir);
@@ -261,7 +261,7 @@ describe("createFsStore – listByType", () => {
 
   test("bootstrap node is listed under its self type after reload", async () => {
     const store1 = await openStore(dir);
-    const builtinSchemas = await bootstrap(store1);
+    const builtinSchemas = bootstrap(store1);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     const store2 = createFsStore(dir);
@@ -295,7 +295,7 @@ describe("createFsStore – verify on disk-loaded nodes", () => {
 
   test("verify passes on a disk-loaded bootstrap node", async () => {
     const store1 = await openStore(dir);
-    const builtinSchemas = await bootstrap(store1);
+    const builtinSchemas = bootstrap(store1);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
     const store2 = createFsStore(dir);
@@ -375,7 +375,7 @@ describe("openStore – async with auto-bootstrap", () => {
     const store = await openStore(dir);
 
     // Check that bootstrap schemas exist
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"];
 
     expect(metaHash).toBeDefined();
@@ -392,11 +392,11 @@ describe("openStore – async with auto-bootstrap", () => {
 
   test("openStore bootstrap is idempotent on subsequent opens", async () => {
     const store1 = await openStore(dir);
-    const schemas1 = await bootstrap(store1);
+    const schemas1 = bootstrap(store1);
     const count1 = store1.cas.listAll().length;
 
     const store2 = await openStore(dir);
-    const schemas2 = await bootstrap(store2);
+    const schemas2 = bootstrap(store2);
     const count2 = store2.cas.listAll().length;
 
     // Same schemas, same count
@@ -407,11 +407,11 @@ describe("openStore – async with auto-bootstrap", () => {
   test("openStore works on already-bootstrapped store", async () => {
     // Open + bootstrap
     const store1 = await openStore(dir);
-    const schemas1 = await bootstrap(store1);
+    const schemas1 = bootstrap(store1);
 
     // Open again
     const store2 = await openStore(dir);
-    const schemas2 = await bootstrap(store2);
+    const schemas2 = bootstrap(store2);
 
     expect(schemas1).toEqual(schemas2);
   });
@@ -424,7 +424,7 @@ describe("openStore – async with auto-bootstrap", () => {
 
     // Open with openStore - should auto-bootstrap
     const store2 = await openStore(dir);
-    const schemas = await bootstrap(store2);
+    const schemas = bootstrap(store2);
 
     expect(store2.cas.has(schemas["@ocas/schema"] as string)).toBe(true);
     // Old data still exists
@@ -560,9 +560,9 @@ describe("createFsStore – listMeta and listSchemas", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// E2. OcasStore shape from openStore
+// E2. Store shape from openStore
 // ──────────────────────────────────────────────────────────────────────────────
-describe("openStore – OcasStore shape", () => {
+describe("openStore – Store shape", () => {
   let dir: string;
   beforeEach(() => {
     dir = makeTmpDir();

@@ -11,7 +11,7 @@ import type { CasNode } from "./types.js";
 describe("putSchema", () => {
   test("returns a valid 13-char hash", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, { type: "object", properties: {} });
+    const hash = putSchema(store, { type: "object", properties: {} });
     expect(hash).toHaveLength(13);
     expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
   });
@@ -19,7 +19,7 @@ describe("putSchema", () => {
   test("schema node is stored in the store", async () => {
     const store = createMemoryStore();
     const schema = { type: "object", properties: { name: { type: "string" } } };
-    const hash = await putSchema(store, schema);
+    const hash = putSchema(store, schema);
 
     expect(store.cas.has(hash)).toBe(true);
     const node = store.cas.get(hash);
@@ -29,9 +29,9 @@ describe("putSchema", () => {
 
   test("schema node type equals the meta-schema hash", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
-    const schemaHash = await putSchema(store, { type: "string" });
+    const schemaHash = putSchema(store, { type: "string" });
     const node = store.cas.get(schemaHash) as CasNode;
 
     expect(node.type).toBe(metaHash);
@@ -40,16 +40,16 @@ describe("putSchema", () => {
   test("putSchema is idempotent: same schema → same hash", async () => {
     const store = createMemoryStore();
     const schema = { type: "number" };
-    const h1 = await putSchema(store, schema);
-    const h2 = await putSchema(store, schema);
+    const h1 = putSchema(store, schema);
+    const h2 = putSchema(store, schema);
 
     expect(h1).toBe(h2);
   });
 
   test("different schemas produce different hashes", async () => {
     const store = createMemoryStore();
-    const h1 = await putSchema(store, { type: "string" });
-    const h2 = await putSchema(store, { type: "number" });
+    const h1 = putSchema(store, { type: "string" });
+    const h2 = putSchema(store, { type: "number" });
 
     expect(h1).not.toBe(h2);
   });
@@ -62,7 +62,7 @@ describe("getSchema", () => {
   test("returns the original schema object", async () => {
     const store = createMemoryStore();
     const schema = { type: "object", properties: { age: { type: "number" } } };
-    const hash = await putSchema(store, schema);
+    const hash = putSchema(store, schema);
 
     expect(getSchema(store, hash)).toEqual(schema);
   });
@@ -82,7 +82,7 @@ describe("getSchema", () => {
         label: { type: "string" },
       },
     };
-    const hash = await putSchema(store, schema);
+    const hash = putSchema(store, schema);
     expect(getSchema(store, hash)).toEqual(schema);
   });
 });
@@ -93,7 +93,7 @@ describe("getSchema", () => {
 describe("validate", () => {
   test("returns true when payload matches the schema", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: { name: { type: "string" }, age: { type: "number" } },
       required: ["name"],
@@ -106,7 +106,7 @@ describe("validate", () => {
 
   test("returns false when payload violates the schema", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: { count: { type: "number" } },
       required: ["count"],
@@ -119,7 +119,7 @@ describe("validate", () => {
 
   test("returns false when required field is missing", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       required: ["title"],
       properties: { title: { type: "string" } },
@@ -148,7 +148,7 @@ describe("validate", () => {
 describe("refs", () => {
   test("returns empty array when schema has no ocas_ref fields", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: { title: { type: "string" } },
     });
@@ -160,7 +160,7 @@ describe("refs", () => {
 
   test("returns the ocas_ref hash values from payload", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         parentHash: { type: "string", format: "ocas_ref" },
@@ -180,7 +180,7 @@ describe("refs", () => {
 
   test("collects multiple ocas_ref fields", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         leftHash: { type: "string", format: "ocas_ref" },
@@ -204,7 +204,7 @@ describe("refs", () => {
 
   test("skips null/undefined ocas_ref values", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         optionalRef: { type: "string", format: "ocas_ref" },
@@ -236,7 +236,7 @@ describe("refs", () => {
 describe("walk", () => {
   test("visits a single node with no refs", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: { val: { type: "number" } },
     });
@@ -250,7 +250,7 @@ describe("walk", () => {
 
   test("visits all reachable nodes in a chain A → B → C", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         nextHash: { type: "string", format: "ocas_ref" },
@@ -274,7 +274,7 @@ describe("walk", () => {
 
   test("handles cycles without infinite loop", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: {
         peerHash: { type: "string", format: "ocas_ref" },
@@ -292,7 +292,7 @@ describe("walk", () => {
     const hashD = store.cas.put(schemaHash, { peerHash: hashC, val: 4 });
     const hashE = store.cas.put(schemaHash, { peerHash: hashC, val: 5 });
 
-    const schemaHash2 = await putSchema(store, {
+    const schemaHash2 = putSchema(store, {
       type: "object",
       properties: {
         leftHash: { type: "string", format: "ocas_ref" },
@@ -317,7 +317,7 @@ describe("walk", () => {
 
   test("skips missing hashes gracefully", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: { ref: { type: "string", format: "ocas_ref" } },
     });
@@ -332,7 +332,7 @@ describe("walk", () => {
 
   test("visitor receives both hash and node", async () => {
     const store = createMemoryStore();
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: { x: { type: "number" } },
     });
@@ -356,7 +356,7 @@ describe("walk", () => {
 describe("bootstrap meta-schema self-reference", () => {
   test("metaNode.type === metaHash (self-referencing)", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const metaNode = store.cas.get(metaHash) as CasNode;
 
@@ -365,9 +365,9 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("schema nodes have type === metaHash", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
-    const schemaHash = await putSchema(store, { type: "string" });
+    const schemaHash = putSchema(store, { type: "string" });
     const schemaNode = store.cas.get(schemaHash) as CasNode;
 
     expect(schemaNode.type).toBe(metaHash);
@@ -375,9 +375,9 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("data nodes have type === schemaHash (not metaHash)", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
-    const schemaHash = await putSchema(store, {
+    const schemaHash = putSchema(store, {
       type: "object",
       properties: { val: { type: "number" } },
     });
@@ -392,7 +392,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with numeric constraints (minimum/maximum)", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "number",
       minimum: 0,
       maximum: 100,
@@ -414,7 +414,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with string constraints (minLength/maxLength/pattern)", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "string",
       minLength: 1,
       maxLength: 10,
@@ -431,7 +431,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with array constraints (minItems/maxItems/uniqueItems)", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "array",
       items: { type: "number" },
       minItems: 1,
@@ -452,20 +452,20 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("rejects schema with wrong constraint types", async () => {
     const store = createMemoryStore();
-    await expect(
+    expect(() =>
       putSchema(store, { type: "number", minimum: "zero" } as never),
-    ).rejects.toThrow();
-    await expect(
+    ).toThrow();
+    expect(() =>
       putSchema(store, { type: "string", maxLength: true } as never),
-    ).rejects.toThrow();
-    await expect(
+    ).toThrow();
+    expect(() =>
       putSchema(store, { type: "array", uniqueItems: 1 } as never),
-    ).rejects.toThrow();
+    ).toThrow();
   });
 
   test("accepts schema with nested property constraints", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "object",
       properties: {
         name: { type: "string", minLength: 1, maxLength: 50 },
@@ -491,11 +491,11 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("bootstrap is idempotent across putSchema calls", async () => {
     const store = createMemoryStore();
-    const builtinSchemas = await bootstrap(store);
+    const builtinSchemas = bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
 
-    await putSchema(store, { type: "string" });
-    await putSchema(store, { type: "number" });
+    putSchema(store, { type: "string" });
+    putSchema(store, { type: "number" });
 
     // bootstrap node should still be there and unchanged
     const metaNode = store.cas.get(metaHash) as CasNode;
@@ -506,7 +506,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with allOf", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       allOf: [
         { type: "object", properties: { name: { type: "string" } } },
         { required: ["name"] },
@@ -523,7 +523,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with if/then/else", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "object",
       properties: {
         kind: { type: "string" },
@@ -539,7 +539,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with patternProperties", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "object",
       patternProperties: {
         "^x-": { type: "string" },
@@ -553,7 +553,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with prefixItems (tuple)", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "array",
       prefixItems: [{ type: "string" }, { type: "number" }],
     });
@@ -562,7 +562,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with multipleOf", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "number",
       multipleOf: 5,
     });
@@ -577,7 +577,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with minProperties/maxProperties", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "object",
       minProperties: 1,
       maxProperties: 3,
@@ -593,7 +593,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with default value", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "string",
       default: "hello",
     });
@@ -602,21 +602,17 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("rejects invalid P2 keyword types", async () => {
     const store = createMemoryStore();
-    await expect(
-      putSchema(store, { allOf: "not-array" } as never),
-    ).rejects.toThrow();
-    await expect(
-      putSchema(store, { multipleOf: "five" } as never),
-    ).rejects.toThrow();
-    await expect(
+    expect(() => putSchema(store, { allOf: "not-array" } as never)).toThrow();
+    expect(() => putSchema(store, { multipleOf: "five" } as never)).toThrow();
+    expect(() =>
       putSchema(store, { patternProperties: [1, 2] } as never),
-    ).rejects.toThrow();
+    ).toThrow();
   });
 
   test("collectRefs traverses allOf sub-schemas", async () => {
     const store = createMemoryStore();
-    const innerSchema = await putSchema(store, { type: "string" });
-    const schema = await putSchema(store, {
+    const innerSchema = putSchema(store, { type: "string" });
+    const schema = putSchema(store, {
       allOf: [
         {
           type: "object",
@@ -634,8 +630,8 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("collectRefs traverses patternProperties", async () => {
     const store = createMemoryStore();
-    const innerSchema = await putSchema(store, { type: "string" });
-    const schema = await putSchema(store, {
+    const innerSchema = putSchema(store, { type: "string" });
+    const schema = putSchema(store, {
       type: "object",
       patternProperties: {
         "^ref_": { type: "string", format: "ocas_ref" },
@@ -651,8 +647,8 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("collectRefs traverses prefixItems", async () => {
     const store = createMemoryStore();
-    const innerSchema = await putSchema(store, { type: "string" });
-    const schema = await putSchema(store, {
+    const innerSchema = putSchema(store, { type: "string" });
+    const schema = putSchema(store, {
       type: "array",
       prefixItems: [{ type: "string", format: "ocas_ref" }, { type: "number" }],
     });
@@ -668,7 +664,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with not", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       not: { type: "string" },
     });
     expect(hash).toHaveLength(13);
@@ -682,7 +678,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with contains", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "array",
       contains: { type: "number", minimum: 10 },
     });
@@ -697,7 +693,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with propertyNames", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "object",
       propertyNames: { pattern: "^[a-z]+$" },
     });
@@ -712,7 +708,7 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("accepts schema with metadata keywords", async () => {
     const store = createMemoryStore();
-    const hash = await putSchema(store, {
+    const hash = putSchema(store, {
       type: "string",
       examples: ["hello", "world"],
       readOnly: true,
@@ -724,22 +720,18 @@ describe("bootstrap meta-schema self-reference", () => {
 
   test("rejects invalid P3 keyword types", async () => {
     const store = createMemoryStore();
-    await expect(
-      putSchema(store, { not: "not-object" } as never),
-    ).rejects.toThrow();
-    await expect(
+    expect(() => putSchema(store, { not: "not-object" } as never)).toThrow();
+    expect(() =>
       putSchema(store, { examples: "not-array" } as never),
-    ).rejects.toThrow();
-    await expect(
-      putSchema(store, { readOnly: "yes" } as never),
-    ).rejects.toThrow();
-    await expect(putSchema(store, { $comment: 42 } as never)).rejects.toThrow();
+    ).toThrow();
+    expect(() => putSchema(store, { readOnly: "yes" } as never)).toThrow();
+    expect(() => putSchema(store, { $comment: 42 } as never)).toThrow();
   });
 
   test("collectRefs traverses contains", async () => {
     const store = createMemoryStore();
-    const innerSchema = await putSchema(store, { type: "string" });
-    const schema = await putSchema(store, {
+    const innerSchema = putSchema(store, { type: "string" });
+    const schema = putSchema(store, {
       type: "array",
       contains: { type: "string", format: "ocas_ref" },
     });

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash, OcasStore } from "@ocas/core";
+import type { Hash, Store } from "@ocas/core";
 import { bootstrap } from "@ocas/core";
 import { openStore as openFsStore } from "@ocas/fs";
 
@@ -61,8 +61,8 @@ async function setupSchemaAndValues(): Promise<{
   schema: Hash;
   values: Hash[];
 }> {
-  const store: OcasStore = await openFsStore(storePath);
-  const aliases = await bootstrap(store);
+  const store: Store = await openFsStore(storePath);
+  const aliases = bootstrap(store);
   const numberHash = aliases["@ocas/number"] as Hash;
   const values: Hash[] = [];
   for (let i = 0; i < 4; i++) {

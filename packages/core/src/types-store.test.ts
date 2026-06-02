@@ -8,7 +8,7 @@ import type {
   HistoryEntry,
   ListEntry,
   ListOptions,
-  OcasStore,
+  Store,
   Tag,
   TagOp,
   TagStore,
@@ -120,11 +120,11 @@ describe("TagStore type", () => {
   });
 });
 
-describe("Aggregate OcasStore type", () => {
+describe("Aggregate Store type", () => {
   test("has cas, var, tag fields", () => {
-    type _AssertCas = OcasStore["cas"] extends CasStore ? true : false;
-    type _AssertVar = OcasStore["var"] extends VarStore ? true : false;
-    type _AssertTag = OcasStore["tag"] extends TagStore ? true : false;
+    type _AssertCas = Store["cas"] extends CasStore ? true : false;
+    type _AssertVar = Store["var"] extends VarStore ? true : false;
+    type _AssertTag = Store["tag"] extends TagStore ? true : false;
     const a: _AssertCas = true;
     const b: _AssertVar = true;
     const c: _AssertTag = true;
@@ -147,7 +147,7 @@ describe("Exports surface", () => {
     type _C = CasStore extends object ? true : never;
     type _V = VarStore extends object ? true : never;
     type _T = TagStore extends object ? true : never;
-    type _O = OcasStore extends object ? true : never;
+    type _O = Store extends object ? true : never;
     const _checks: [_C, _V, _T, _O] = [true, true, true, true];
     expect(_checks.length).toBe(4);
   });
