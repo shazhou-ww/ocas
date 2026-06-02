@@ -16,7 +16,7 @@ let stringHash: Hash;
 beforeEach(async () => {
   dbDir = mkdtempSync(join(tmpdir(), "ocas-var-pagination-"));
   dbPath = join(dbDir, "vars.db");
-  casStore = createMemoryStore();
+  casStore = createMemoryStore().cas;
   const aliases = await bootstrap(casStore);
   stringHash = aliases["@ocas/string"] as Hash;
   varStore = createVariableStore(dbPath, casStore);

@@ -262,7 +262,7 @@ export async function putSchema(
       "Invalid schema: input does not conform to the ocas JSON Schema meta-schema",
     );
   }
-  return store.put(metaHash, jsonSchema);
+  return Promise.resolve(store.put(metaHash, jsonSchema));
 }
 
 /**

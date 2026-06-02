@@ -72,7 +72,7 @@ describe("computeHash", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 describe("createMemoryStore – put and get", () => {
   test("put returns a hash and get retrieves the node", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "my-type" });
     const hash = await store.put(typeHash, { greeting: "hello" });
 
@@ -86,12 +86,12 @@ describe("createMemoryStore – put and get", () => {
   });
 
   test("get returns null for unknown hash", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     expect(store.get("0000000000000")).toBeNull();
   });
 
   test("put is idempotent: same type+payload → same hash, no duplicate", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "my-type" });
 
     const h1 = await store.put(typeHash, { n: 42 });
@@ -101,7 +101,7 @@ describe("createMemoryStore – put and get", () => {
   });
 
   test("put does not create self-referencing nodes", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const payload = { name: "type-descriptor" };
     const typeHash = await computeSelfHash(payload);
     const hash = await store.put(typeHash, payload);
@@ -112,7 +112,7 @@ describe("createMemoryStore – put and get", () => {
   });
 
   test("timestamp is preserved on second put (idempotency)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "my-type" });
 
     const h1 = await store.put(typeHash, { v: 1 });
@@ -131,7 +131,7 @@ describe("createMemoryStore – put and get", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 describe("createMemoryStore – has", () => {
   test("has returns false before put, true after", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "t" });
     const hash = await computeHash(typeHash, { x: 1 });
 
@@ -141,7 +141,7 @@ describe("createMemoryStore – has", () => {
   });
 
   test("listByType returns all stored hashes for a type", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "t" });
 
     const h1 = await store.put(typeHash, { a: 1 });
@@ -156,7 +156,7 @@ describe("createMemoryStore – has", () => {
   });
 
   test("listByType returns empty array on fresh store", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     expect(store.listByType("0000000000000")).toEqual([]);
   });
 });
@@ -166,12 +166,12 @@ describe("createMemoryStore – has", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 describe("createMemoryStore – listByType", () => {
   test("returns empty array for unknown type", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     expect(store.listByType("0000000000000")).toEqual([]);
   });
 
   test("returns all hashes for the given type", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "t" });
     const otherType = await computeSelfHash({ name: "other" });
 
@@ -186,7 +186,7 @@ describe("createMemoryStore – listByType", () => {
   });
 
   test("idempotent put does not duplicate in listByType", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "t" });
 
     const h1 = await store.put(typeHash, { n: 1 });
@@ -196,7 +196,7 @@ describe("createMemoryStore – listByType", () => {
   });
 
   test("bootstrap node is listed under its self type", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const builtinSchemas = await bootstrap(store);
     const hash = builtinSchemas["@ocas/schema"] ?? "";
 
@@ -216,7 +216,7 @@ describe("createMemoryStore – listByType", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 describe("verify", () => {
   test("returns true for a correctly stored node", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "my-type" });
     const hash = await store.put(typeHash, { data: 123 });
     const node = store.get(hash) as CasNode;
@@ -225,7 +225,7 @@ describe("verify", () => {
   });
 
   test("returns false when payload is tampered", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "my-type" });
     const hash = await store.put(typeHash, { data: 123 });
 
@@ -238,7 +238,7 @@ describe("verify", () => {
   });
 
   test("returns false when type is tampered", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const typeHash = await computeSelfHash({ name: "my-type" });
     const hash = await store.put(typeHash, { data: 123 });
     const node = store.get(hash) as CasNode;
@@ -265,7 +265,7 @@ describe("bootstrap", () => {
   });
 
   test("returns a map with 30 built-in schema aliases", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const builtinSchemas = await bootstrap(store);
 
     expect(builtinSchemas).toHaveProperty("@ocas/schema");
@@ -288,7 +288,7 @@ describe("bootstrap", () => {
   });
 
   test("meta-schema node is stored and retrievable", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const builtinSchemas = await bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
 
@@ -298,7 +298,7 @@ describe("bootstrap", () => {
   });
 
   test("meta-schema node is self-referencing: type === hash", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const builtinSchemas = await bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const node = store.get(metaHash) as CasNode;
@@ -307,7 +307,7 @@ describe("bootstrap", () => {
   });
 
   test("bootstrap node passes verify()", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const builtinSchemas = await bootstrap(store);
     const metaHash = builtinSchemas["@ocas/schema"] ?? "";
     const node = store.get(metaHash) as CasNode;
@@ -316,7 +316,7 @@ describe("bootstrap", () => {
   });
 
   test("bootstrap is idempotent: same hashes on repeated calls", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const h1 = await bootstrap(store);
     const h2 = await bootstrap(store);
 

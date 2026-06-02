@@ -22,7 +22,7 @@ async function putN(
 
 describe("listByType - pagination + sort + timestamps", () => {
   test("A1. returns objects with hash/created/updated", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 3, 0);
 
@@ -36,7 +36,7 @@ describe("listByType - pagination + sort + timestamps", () => {
   });
 
   test("A2. default sort is created ASC", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 4);
 
@@ -49,7 +49,7 @@ describe("listByType - pagination + sort + timestamps", () => {
   });
 
   test("A3. desc:true reverses order", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 4);
 
@@ -62,7 +62,7 @@ describe("listByType - pagination + sort + timestamps", () => {
   });
 
   test("A4. sort: 'updated' is equivalent to 'created' for CAS nodes", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 4);
 
@@ -72,14 +72,14 @@ describe("listByType - pagination + sort + timestamps", () => {
   });
 
   test("A5. limit truncates", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 5, 0);
     expect(store.listByType(m, { limit: 2 })).toHaveLength(2);
   });
 
   test("A6. offset skips", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 5);
 
@@ -90,21 +90,21 @@ describe("listByType - pagination + sort + timestamps", () => {
   });
 
   test("A7. limit:0 returns empty array", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 3, 0);
     expect(store.listByType(m, { limit: 0 })).toEqual([]);
   });
 
   test("A8. offset past end returns empty array", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 3, 0);
     expect(store.listByType(m, { offset: 100 })).toEqual([]);
   });
 
   test("A9. core has no default limit (returns all)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 150, 0);
     // No CLI-layer cap; with 150 nodes of type m (plus m itself which is
@@ -113,7 +113,7 @@ describe("listByType - pagination + sort + timestamps", () => {
   });
 
   test("A10. desc + offset + limit combined", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await putN(store, m, 5, 15);
     const all = store.listByType(m);
@@ -128,7 +128,7 @@ describe("listByType - pagination + sort + timestamps", () => {
 
 describe("listMeta / listSchemas - pagination", () => {
   test("B1. listMeta returns {hash,created,updated}", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const h = await store[BOOTSTRAP_STORE]({ type: "object" });
     const list = store.listMeta();
     expect(list).toHaveLength(1);
@@ -139,7 +139,7 @@ describe("listMeta / listSchemas - pagination", () => {
   });
 
   test("B2. listMeta has no default limit (returns all)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     for (let i = 0; i < 150; i++) {
       await store[BOOTSTRAP_STORE]({ type: "object", i });
     }
@@ -147,7 +147,7 @@ describe("listMeta / listSchemas - pagination", () => {
   });
 
   test("B3. listMeta limit/offset/desc", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     for (let i = 0; i < 5; i++) {
       await store[BOOTSTRAP_STORE]({ type: "object", i });
       await new Promise((r) => setTimeout(r, 2));
@@ -159,7 +159,7 @@ describe("listMeta / listSchemas - pagination", () => {
   });
 
   test("B4. listSchemas returns objects, supports limit", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     await store.put(m, { type: "string" });
     await store.put(m, { type: "number" });
@@ -175,7 +175,7 @@ describe("listMeta / listSchemas - pagination", () => {
 
 describe("Determinism / edge cases", () => {
   test("I1. same-ms timestamps yield deterministic ordering across calls", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const m = await store[BOOTSTRAP_STORE]({ type: "object" });
     // No delay → likely same millisecond
     await putN(store, m, 5, 0);
@@ -185,7 +185,7 @@ describe("Determinism / edge cases", () => {
   });
 
   test("I2. empty store returns []", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     expect(store.listByType("0000000000000")).toEqual([]);
     expect(store.listMeta()).toEqual([]);
     expect(store.listSchemas()).toEqual([]);

@@ -25,7 +25,7 @@ const tmpDbPath = () =>
 
 describe("VariableStore - Database Schema", () => {
   test("Database schema has (name, schema) composite primary key", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
@@ -61,7 +61,7 @@ describe("VariableStore - Database Schema", () => {
   });
 
   test("Database indexes reference name instead of id/scope", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
@@ -92,7 +92,7 @@ describe("VariableStore - Database Schema", () => {
   });
 
   test("variable_tags table has composite foreign key", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
@@ -129,7 +129,7 @@ describe("VariableStore - set() Upsert Method", () => {
 
   test("set() creates new variable when (name, schema) doesn't exist", async () => {
     // Setup: store with schema and data node
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, {
       type: "object",
@@ -161,7 +161,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() updates value when (name, schema) already exists", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, {
       type: "object",
@@ -197,7 +197,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() creates variable with tags and labels", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -217,7 +217,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() preserves tags/labels when updating without options", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, {
       type: "object",
@@ -247,7 +247,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() allows same name with different schemas", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, {
       type: "object",
@@ -285,7 +285,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() validates variable name", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -320,7 +320,7 @@ describe("VariableStore - set() Upsert Method", () => {
 
   test("set() extracts schema from value hash internally", async () => {
     // Given: Two different schemas
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -349,7 +349,7 @@ describe("VariableStore - set() Upsert Method", () => {
 
   test("set() upserts based on extracted schema", async () => {
     // Given: Existing variable with schemaA
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const value1 = await store.put(schemaA, 42);
@@ -371,7 +371,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() throws CasNodeNotFoundError for invalid hash", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
@@ -388,7 +388,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() throws TagLabelConflictError when updating with tag key that matches new label", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = { type: "object", properties: { x: { type: "number" } } };
     const schemaHash = await putSchema(store, schema);
@@ -413,7 +413,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() throws TagLabelConflictError when updating with label that matches new tag key", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = { type: "object", properties: { x: { type: "number" } } };
     const schemaHash = await putSchema(store, schema);
@@ -438,7 +438,7 @@ describe("VariableStore - set() Upsert Method", () => {
   });
 
   test("set() allows updating tags/labels when no conflicts", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = { type: "object", properties: { x: { type: "number" } } };
     const schemaHash = await putSchema(store, schema);
@@ -482,7 +482,7 @@ describe("VariableStore - get() with Optional Schema", () => {
 
   test("get(name, schema) returns Variable when exists", async () => {
     // Given: Variable with (name, schema)
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const value = await store.put(schema, 42);
@@ -505,7 +505,7 @@ describe("VariableStore - get() with Optional Schema", () => {
   });
 
   test("get(name, schema) returns null when name doesn't exist", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
 
@@ -523,7 +523,7 @@ describe("VariableStore - get() with Optional Schema", () => {
 
   test("get(name, schema) returns null when schema doesn't match", async () => {
     // Given: Variable with schemaA
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -545,7 +545,7 @@ describe("VariableStore - get() with Optional Schema", () => {
 
   test("get(name, schema) returns correct variant when multiple schemas exist", async () => {
     // Given: Same name with two different schemas
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -575,7 +575,7 @@ describe("VariableStore - get() with Optional Schema", () => {
   });
 
   test("get(name, schema) includes tags and labels", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "object" });
     const value = await store.put(schema, {});
@@ -598,7 +598,7 @@ describe("VariableStore - get() with Optional Schema", () => {
   });
 
   test("get(name, schema) returns exact match", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, {
       type: "object",
@@ -635,7 +635,7 @@ describe("VariableStore - get() with Optional Schema", () => {
   });
 
   test("get(name, schema) returns null when combination doesn't exist", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, {
       type: "object",
@@ -674,7 +674,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
   });
 
   test("remove(name) deletes all schema variants", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, {
       type: "object",
@@ -712,7 +712,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
   });
 
   test("remove(name) returns empty array when variable doesn't exist", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     dbPath = tmpDbPath();
     const varStore = new VariableStore(dbPath, store);
 
@@ -725,7 +725,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
   });
 
   test("remove(name, schema) deletes only specified variant", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, {
       type: "object",
@@ -762,7 +762,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
   });
 
   test("remove(name, schema) throws VariableNotFoundError when not found", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
 
@@ -777,7 +777,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
   });
 
   test("remove() cascades deletion to tags and labels", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -817,7 +817,7 @@ describe("VariableStore - remove() with Optional Schema", () => {
   });
 
   test("remove(name) returns array even with single variant", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -852,7 +852,7 @@ describe("VariableStore - Name Validation", () => {
   });
 
   test("validateName accepts valid variable names", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -878,7 +878,7 @@ describe("VariableStore - Name Validation", () => {
   });
 
   test("validateName rejects empty name", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -893,7 +893,7 @@ describe("VariableStore - Name Validation", () => {
   });
 
   test("validateName rejects invalid characters", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -933,7 +933,7 @@ describe("VariableStore - Name Validation", () => {
   });
 
   test("validateName rejects empty segments", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -958,7 +958,7 @@ describe("VariableStore - Name Validation", () => {
   });
 
   test("validateName rejects leading or trailing slashes", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -1034,7 +1034,7 @@ describe("VariableStore - validateName() Error Messages", () => {
   });
 
   test("validateName error message mentions 'empty' for empty string", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     schemaHash = await putSchema(store, { type: "object" });
     dataHash = await store.put(schemaHash, {});
@@ -1053,7 +1053,7 @@ describe("VariableStore - validateName() Error Messages", () => {
   });
 
   test("validateName error message identifies specific invalid segment", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     schemaHash = await putSchema(store, { type: "object" });
     dataHash = await store.put(schemaHash, {});
@@ -1073,7 +1073,7 @@ describe("VariableStore - validateName() Error Messages", () => {
   });
 
   test("validateName error message explains consecutive slashes", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     schemaHash = await putSchema(store, { type: "object" });
     dataHash = await store.put(schemaHash, {});
@@ -1092,7 +1092,7 @@ describe("VariableStore - validateName() Error Messages", () => {
   });
 
   test("validateName error message distinguishes leading vs trailing slash", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     schemaHash = await putSchema(store, { type: "object" });
     dataHash = await store.put(schemaHash, {});
@@ -1126,7 +1126,7 @@ describe("VariableStore - validateName() Error Messages", () => {
   });
 
   test("validateName accepts valid names with dots, underscores, hyphens", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     schemaHash = await putSchema(store, { type: "object" });
     dataHash = await store.put(schemaHash, {});
@@ -1160,7 +1160,7 @@ describe("VariableStore - Integration Tests", () => {
   });
 
   test("Complete workflow: set, get, remove with multiple schemas", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
 
     const schemaConfig = await putSchema(store, {
@@ -1231,7 +1231,7 @@ describe("VariableStore - Integration Tests", () => {
   });
 
   test("Upsert workflow preserves and updates tags", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, {
       type: "object",
@@ -1280,7 +1280,7 @@ describe("VariableStore - Legacy Update Method", () => {
   });
 
   test("update() is distinct from set() and fails when variable doesn't exist", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -1305,7 +1305,7 @@ describe("VariableStore - Legacy Update Method", () => {
   });
 
   test("update() throws SchemaMismatchError when schema changes", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "object" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -1338,7 +1338,7 @@ describe("VariableStore - List Operation", () => {
   });
 
   test("list() returns all variables", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const data1 = await store.put(schemaHash, { a: 1 });
@@ -1362,7 +1362,7 @@ describe("VariableStore - List Operation", () => {
   });
 
   test("list() with namePrefix filters results", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const data = await store.put(schemaHash, {});
@@ -1397,7 +1397,7 @@ describe("VariableStore - list() with exactName", () => {
 
   test("list({ exactName }) returns all schema variants for name", async () => {
     // Given: Same name with multiple schemas
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -1429,7 +1429,7 @@ describe("VariableStore - list() with exactName", () => {
   });
 
   test("list({ exactName }) returns empty array when name doesn't exist", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
 
     dbPath = tmpDbPath();
@@ -1443,7 +1443,7 @@ describe("VariableStore - list() with exactName", () => {
 
   test("list({ exactName, schema }) filters to specific variant", async () => {
     // Given: Same name with two schemas
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -1470,7 +1470,7 @@ describe("VariableStore - list() with exactName", () => {
   });
 
   test("list({ exactName }) with tags filters variants", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -1497,7 +1497,7 @@ describe("VariableStore - list() with exactName", () => {
   });
 
   test("exactName and namePrefix are mutually exclusive", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
 
     dbPath = tmpDbPath();
@@ -1512,7 +1512,7 @@ describe("VariableStore - list() with exactName", () => {
   });
 
   test("list({ namePrefix }) does match partial exact names", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const value = await store.put(schema, 42);
@@ -1542,7 +1542,7 @@ describe("VariableStore - list() with exactName", () => {
     // This test demonstrates that list({ exactName }) provides
     // the functionality previously available via get(name) → Variable[]
 
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = await putSchema(store, { type: "number" });
     const schemaB = await putSchema(store, { type: "string" });
@@ -1579,7 +1579,7 @@ describe("VariableStore - Tag/Label Management", () => {
   });
 
   test("tag() adds tags to existing variable", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -1599,7 +1599,7 @@ describe("VariableStore - Tag/Label Management", () => {
   });
 
   test("tag() throws error for conflicting tag/label names", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "object" });
     const dataHash = await store.put(schemaHash, {});
@@ -1638,7 +1638,7 @@ describe("VariableStore - @ Prefix Variable Names", () => {
   });
 
   test("should accept variable name with @ prefix in first segment", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "string" });
     const hash = await store.put(schemaHash, "test value");
@@ -1659,7 +1659,7 @@ describe("VariableStore - @ Prefix Variable Names", () => {
   });
 
   test("should accept variable name starting with @", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "string" });
     const hash = await store.put(schemaHash, "config value");
@@ -1677,7 +1677,7 @@ describe("VariableStore - @ Prefix Variable Names", () => {
   });
 
   test("should accept complex @ prefix paths", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "string" });
     const hash = await store.put(schemaHash, "test");
@@ -1704,7 +1704,7 @@ describe("VariableStore - @ Prefix Variable Names", () => {
   });
 
   test("should reject @ in non-first segment", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "string" });
     const hash = await store.put(schemaHash, "test");
@@ -1727,7 +1727,7 @@ describe("VariableStore - @ Prefix Variable Names", () => {
   });
 
   test("should reject @ followed by invalid characters", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "string" });
     const hash = await store.put(schemaHash, "test");
@@ -1751,7 +1751,7 @@ describe("VariableStore - @ Prefix Variable Names", () => {
   });
 
   test("should still accept all previously valid names", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "string" });
     const hash = await store.put(schemaHash, "test");
@@ -1777,7 +1777,7 @@ describe("VariableStore - @ Prefix Variable Names", () => {
   });
 
   test("should still reject previously invalid names", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaHash = await putSchema(store, { type: "string" });
     const hash = await store.put(schemaHash, "test");
@@ -1819,7 +1819,7 @@ describe("VariableStore - History (LRU)", () => {
   });
 
   test("history() initializes with single entry on create", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const v1 = await store.put(schema, 1);
@@ -1834,7 +1834,7 @@ describe("VariableStore - History (LRU)", () => {
   });
 
   test("history() pushes new values to position 0", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const v1 = await store.put(schema, 1);
@@ -1852,7 +1852,7 @@ describe("VariableStore - History (LRU)", () => {
   });
 
   test("set() with same value as current is idempotent (no history change)", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const v1 = await store.put(schema, 1);
@@ -1870,7 +1870,7 @@ describe("VariableStore - History (LRU)", () => {
   });
 
   test("setting an existing-history value moves it to position 0 (no duplicates)", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const v1 = await store.put(schema, 1);
@@ -1890,7 +1890,7 @@ describe("VariableStore - History (LRU)", () => {
   });
 
   test("history is bounded by MAX_HISTORY=10", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const values: string[] = [];
@@ -1911,7 +1911,7 @@ describe("VariableStore - History (LRU)", () => {
   });
 
   test("rollback semantics: re-setting an old value moves it to position 0", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const v1 = await store.put(schema, 1);
@@ -1933,7 +1933,7 @@ describe("VariableStore - History (LRU)", () => {
   });
 
   test("history is cascade-deleted with the variable", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = await putSchema(store, { type: "number" });
     const v1 = await store.put(schema, 1);

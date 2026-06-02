@@ -13,7 +13,7 @@ import { createVariableStore } from "./variable-store.js";
 async function createTempVarStore() {
   const tempDir = await mkdtemp(join(tmpdir(), "ocas-test-"));
   const dbPath = join(tempDir, "vars.db");
-  const store = createMemoryStore();
+  const store = createMemoryStore().cas;
   await bootstrap(store);
   const varStore = createVariableStore(dbPath, store);
   return {

@@ -5,7 +5,7 @@ import { wrapEnvelope } from "./wrap-envelope.js";
 
 describe("wrapEnvelope", () => {
   test("resolves @ocas/output/put alias and returns envelope", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const aliases = await bootstrap(store);
 
     const envelope = await wrapEnvelope(
@@ -19,7 +19,7 @@ describe("wrapEnvelope", () => {
   });
 
   test("resolves @ocas/output/has alias with boolean value", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const aliases = await bootstrap(store);
 
     const envelope = await wrapEnvelope(store, "@ocas/output/has", true);
@@ -29,7 +29,7 @@ describe("wrapEnvelope", () => {
   });
 
   test("resolves @ocas/output/gc alias with object value", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const aliases = await bootstrap(store);
 
     const gcStats = { total: 100, reachable: 80, collected: 20, scanned: 5 };
@@ -40,7 +40,7 @@ describe("wrapEnvelope", () => {
   });
 
   test("resolves primitive alias @ocas/string", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const aliases = await bootstrap(store);
 
     const envelope = await wrapEnvelope(store, "@ocas/string", "hello");
@@ -50,7 +50,7 @@ describe("wrapEnvelope", () => {
   });
 
   test("throws for unknown alias", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     await expect(
@@ -59,7 +59,7 @@ describe("wrapEnvelope", () => {
   });
 
   test("is idempotent — same alias returns same type hash", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
 
     const first = await wrapEnvelope(store, "@ocas/output/verify", "ok");
     const second = await wrapEnvelope(
@@ -74,7 +74,7 @@ describe("wrapEnvelope", () => {
   });
 
   test("preserves complex object values without mutation", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const original = {

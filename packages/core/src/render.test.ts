@@ -8,7 +8,7 @@ import { CasNodeNotFoundError } from "./variable-store.js";
 
 describe("Suite 1: Basic Rendering (No Nesting)", () => {
   test("1.1 Render Simple Primitives", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const textSchema = await putSchema(store, { type: "string" });
     const hash = await store.put(textSchema, "hello");
@@ -20,7 +20,7 @@ describe("Suite 1: Basic Rendering (No Nesting)", () => {
   });
 
   test("1.2 Render Object Node (Flat)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const objSchema = await putSchema(store, {
       type: "object",
@@ -40,7 +40,7 @@ describe("Suite 1: Basic Rendering (No Nesting)", () => {
   });
 
   test("1.3 Render Array Node (Flat)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const arraySchema = await putSchema(store, {
       type: "array",
@@ -56,7 +56,7 @@ describe("Suite 1: Basic Rendering (No Nesting)", () => {
   });
 
   test("1.4 Render with resolution=0 (Force Reference)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const textSchema = await putSchema(store, { type: "string" });
     const hash = await store.put(textSchema, "hello");
@@ -67,7 +67,7 @@ describe("Suite 1: Basic Rendering (No Nesting)", () => {
   });
 
   test("1.5 Render Non-existent Hash Throws Error", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const fakeHash = "ZZZZZZZZZZZZZ" as Hash;
 
     // Non-existent root node should throw
@@ -79,7 +79,7 @@ describe("Suite 1: Basic Rendering (No Nesting)", () => {
 
 describe("Suite 2: Resolution Decay Model", () => {
   test("2.1 Single-level Nesting with Default Decay", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const childSchema = await putSchema(store, {
@@ -115,7 +115,7 @@ describe("Suite 2: Resolution Decay Model", () => {
   });
 
   test("2.2 Multi-level Nesting Reaches Epsilon", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const leafSchema = await putSchema(store, {
@@ -151,7 +151,7 @@ describe("Suite 2: Resolution Decay Model", () => {
   });
 
   test("2.3 High Decay (Quick Cutoff)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
@@ -189,7 +189,7 @@ describe("Suite 2: Resolution Decay Model", () => {
   });
 
   test("2.4 Low Decay (Deep Expansion)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
@@ -224,7 +224,7 @@ describe("Suite 2: Resolution Decay Model", () => {
   });
 
   test("2.5 Starting Resolution Below 1.0", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
@@ -262,7 +262,7 @@ describe("Suite 2: Resolution Decay Model", () => {
 
 describe("Suite 3: Complex Graph Structures", () => {
   test("3.1 Multiple Child References", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const itemSchema = await putSchema(store, {
@@ -301,7 +301,7 @@ describe("Suite 3: Complex Graph Structures", () => {
   });
 
   test("3.2 Object with Multiple ocas_ref Fields", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const childSchema = await putSchema(store, {
@@ -340,7 +340,7 @@ describe("Suite 3: Complex Graph Structures", () => {
   });
 
   test("3.3 Cycle Detection", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
@@ -372,7 +372,7 @@ describe("Suite 3: Complex Graph Structures", () => {
   });
 
   test("3.4 DAG (Shared Descendant)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const leafSchema = await putSchema(store, {
@@ -423,7 +423,7 @@ describe("Suite 3: Complex Graph Structures", () => {
   });
 
   test("3.5 Deep Tree", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
@@ -464,7 +464,7 @@ describe("Suite 3: Complex Graph Structures", () => {
 
 describe("Suite 4: Epsilon Boundary Cases", () => {
   test("4.1 Resolution Exactly at Epsilon", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const textSchema = await putSchema(store, { type: "string" });
     const hash = await store.put(textSchema, "test");
@@ -479,7 +479,7 @@ describe("Suite 4: Epsilon Boundary Cases", () => {
   });
 
   test("4.2 Resolution Just Above Epsilon", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const textSchema = await putSchema(store, { type: "string" });
     const hash = await store.put(textSchema, "test");
@@ -494,7 +494,7 @@ describe("Suite 4: Epsilon Boundary Cases", () => {
   });
 
   test("4.3 Very Small Epsilon (Deep Expansion)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
@@ -529,7 +529,7 @@ describe("Suite 4: Epsilon Boundary Cases", () => {
   });
 
   test("4.4 Zero Epsilon (Never Prune)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
@@ -566,7 +566,7 @@ describe("Suite 4: Epsilon Boundary Cases", () => {
 
 describe("Suite 5: YAML Output Format", () => {
   test("5.1 Valid YAML Syntax", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const objSchema = await putSchema(store, {
       type: "object",
@@ -584,7 +584,7 @@ describe("Suite 5: YAML Output Format", () => {
   });
 
   test("5.2 Nested Object Indentation", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const nestedSchema = await putSchema(store, {
       type: "object",
@@ -610,7 +610,7 @@ describe("Suite 5: YAML Output Format", () => {
   });
 
   test("5.3 Array Rendering", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const arraySchema = await putSchema(store, {
       type: "array",
@@ -625,7 +625,7 @@ describe("Suite 5: YAML Output Format", () => {
   });
 
   test("5.4 CAS Reference in YAML", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const childSchema = await putSchema(store, {
@@ -655,7 +655,7 @@ describe("Suite 5: YAML Output Format", () => {
   });
 
   test("5.5 Special Characters Escaping", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const textSchema = await putSchema(store, { type: "string" });
     const hash = await store.put(textSchema, "line1\nline2: value");
@@ -667,7 +667,7 @@ describe("Suite 5: YAML Output Format", () => {
   });
 
   test("5.6 Null Handling", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const nullableSchema = await putSchema(store, {
       type: "object",
@@ -687,7 +687,7 @@ describe("Suite 5: YAML Output Format", () => {
 
 describe("Suite 6: Schema Integration", () => {
   test("6.1 Detect ocas_ref Fields via Schema", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const childSchema = await putSchema(store, {
@@ -716,7 +716,7 @@ describe("Suite 6: Schema Integration", () => {
   });
 
   test("6.2 Non-ocas_ref String Not Expanded", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const objSchema = await putSchema(store, {
       type: "object",
@@ -734,7 +734,7 @@ describe("Suite 6: Schema Integration", () => {
   });
 
   test("6.3 Array of ocas_ref", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const itemSchema = await putSchema(store, {
@@ -763,7 +763,7 @@ describe("Suite 6: Schema Integration", () => {
   });
 
   test("6.4 anyOf with ocas_ref (Nullable Reference)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const childSchema = await putSchema(store, {
@@ -794,7 +794,7 @@ describe("Suite 6: Schema Integration", () => {
   });
 
   test("6.5 Schema-less Node (Bootstrap Node)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const types = await bootstrap(store);
     const schemaHash = types["@ocas/schema"];
 
@@ -807,7 +807,7 @@ describe("Suite 6: Schema Integration", () => {
 
 describe("Suite 7: Error Handling", () => {
   test("7.1 Missing Referenced Node", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const parentSchema = await putSchema(store, {
@@ -826,21 +826,21 @@ describe("Suite 7: Error Handling", () => {
   });
 
   test("7.3 Invalid Resolution Parameter", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const fakeHash = "AAAAAAAAAAAAA" as Hash;
 
     expect(() => render(store, fakeHash, { resolution: -1 })).toThrow();
   });
 
   test("7.4 Invalid Decay Parameter", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const fakeHash = "AAAAAAAAAAAAA" as Hash;
 
     expect(() => render(store, fakeHash, { decay: 1.5 })).toThrow();
   });
 
   test("7.5 Invalid Epsilon Parameter", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const fakeHash = "AAAAAAAAAAAAA" as Hash;
 
     expect(() => render(store, fakeHash, { epsilon: -0.01 })).toThrow();
@@ -849,7 +849,7 @@ describe("Suite 7: Error Handling", () => {
 
 describe("Suite 8: Performance & Edge Cases", () => {
   test("8.1 Large Payload", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const arraySchema = await putSchema(store, {
       type: "array",
@@ -877,7 +877,7 @@ describe("Suite 8: Performance & Edge Cases", () => {
   });
 
   test("8.2 Wide Fan-out", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const itemSchema = await putSchema(store, {
@@ -909,7 +909,7 @@ describe("Suite 8: Performance & Edge Cases", () => {
   });
 
   test("8.3 Empty Payload", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const emptySchema = await putSchema(store, { type: "object" });
     const hash = await store.put(emptySchema, {});
@@ -920,7 +920,7 @@ describe("Suite 8: Performance & Edge Cases", () => {
   });
 
   test("8.4 Unicode in Payload", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const textSchema = await putSchema(store, {
       type: "object",
@@ -985,7 +985,7 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
   });
 
   test("9.5 Render with store expands ocas_ref fields", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     // Create a child node
@@ -1051,7 +1051,7 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
   });
 
   test("9.10 store present but schema missing — renders without ref expansion", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const unknownType = "ZZZZZZZZZZZZ0" as Hash;
     const output = renderDirect(unknownType, { key: "val" }, store, null);
@@ -1061,7 +1061,7 @@ describe("Suite 9: renderDirect (in-memory rendering)", () => {
 
 describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
   test("10.1 renderAsync() throws CasNodeNotFoundError for missing root hash", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
     const fakeHash = "AAAAAAAAAAAAA" as Hash;
 
@@ -1075,7 +1075,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
   });
 
   test("10.2 render() throws CasNodeNotFoundError for missing root hash", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const fakeHash = "ZZZZZZZZZZZZZ" as Hash;
 
     expect(() => render(store, fakeHash)).toThrow(CasNodeNotFoundError);
@@ -1084,7 +1084,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
   });
 
   test("10.3 renderDirect() does NOT throw for non-existent type hash", () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     const fakeTypeHash = "0000000000000" as Hash;
     const output = renderDirect(fakeTypeHash, { key: "value" }, store, null);
 
@@ -1092,7 +1092,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
   });
 
   test("10.4 Missing nested node renders as cas: reference (no error)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const parentSchema = await putSchema(store, {
@@ -1116,7 +1116,7 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
   });
 
   test("10.5 Resolution below epsilon renders as cas: reference (no error)", async () => {
-    const store = createMemoryStore();
+    const store = createMemoryStore().cas;
     await bootstrap(store);
 
     const nodeSchema = await putSchema(store, {
