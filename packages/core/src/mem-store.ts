@@ -3,15 +3,17 @@ import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import { createMemoryStore } from "./store.js";
 import type { CasNode, Hash, ListEntry, ListOptions } from "./types.js";
 
-/** In-memory store wrapper used by schema validation tests. */
+/** In-memory store wrapper used by schema validation tests. Wraps the
+ * `cas` sub-store of an `OcasStore` and exposes the legacy
+ * `BootstrapCapableStore` interface (async `put`, etc.). */
 export class MemStore implements BootstrapCapableStore {
-  readonly #inner: BootstrapCapableStore;
+  readonly #inner: ReturnType<typeof createMemoryStore>["cas"];
 
   constructor() {
-    this.#inner = createMemoryStore();
+    this.#inner = createMemoryStore().cas;
   }
 
-  put(typeHash: Hash, payload: unknown): Promise<Hash> {
+  async put(typeHash: Hash, payload: unknown): Promise<Hash> {
     return this.#inner.put(typeHash, payload);
   }
 
@@ -43,7 +45,7 @@ export class MemStore implements BootstrapCapableStore {
     this.#inner.delete(hash);
   }
 
-  [BOOTSTRAP_STORE](payload: unknown): Promise<Hash> {
+  async [BOOTSTRAP_STORE](payload: unknown): Promise<Hash> {
     return this.#inner[BOOTSTRAP_STORE](payload);
   }
 }

@@ -43,7 +43,7 @@ describe("registerOutputTemplates", () => {
 
   test("registers a template for every @ocas/output/* schema", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ocas-tmpl-"));
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     varStore = createVariableStore(join(tempDir, "vars.db"), store);
 
@@ -58,7 +58,7 @@ describe("registerOutputTemplates", () => {
 
   test("each template is retrievable via @ocas/template/text/<hash>", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ocas-tmpl-"));
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     const aliases = await bootstrap(store);
     varStore = createVariableStore(join(tempDir, "vars.db"), store);
 
@@ -84,7 +84,7 @@ describe("registerOutputTemplates", () => {
 
   test("is idempotent — safe to call multiple times", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ocas-tmpl-"));
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     varStore = createVariableStore(join(tempDir, "vars.db"), store);
 
@@ -96,7 +96,7 @@ describe("registerOutputTemplates", () => {
 
   test("@ocas/output/put template contains payload reference", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ocas-tmpl-"));
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     const aliases = await bootstrap(store);
     varStore = createVariableStore(join(tempDir, "vars.db"), store);
 

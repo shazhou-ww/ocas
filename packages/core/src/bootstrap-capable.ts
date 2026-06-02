@@ -4,7 +4,7 @@ import type { Hash, Store } from "./types.js";
 export const BOOTSTRAP_STORE = Symbol.for("@ocas/core/bootstrap-store");
 
 export type BootstrapCapableStore = Store & {
-  [BOOTSTRAP_STORE](payload: unknown): Promise<Hash>;
+  [BOOTSTRAP_STORE](payload: unknown): Hash | Promise<Hash>;
 };
 
 export function isBootstrapCapableStore(

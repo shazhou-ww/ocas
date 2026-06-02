@@ -28,7 +28,7 @@ describe("GC - Variable Model Refactoring", () => {
   });
 
   test("GC preserves variable-referenced nodes", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = { type: "object", properties: { name: { type: "string" } } };
     const schemaHash = await putSchema(store, schema);
@@ -52,7 +52,7 @@ describe("GC - Variable Model Refactoring", () => {
   });
 
   test("GC preserves nodes from variables with same name, different schemas", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = { type: "object", properties: { x: { type: "number" } } };
     const schemaB = { type: "object", properties: { y: { type: "string" } } };
@@ -80,7 +80,7 @@ describe("GC - Variable Model Refactoring", () => {
   });
 
   test("GC removes nodes after variable deletion", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schema = { type: "object", properties: { name: { type: "string" } } };
     const schemaHash = await putSchema(store, schema);
@@ -102,7 +102,7 @@ describe("GC - Variable Model Refactoring", () => {
   });
 
   test("GC is global across all variables", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
     const schemaA = { type: "object", properties: { x: { type: "number" } } };
     const schemaB = { type: "object", properties: { y: { type: "string" } } };
@@ -133,7 +133,7 @@ describe("GC - Variable Model Refactoring", () => {
   });
 
   test("GC integration with refactored variable store", async () => {
-    store = createMemoryStore();
+    store = createMemoryStore().cas;
     await bootstrap(store);
 
     const schemaA = { type: "object", properties: { x: { type: "number" } } };

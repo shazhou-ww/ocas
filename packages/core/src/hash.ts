@@ -49,6 +49,38 @@ async function getInstance(): Promise<XXHashAPI> {
 }
 
 /**
+ * Initialize the xxhash WASM instance. After this resolves, the synchronous
+ * hashing functions {@link computeHashSync} and {@link computeSelfHashSync}
+ * may be called.
+ */
+export async function initHasher(): Promise<void> {
+  await getInstance();
+}
+
+/**
+ * Synchronous variant of {@link computeHash}. Must only be called after
+ * {@link initHasher} has resolved at least once; throws otherwise.
+ */
+export function computeHashSync(typeHash: Hash, payload: unknown): Hash {
+  if (_instance === null) {
+    throw new Error("Hasher not initialised — call initHasher() first");
+  }
+  const input = concatBytes(asciiToBytes(typeHash), cborEncode(payload));
+  return u64ToCrockford(_instance.h64Raw(input));
+}
+
+/**
+ * Synchronous variant of {@link computeSelfHash}. Must only be called after
+ * {@link initHasher} has resolved at least once; throws otherwise.
+ */
+export function computeSelfHashSync(payload: unknown): Hash {
+  if (_instance === null) {
+    throw new Error("Hasher not initialised — call initHasher() first");
+  }
+  return u64ToCrockford(_instance.h64Raw(cborEncode(payload)));
+}
+
+/**
  * hash = XXH64(utf8(typeHash) ++ CBOR_deterministic(payload))
  * Used for all normal nodes.
  */

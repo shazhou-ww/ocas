@@ -51,7 +51,7 @@ export type ListEntry = {
  * Self-referencing nodes are created only via bootstrap().
  */
 export type Store = {
-  put(typeHash: Hash, payload: unknown): Promise<Hash>;
+  put(typeHash: Hash, payload: unknown): Hash | Promise<Hash>;
   get(hash: Hash): CasNode | null;
   has(hash: Hash): boolean;
   listByType(typeHash: Hash, options?: ListOptions): ListEntry[];
