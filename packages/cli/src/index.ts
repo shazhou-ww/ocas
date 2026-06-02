@@ -3,8 +3,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Hash, ListOptions, Store, TagOp } from "@ocas/core";
+import type { Hash, ListEntry, ListOptions, Store, TagOp } from "@ocas/core";
 import {
+  applyListOptions,
   CasNodeNotFoundError,
   computeHash,
   gc,
@@ -987,12 +988,59 @@ async function cmdGc(_args: string[]): Promise<void> {
 async function cmdList(_args: string[]): Promise<void> {
   const typeFlag = flags.type;
   if (typeof typeFlag !== "string")
-    die("Usage: ocas list --type <hash-or-name>");
+    die("Usage: ocas list --type <hash-or-name> [--tag <tag>...]");
   const opts = parseListOptions();
+  const tagFlags = flags.tag;
+  const tagArgs = Array.isArray(tagFlags)
+    ? tagFlags
+    : typeof tagFlags === "string"
+      ? [tagFlags]
+      : [];
   const store = await openStore();
   const typeHash = resolveHash(typeFlag, store);
-  const entries = store.cas.listByType(typeHash, opts);
-  await out(await wrapEnvelope(store, "@ocas/output/list", entries), store);
+
+  if (tagArgs.length === 0) {
+    const entries = store.cas.listByType(typeHash, opts);
+    await out(await wrapEnvelope(store, "@ocas/output/list", entries), store);
+    return;
+  }
+
+  const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+  if (deleteNames.length > 0) {
+    die("Error: Cannot use deletion syntax (:name) in list filters");
+  }
+
+  // Build per-tag-spec hash sets, then intersect.
+  const tagSpecs: string[] = [
+    ...Object.entries(tags).map(([k, v]) => `${k}=${v}`),
+    ...labels,
+  ];
+  let intersection: Set<Hash> | null = null;
+  for (const spec of tagSpecs) {
+    const hashes = store.tag.listByTag(spec);
+    const set = new Set<Hash>(hashes);
+    if (intersection === null) {
+      intersection = set;
+    } else {
+      const next = new Set<Hash>();
+      for (const h of intersection) {
+        if (set.has(h)) next.add(h);
+      }
+      intersection = next;
+    }
+    if (intersection.size === 0) break;
+  }
+
+  // Get all entries of the requested type (no limit/offset yet) and filter.
+  const allOfType = store.cas.listByType(typeHash, {
+    sort: opts.sort,
+    desc: opts.desc,
+  });
+  const filtered: ListEntry[] = allOfType.filter((e) =>
+    intersection!.has(e.hash),
+  );
+  const paged = applyListOptions(filtered, opts);
+  await out(await wrapEnvelope(store, "@ocas/output/list", paged), store);
 }
 
 async function cmdListMeta(_args: string[]): Promise<void> {
@@ -1035,7 +1083,7 @@ Commands:
   hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
-  list --type <hash-or-name>        List hashes for a type (value=string[])            (@ocas/output/list)
+  list --type <hash-or-name> [--tag <tag>...]  List hashes for a type, optionally filtered by tags    (@ocas/output/list)
   list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
   list-schema                       List all schema hashes (value=string[])           (@ocas/output/list-schema)
   tag <target> <tag>...             Apply tags/labels to a target                      (@ocas/output/tag)
