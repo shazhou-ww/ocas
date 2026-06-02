@@ -13,15 +13,23 @@ The Store is the abstract storage interface at the heart of OCAS. All operations
 
 ```typescript
 type Store = {
-  put(typeHash: Hash, payload: unknown): Promise<Hash>;
-  get(hash: Hash): CasNode | null;
-  has(hash: Hash): boolean;
-  listAll(): Hash[];
-  listByType(typeHash: Hash, options?: ListOptions): ListEntry[];
-  listMeta(options?: ListOptions): ListEntry[];
-  listSchemas(options?: ListOptions): ListEntry[];
+  cas: CasStore;
+  var: VarStore;
+  tag: TagStore;
 };
 ```
+
+### CasStore
+
+Content-addressed storage. Handles `put`, `get`, `has`, and list operations over CAS nodes.
+
+### VarStore
+
+Mutable name → hash bindings (variables). Replaces the old standalone `VariableStore`.
+
+### TagStore
+
+Tag-based grouping and querying of CAS nodes.
 
 ### ListOptions & ListEntry
 
@@ -43,16 +51,12 @@ When `limit` is `undefined`, all results are returned (no cap). The [[CLI]] defa
 
 In-memory `Map<Hash, CasNode>`. Used in tests and for ephemeral computation (e.g. computing a hash without persisting). Created via `createMemoryStore()`.
 
-### FsStore
+### FsStore (`@ocas/fs`)
 
-Filesystem-backed store (`@ocas/fs`). Nodes are serialized as CBOR files under a content-addressed directory tree. Created via `openStore(path)`, which:
+Filesystem-backed store. Nodes are serialized as CBOR files under a content-addressed directory tree. Created via `openStore(path)`, which:
 
 1. Creates the directory if it doesn't exist
 2. Runs [[Bootstrap]] automatically
 3. Returns a ready-to-use Store
 
 The default location is `~/.ocas`, configurable via `OCAS_HOME` environment variable or `--home` [[CLI]] flag.
-
-## VariableStore
-
-A companion store for [[Variable]] bindings, backed by SQLite. Created via `createVariableStore(dbPath, store)`. It sits alongside the CAS store — variables point into the CAS but live in their own database.
