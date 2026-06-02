@@ -6,7 +6,7 @@ CLI tool for ocas stores.
 
 `@ocas/cli` provides the `ocas` command for managing a filesystem-backed store: node CRUD, integrity checks, reference listing, graph walks, variables, and output templates. It uses `@ocas/fs` for persistence and `@ocas/core` for core operations.
 
-The store is **auto-created and bootstrapped** on first use, so there is no `init`/`bootstrap` command. Schemas are ordinary `@schema`-typed nodes — register one with `ocas put @schema file.json` and list them with `ocas list --type @schema`; there is no dedicated `schema` subcommand.
+The store is **auto-created and bootstrapped** on first use, so there is no `init`/`bootstrap` command. Schemas are ordinary `@ocas/schema`-typed nodes — register one with `ocas put @ocas/schema file.json` and list them with `ocas list --type @ocas/schema`; there is no dedicated `schema` subcommand.
 
 **Dependencies:** `@ocas/core`, `@ocas/fs`
 
@@ -86,8 +86,8 @@ raw, non-envelope text.
 ### Examples
 
 ```bash
-# Register a schema (schemas are plain @schema nodes) and store a payload
-ocas put @schema ./schemas/item.json
+# Register a schema (schemas are plain @ocas/schema nodes) and store a payload
+ocas put @ocas/schema ./schemas/item.json
 # → { "type": "...", "value": "0123456789ABC" }  (the schema's type hash)
 
 ocas put 0123456789ABC ./payloads/item.json
@@ -98,7 +98,7 @@ ocas verify <content-hash>
 ocas walk <content-hash> --format tree
 
 # List every registered schema, then extract the hashes with jq
-ocas list --type @schema | jq -r '.value[]'
+ocas list --type @ocas/schema | jq -r '.value[]'
 ```
 
 ### Pipe composition
@@ -108,13 +108,13 @@ Because every command shares the `{ type, value }` envelope, output composes dir
 
 ```bash
 # put emits a cas_ref hash envelope; render -p dereferences and renders the node
-ocas put @schema ./schemas/item.json | ocas render -p
+ocas put @ocas/schema ./schemas/item.json | ocas render -p
 
 # render gc statistics
 ocas gc | ocas render -p
 
 # render every schema referenced by a list result
-ocas list --type @schema | ocas render -p
+ocas list --type @ocas/schema | ocas render -p
 ```
 
 ### Variable names as hash arguments
