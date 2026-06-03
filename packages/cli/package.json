@@ -6,8 +6,8 @@
     "ocas": "dist/index.js"
   },
   "dependencies": {
-    "@ocas/core": "0.2.1",
-    "@ocas/fs": "0.2.1"
+    "@ocas/core": "workspace:*",
+    "@ocas/fs": "workspace:*"
   },
   "repository": {
     "type": "git",
