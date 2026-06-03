@@ -1,6 +1,16 @@
 {
   "name": "@ocas/fs",
   "version": "0.3.0",
+  "description": "Filesystem-backed CAS store with SQLite",
+  "keywords": [
+    "cas",
+    "filesystem",
+    "sqlite",
+    "storage"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

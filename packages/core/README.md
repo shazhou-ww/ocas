@@ -8,7 +8,7 @@ Core CAS engine — hashing, schema, store, verify, bootstrap.
 
 Other packages build on this layer: `@ocas/fs` provides persistence, and `@ocas/cli` exposes store operations on the command line.
 
-**Dependencies:** `ajv`, `cborg`, `xxhash-wasm`
+**Dependencies:** `ajv`, `cborg`, `liquidjs`, `xxhash-wasm`
 
 ## Installation
 
@@ -32,12 +32,7 @@ type CasNode<T = unknown> = {
   timestamp: number; // Unix epoch ms
 };
 
-type Store = {
-  put(typeHash: Hash, payload: unknown): Promise<Hash>;
-  get(hash: Hash): CasNode | null;
-  has(hash: Hash): boolean;
-  listByType(typeHash: Hash): Hash[];
-};
+type Store = { cas: CasStore; var: VarStore; tag: TagStore; };
 
 type JSONSchema = Record<string, unknown>;
 

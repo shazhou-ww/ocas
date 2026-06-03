@@ -1,6 +1,16 @@
 {
   "name": "@ocas/core",
   "version": "0.3.0",
+  "description": "Core CAS engine — hashing, schema, store, verify, bootstrap",
+  "keywords": [
+    "cas",
+    "content-addressing",
+    "json-schema",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

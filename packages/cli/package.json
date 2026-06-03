@@ -1,6 +1,15 @@
 {
   "name": "@ocas/cli",
   "version": "0.3.0",
+  "description": "CLI for OCAS content-addressed store",
+  "keywords": [
+    "cas",
+    "cli",
+    "content-addressing"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "type": "module",
   "bin": {
     "ocas": "dist/index.js"
