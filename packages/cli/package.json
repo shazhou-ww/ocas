@@ -5,10 +5,6 @@
   "bin": {
     "ocas": "src/index.ts"
   },
-  "scripts": {
-    "test": "bun test",
-    "prepublishOnly": "bash ../../scripts/check-workspace-deps.sh"
-  },
   "dependencies": {
     "@ocas/core": "workspace:*",
     "@ocas/fs": "workspace:*"
