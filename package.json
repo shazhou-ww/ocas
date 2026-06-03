@@ -1,14 +1,12 @@
 {
   "name": "@ocas/workspace",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "devDependencies": {
     "@shazhou/proman": "0.2.0",
     "@types/node": "^25.9.1",
     "tsx": "^4.22.4",
     "ulidx": "^2.4.1",
+    "vite": "^8.0.16",
     "vitest": "^4.1.8"
   },
   "scripts": {
@@ -24,5 +22,11 @@
   "homepage": "https://github.com/shazhou-ww/ocas",
   "bugs": {
     "url": "https://github.com/shazhou-ww/ocas/issues"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "better-sqlite3"
+    ]
   }
 }

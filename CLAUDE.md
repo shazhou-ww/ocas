@@ -14,20 +14,21 @@ Monorepo with 3 packages under `packages/`:
 
 ## Tech Stack
 
-- **Runtime:** Bun
+- **Runtime:** Node.js
 - **Language:** TypeScript (strict mode, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`)
-- **Build:** `tsc --build` (composite project references)
-- **Test:** `bun test`
+- **Build:** `tsc` (composite project references, sequential: core → fs → cli)
+- **Test:** Vitest (`npx vitest run`)
+- **Package Manager:** pnpm (workspace)
 - **Lint/Format:** Biome (`biome check .` / `biome format --write .`)
-- **Publish:** Changesets + `bun publish` → npmjs (`@ocas/*`)
+- **Publish:** Changesets + `pnpm publish` → npmjs (`@ocas/*`)
 
 ## Commands
 
 ```bash
-bun test          # Run all tests
-bun run build     # Build all packages
-bun run check     # Biome lint
-bun run format    # Biome format (auto-fix)
+pnpm run test     # Run all tests (vitest)
+pnpm run build    # Build all packages (tsc via proman)
+pnpm run check    # Biome lint
+pnpm run format   # Biome format (auto-fix)
 ```
 
 ## Code Conventions
@@ -72,7 +73,7 @@ bun run format    # Biome format (auto-fix)
 - **`bootstrap(store)`** synchronously writes builtin name → hash bindings into the unified store; called automatically by `openStore()`.
 - **`resolveHash(input, store)`** is the unified hash/name resolver in the CLI. If `input` matches the 13-char hash format it is returned as-is; otherwise `store.var` is queried by exact name. This means every CLI command that accepts a hash argument also accepts a variable name (schema names, user vars, etc.).
 - **Variable naming**: all names must follow `@scope/name` format (`@[a-zA-Z][a-zA-Z0-9]*/segments`). `@ocas/*` is reserved for builtins. The `@` prefix ensures names are visually distinct from hashes.
-- **`openStore()`** returns a unified `Store` with `cas`, `var`, and `tag` sub-stores, and bootstraps automatically. `@ocas/core` has zero `bun:sqlite` dependency.
+- **`openStore()`** returns a unified `Store` with `cas`, `var`, and `tag` sub-stores, and bootstraps automatically. `@ocas/core` has zero SQLite dependency.
 
 ### Internal Dependencies
 
@@ -91,9 +92,9 @@ This is resolved to real version numbers only during publishing (see below).
 
 ## Before Submitting
 
-1. `bun test` — all tests pass
-2. `bun run check` — no lint errors
-3. `bun run build` — builds cleanly
+1. `pnpm run test` — all tests pass
+2. `pnpm run check` — no lint errors
+3. `pnpm run build` — builds cleanly
 
 ## Release Process
 
@@ -133,12 +134,12 @@ One changeset can cover multiple packages.
 - **Precondition:** on `release/*` branch
 - **Steps:**
   1. Set version to `<version>-rc.N` (first time rc.1, increment on subsequent runs)
-  2. `bun install && bun run build && bun test && bun run check`
-  3. Publish: `bun publish --tag rc` (order: core → fs → cli)
+  2. `pnpm install && pnpm run build && pnpm run test && pnpm run check`
+  3. Publish: `pnpm publish --tag rc` (order: core → fs → cli)
   4. Commit + push
 - **Repeatable:** fix bugs → add new changesets on the release branch → rc.N+1
 - **Does NOT** consume changesets, does NOT write CHANGELOG
-- Install for testing: `bun add -g @ocas/cli@rc`
+- Install for testing: `pnpm add -g @ocas/cli@rc`
 
 ### Phase 3: Finalize (official release)
 
@@ -146,8 +147,8 @@ One changeset can cover multiple packages.
 - **Steps:**
   1. Consume all `.changeset/*.md` → write CHANGELOG entries (use `changeset version` or manual)
   2. Set final version `<version>` (remove `-rc.N`)
-  3. `bun install && bun run build && bun test && bun run check`
-  4. Publish: `bun publish --tag latest` (order: core → fs → cli)
+  3. `pnpm install && pnpm run build && pnpm run test && pnpm run check`
+  4. Publish: `pnpm publish --tag latest` (order: core → fs → cli)
   5. Git tag `v<version>`
   6. Merge back to `main` (CHANGELOG comes along)
   7. Restore `workspace:*` on `main`
@@ -156,6 +157,6 @@ One changeset can cover multiple packages.
 ### Key Rules
 
 - **Publish order** is always `@ocas/core` → `@ocas/fs` → `@ocas/cli`
-- **`workspace:*`** must be fixed before any publish — `bun publish` does NOT auto-replace them
+- **`workspace:*`** must be fixed before any publish — `pnpm publish` does NOT auto-replace them
 - **CHANGELOG** only contains official releases, never rc entries
 - **Changesets added on release branch** (bug fixes during rc) are consumed together at finalize
