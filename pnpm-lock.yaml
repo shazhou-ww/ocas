@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@shazhou/proman':
-        specifier: 0.2.0
-        version: 0.2.0(@types/node@25.9.1)(lightningcss@1.32.0)
+        specifier: 0.2.2
+        version: 0.2.2(@types/node@25.9.1)(lightningcss@1.32.0)
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
@@ -1005,8 +1005,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@shazhou/proman@0.2.0':
-    resolution: {integrity: sha512-VyvhBYtVI9Cd9CRF+WOwgxSQ5kVGPlGbBCJMERO+vkiHivrNStiqgyAysjGDf7zsJXvsaPO0ZQVOhk4TVaa/6A==}
+  '@shazhou/proman@0.2.2':
+    resolution: {integrity: sha512-3lrpiAm9Hz11L2l05mBGO2Vm0oQebSwuzkcWBn63OjdiOOPAW8ZbkT17ncbYCMOfruwsKSRiLJa7TTM7iB1Dsg==}
     hasBin: true
 
   '@standard-schema/spec@1.1.0':
@@ -2245,7 +2245,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.61.0':
     optional: true
 
-  '@shazhou/proman@0.2.0(@types/node@25.9.1)(lightningcss@1.32.0)':
+  '@shazhou/proman@0.2.2(@types/node@25.9.1)(lightningcss@1.32.0)':
     dependencies:
       '@biomejs/biome': 2.4.16
       typescript: 5.9.3
