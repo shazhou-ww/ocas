@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import type {
@@ -16,17 +16,25 @@ import type {
   VarStore,
 } from "@ocas/core";
 import {
+  addNameIndex,
   checkTagLabelConflict,
   extractSchema,
   MAX_HISTORY,
+  pushHistory,
+  removeNameIndex,
   SchemaMismatchError,
   VariableNotFoundError,
+  type VarRecord,
   validateName,
+  varKey,
+  cloneVarRecord,
 } from "@ocas/core";
 
 const DB_FILE = "_store.db";
+const VARS_FILE = "_vars.jsonl";
+const TAGS_FILE = "_tags.jsonl";
 
-function openDb(dir: string): InstanceType<typeof Database> {
+function openDb(dir: string): Database.Database {
   mkdirSync(dir, { recursive: true });
   const db = new Database(join(dir, DB_FILE));
   db.pragma("journal_mode = WAL");
@@ -34,7 +42,7 @@ function openDb(dir: string): InstanceType<typeof Database> {
   return db;
 }
 
-function initVarTables(db: InstanceType<typeof Database>): void {
+function initVarTables(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS vars (
       name     TEXT NOT NULL,
@@ -58,10 +66,11 @@ function initVarTables(db: InstanceType<typeof Database>): void {
     CREATE INDEX IF NOT EXISTS idx_vars_name ON vars(name);
     CREATE INDEX IF NOT EXISTS idx_vars_created ON vars(created);
     CREATE INDEX IF NOT EXISTS idx_vars_updated ON vars(updated);
+    CREATE INDEX IF NOT EXISTS idx_var_history_pos_desc ON var_history(name, schema, position DESC);
   `);
 }
 
-function initTagTables(db: InstanceType<typeof Database>): void {
+function initTagTables(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS tags (
       target   TEXT NOT NULL,
@@ -71,20 +80,167 @@ function initTagTables(db: InstanceType<typeof Database>): void {
       PRIMARY KEY (target, key)
     );
     CREATE INDEX IF NOT EXISTS idx_tags_key ON tags(key);
+    CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value);
   `);
 }
 
+// ── JSONL migration ──
+
+type StoredTag = {
+  key: string;
+  value: string | null;
+  target: Hash;
+  created: number;
+};
+
+function migrateJsonlVars(
+  db: Database.Database,
+  dir: string,
+  cas: CasStore,
+): void {
+  const path = join(dir, VARS_FILE);
+  if (!existsSync(path)) return;
+
+  const records = new Map<string, VarRecord>();
+  const byName = new Map<string, Set<string>>();
+
+  const content = readFileSync(path, "utf8");
+  for (const line of content.split("\n")) {
+    if (line.length === 0) continue;
+    try {
+      const rec = JSON.parse(line) as VarRecord & { __op?: string };
+      if (rec.__op === "remove") {
+        const k = varKey(rec.name, rec.schema);
+        records.delete(k);
+        removeNameIndex(byName, rec.name, k);
+      } else {
+        const k = varKey(rec.name, rec.schema);
+        records.set(k, rec);
+        addNameIndex(byName, rec.name, k);
+      }
+    } catch {
+      // skip malformed
+    }
+  }
+
+  if (records.size === 0) return;
+
+  const insertVar = db.prepare(`
+    INSERT OR REPLACE INTO vars (name, schema, value, created, updated, tags, labels)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertHistory = db.prepare(`
+    INSERT OR REPLACE INTO var_history (name, schema, value, position, set_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  const migrate = db.transaction(() => {
+    for (const rec of records.values()) {
+      insertVar.run(
+        rec.name,
+        rec.schema,
+        rec.value,
+        rec.created,
+        rec.updated,
+        JSON.stringify(rec.tags),
+        JSON.stringify(rec.labels),
+      );
+      for (const h of rec.history) {
+        insertHistory.run(rec.name, rec.schema, h.value, h.position, h.setAt);
+      }
+    }
+  });
+  migrate();
+}
+
+function migrateJsonlTags(db: Database.Database, dir: string): void {
+  const path = join(dir, TAGS_FILE);
+  if (!existsSync(path)) return;
+
+  const byTarget = new Map<Hash, Map<string, Tag>>();
+
+  const content = readFileSync(path, "utf8");
+  for (const line of content.split("\n")) {
+    if (line.length === 0) continue;
+    try {
+      const ent = JSON.parse(line) as
+        | (StoredTag & { __op?: "set" | "untag" })
+        | { __op: "untag"; target: Hash; key: string };
+      if ((ent as { __op?: string }).__op === "untag") {
+        const e = ent as { target: Hash; key: string };
+        const tm = byTarget.get(e.target);
+        if (tm) {
+          tm.delete(e.key);
+          if (tm.size === 0) byTarget.delete(e.target);
+        }
+      } else {
+        const t = ent as StoredTag;
+        let tm = byTarget.get(t.target);
+        if (!tm) {
+          tm = new Map();
+          byTarget.set(t.target, tm);
+        }
+        tm.set(t.key, {
+          key: t.key,
+          value: t.value,
+          target: t.target,
+          created: t.created,
+        });
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  if (byTarget.size === 0) return;
+
+  const insertTag = db.prepare(`
+    INSERT OR REPLACE INTO tags (target, key, value, created)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  const migrate = db.transaction(() => {
+    for (const tm of byTarget.values()) {
+      for (const tag of tm.values()) {
+        insertTag.run(tag.target, tag.key, tag.value, tag.created);
+      }
+    }
+  });
+  migrate();
+}
+
+// ── Row helpers ──
+
 function toVariable(row: Record<string, unknown>): Variable {
   return {
-    name: row["name"] as string,
-    schema: row["schema"] as Hash,
-    value: row["value"] as Hash,
-    created: row["created"] as number,
-    updated: row["updated"] as number,
-    tags: JSON.parse(row["tags"] as string) as Record<string, string>,
-    labels: JSON.parse(row["labels"] as string) as string[],
+    name: row.name as string,
+    schema: row.schema as Hash,
+    value: row.value as Hash,
+    created: row.created as number,
+    updated: row.updated as number,
+    tags: JSON.parse(row.tags as string) as Record<string, string>,
+    labels: JSON.parse(row.labels as string) as string[],
   };
 }
+
+function toHistoryEntry(r: Record<string, unknown>): HistoryEntry {
+  return {
+    value: r.value as Hash,
+    position: r.position as number,
+    setAt: r.set_at as number,
+  };
+}
+
+function toTag(r: Record<string, unknown>, target: Hash): Tag {
+  return {
+    key: r.key as string,
+    value: r.value as string | null,
+    target,
+    created: r.created as number,
+  };
+}
+
+// ── Main factory ──
 
 export function createSqliteVarStore(
   dir: string,
@@ -93,6 +249,12 @@ export function createSqliteVarStore(
   const db = openDb(dir);
   initVarTables(db);
   initTagTables(db);
+
+  // Migrate JSONL if present (one-time, idempotent)
+  migrateJsonlVars(db, dir, cas);
+  migrateJsonlTags(db, dir);
+
+  let closed = false;
 
   // ── Prepared statements (var) ──
   const stmtGetVar = db.prepare(
@@ -121,14 +283,11 @@ export function createSqliteVarStore(
   const stmtMaxPosition = db.prepare(
     "SELECT MAX(position) as max_pos FROM var_history WHERE name = ? AND schema = ?",
   );
-  const stmtTruncateHistory = db.prepare(
-    "DELETE FROM var_history WHERE name = ? AND schema = ? AND position < (SELECT MAX(position) - ? + 1 FROM var_history WHERE name = ? AND schema = ?)",
+  const stmtDeleteOldHistory = db.prepare(
+    "DELETE FROM var_history WHERE name = ? AND schema = ? AND position NOT IN (SELECT position FROM var_history WHERE name = ? AND schema = ? ORDER BY position DESC LIMIT ?)",
   );
 
   // ── Prepared statements (tag) ──
-  const stmtGetTag = db.prepare(
-    "SELECT * FROM tags WHERE target = ? AND key = ?",
-  );
   const stmtUpsertTag = db.prepare(`
     INSERT INTO tags (target, key, value, created) VALUES (?, ?, ?, ?)
     ON CONFLICT(target, key) DO UPDATE SET value = excluded.value
@@ -139,10 +298,65 @@ export function createSqliteVarStore(
   const stmtGetTagsByTarget = db.prepare(
     "SELECT * FROM tags WHERE target = ? ORDER BY key",
   );
-  const stmtGetTagsByKey = db.prepare("SELECT * FROM tags WHERE key = ?");
-  const stmtGetTagsByKeyValue = db.prepare(
-    "SELECT * FROM tags WHERE key = ? AND value = ?",
+  const stmtGetTagsByKey = db.prepare(
+    "SELECT target, key, value, created FROM tags WHERE key = ? ORDER BY created ASC",
   );
+  const stmtGetTagsByKeyValue = db.prepare(
+    "SELECT target, key, value, created FROM tags WHERE key = ? AND value = ? ORDER BY created ASC",
+  );
+
+  // ── Transactional helpers ──
+
+  const txnSetVar = db.transaction(
+    (
+      name: string,
+      schema: Hash,
+      hash: Hash,
+      now: number,
+      tagsJson: string,
+      labelsJson: string,
+      isNew: boolean,
+      valueChanged: boolean,
+    ) => {
+      if (isNew) {
+        stmtInsertVar.run(name, schema, hash, now, now, tagsJson, labelsJson);
+        stmtInsertHistory.run(name, schema, hash, 0, now);
+      } else if (valueChanged) {
+        const maxRow = stmtMaxPosition.get(name, schema) as {
+          max_pos: number | null;
+        };
+        const nextPos = (maxRow.max_pos ?? -1) + 1;
+        stmtInsertHistory.run(name, schema, hash, nextPos, now);
+        stmtDeleteOldHistory.run(name, schema, name, schema, MAX_HISTORY);
+        stmtUpdateVar.run(hash, now, tagsJson, labelsJson, name, schema);
+      } else {
+        stmtUpdateVar.run(hash, now, tagsJson, labelsJson, name, schema);
+      }
+    },
+  );
+
+  const txnTagOps = db.transaction(
+    (target: Hash, operations: TagOp[], now: number) => {
+      for (const op of operations) {
+        if (op.op === "set") {
+          // Use ON CONFLICT to preserve created time — but we need existing created
+          const existing = db
+            .prepare("SELECT created FROM tags WHERE target = ? AND key = ?")
+            .get(target, op.key) as { created: number } | undefined;
+          const created = existing?.created ?? now;
+          stmtUpsertTag.run(target, op.key, op.value ?? null, created);
+        } else {
+          stmtDeleteTag.run(target, op.key);
+        }
+      }
+    },
+  );
+
+  const txnUntag = db.transaction((target: Hash, keys: string[]) => {
+    for (const k of keys) {
+      stmtDeleteTag.run(target, k);
+    }
+  });
 
   // ── VarStore implementation ──
   const varStore: VarStore = {
@@ -160,30 +374,20 @@ export function createSqliteVarStore(
         const labels = options?.labels ?? v.labels;
         if (options !== undefined) checkTagLabelConflict(tags, labels);
 
-        // Check if value changed
-        if (v.value !== hash) {
-          const maxRow = stmtMaxPosition.get(name, schema) as {
-            max_pos: number | null;
-          };
-          const nextPos = (maxRow.max_pos ?? -1) + 1;
-          stmtInsertHistory.run(name, schema, hash, nextPos, now);
-          stmtTruncateHistory.run(name, schema, MAX_HISTORY, name, schema);
-          stmtUpdateVar.run(
+        const valueChanged = v.value !== hash;
+        const newTags = options !== undefined ? tags : v.tags;
+        const newLabels = options !== undefined ? labels : v.labels;
+
+        if (valueChanged || options !== undefined) {
+          txnSetVar(
+            name,
+            schema,
             hash,
-            now,
-            JSON.stringify(options !== undefined ? tags : v.tags),
-            JSON.stringify(options !== undefined ? labels : v.labels),
-            name,
-            schema,
-          );
-        } else if (options !== undefined) {
-          stmtUpdateVar.run(
-            v.value,
-            v.updated,
-            JSON.stringify(tags),
-            JSON.stringify(labels),
-            name,
-            schema,
+            valueChanged ? now : v.updated,
+            JSON.stringify(newTags),
+            JSON.stringify(newLabels),
+            false,
+            valueChanged,
           );
         }
 
@@ -192,9 +396,9 @@ export function createSqliteVarStore(
           schema,
           value: hash,
           created: v.created,
-          updated: v.value !== hash ? now : v.updated,
-          tags: options !== undefined ? { ...tags } : { ...v.tags },
-          labels: options !== undefined ? [...labels] : [...v.labels],
+          updated: valueChanged ? now : v.updated,
+          tags: { ...newTags },
+          labels: [...newLabels],
         };
       }
 
@@ -202,16 +406,16 @@ export function createSqliteVarStore(
       const tags = options?.tags ?? {};
       const labels = options?.labels ?? [];
       checkTagLabelConflict(tags, labels);
-      stmtInsertVar.run(
+      txnSetVar(
         name,
         schema,
         hash,
         now,
-        now,
         JSON.stringify(tags),
         JSON.stringify(labels),
+        true,
+        false,
       );
-      stmtInsertHistory.run(name, schema, hash, 0, now);
       return {
         name,
         schema,
@@ -262,7 +466,6 @@ export function createSqliteVarStore(
         | Record<string, unknown>
         | undefined;
       if (!existing) {
-        // Schema mismatch
         const first = toVariable(rows[0]!);
         throw new SchemaMismatchError(first.schema, newSchema);
       }
@@ -273,29 +476,20 @@ export function createSqliteVarStore(
       const labels = options?.labels ?? v.labels;
       if (options !== undefined) checkTagLabelConflict(tags, labels);
 
-      if (v.value !== hash) {
-        const maxRow = stmtMaxPosition.get(name, newSchema) as {
-          max_pos: number | null;
-        };
-        const nextPos = (maxRow.max_pos ?? -1) + 1;
-        stmtInsertHistory.run(name, newSchema, hash, nextPos, now);
-        stmtTruncateHistory.run(name, newSchema, MAX_HISTORY, name, newSchema);
-        stmtUpdateVar.run(
+      const valueChanged = v.value !== hash;
+      const newTags = options !== undefined ? tags : v.tags;
+      const newLabels = options !== undefined ? labels : v.labels;
+
+      if (valueChanged || options !== undefined) {
+        txnSetVar(
+          name,
+          newSchema,
           hash,
-          now,
-          JSON.stringify(options !== undefined ? tags : v.tags),
-          JSON.stringify(options !== undefined ? labels : v.labels),
-          name,
-          newSchema,
-        );
-      } else if (options !== undefined) {
-        stmtUpdateVar.run(
-          v.value,
-          v.updated,
-          JSON.stringify(tags),
-          JSON.stringify(labels),
-          name,
-          newSchema,
+          valueChanged ? now : v.updated,
+          JSON.stringify(newTags),
+          JSON.stringify(newLabels),
+          false,
+          valueChanged,
         );
       }
 
@@ -304,9 +498,9 @@ export function createSqliteVarStore(
         schema: newSchema,
         value: hash,
         created: v.created,
-        updated: v.value !== hash ? now : v.updated,
-        tags: options !== undefined ? { ...tags } : { ...v.tags },
-        labels: options !== undefined ? [...labels] : [...v.labels],
+        updated: valueChanged ? now : v.updated,
+        tags: { ...newTags },
+        labels: [...newLabels],
       };
     },
 
@@ -332,9 +526,9 @@ export function createSqliteVarStore(
         params.push(options.exactName);
       }
       if (options?.namePrefix !== undefined) {
-        conditions.push("name LIKE ?");
-        // Escape % and _ in the prefix for LIKE
+        conditions.push("name LIKE ? ESCAPE '\\'");
         const escaped = options.namePrefix
+          .replace(/\\/g, "\\\\")
           .replace(/%/g, "\\%")
           .replace(/_/g, "\\_");
         params.push(`${escaped}%`);
@@ -344,18 +538,10 @@ export function createSqliteVarStore(
         params.push(options.schema);
       }
 
-      const sortCol =
-        options?.sort === "updated" ? "updated" : "created";
+      const sortCol = options?.sort === "updated" ? "updated" : "created";
       const sortDir = options?.desc ? "DESC" : "ASC";
       const where =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-      let sql = `SELECT * FROM vars ${where} ORDER BY ${sortCol} ${sortDir}, name ASC`;
-      if (limit !== undefined || (options?.offset ?? 0) > 0) {
-        sql += ` LIMIT ${limit ?? -1} OFFSET ${options?.offset ?? 0}`;
-      }
-
-      const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
 
       // Post-filter by tags and labels (stored as JSON)
       const filterTags = options?.tags ?? {};
@@ -363,9 +549,23 @@ export function createSqliteVarStore(
       const needsPostFilter =
         Object.keys(filterTags).length > 0 || filterLabels.length > 0;
 
+      // When post-filtering, fetch all matching rows (no SQL LIMIT)
+      // then apply limit/offset after filtering
+      let sql: string;
+      if (needsPostFilter) {
+        sql = `SELECT * FROM vars ${where} ORDER BY ${sortCol} ${sortDir}, name ASC`;
+      } else {
+        sql = `SELECT * FROM vars ${where} ORDER BY ${sortCol} ${sortDir}, name ASC`;
+        if (limit !== undefined || (options?.offset ?? 0) > 0) {
+          sql += ` LIMIT ${limit ?? -1} OFFSET ${options?.offset ?? 0}`;
+        }
+      }
+
+      const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
+
       if (!needsPostFilter) return rows.map(toVariable);
 
-      const results: Variable[] = [];
+      let results: Variable[] = [];
       for (const row of rows) {
         const v = toVariable(row);
         let ok = true;
@@ -384,37 +584,35 @@ export function createSqliteVarStore(
         }
         if (ok) results.push(v);
       }
+
+      // Apply limit/offset after post-filter
+      const offset = options?.offset ?? 0;
+      if (offset > 0) results = results.slice(offset);
+      if (limit !== undefined) results = results.slice(0, limit);
+
       return results;
     },
 
     history(name: string, schema?: Hash): HistoryEntry[] {
       if (schema !== undefined) {
-        const rows = stmtGetHistory.all(name, schema) as Record<
-          string,
-          unknown
-        >[];
-        return rows.map((r) => ({
-          value: r["value"] as Hash,
-          position: r["position"] as number,
-          setAt: r["set_at"] as number,
-        }));
+        return (
+          stmtGetHistory.all(name, schema) as Record<string, unknown>[]
+        ).map(toHistoryEntry);
       }
-      // No schema: if exactly one variant, return its history
       const vars = stmtGetByName.all(name) as Record<string, unknown>[];
       if (vars.length !== 1) return [];
       const v = vars[0]!;
-      const rows = stmtGetHistory.all(
-        v["name"] as string,
-        v["schema"] as string,
-      ) as Record<string, unknown>[];
-      return rows.map((r) => ({
-        value: r["value"] as Hash,
-        position: r["position"] as number,
-        setAt: r["set_at"] as number,
-      }));
+      return (
+        stmtGetHistory.all(v.name as string, v.schema as string) as Record<
+          string,
+          unknown
+        >[]
+      ).map(toHistoryEntry);
     },
 
     close(): void {
+      if (closed) return;
+      closed = true;
       db.close();
     },
   };
@@ -423,46 +621,20 @@ export function createSqliteVarStore(
   const tagStore: TagStore = {
     tag(target: Hash, operations: TagOp[]): Tag[] {
       const now = Date.now();
-      for (const op of operations) {
-        if (op.op === "set") {
-          const existing = stmtGetTag.get(target, op.key) as
-            | Record<string, unknown>
-            | undefined;
-          const created = (existing?.["created"] as number) ?? now;
-          stmtUpsertTag.run(target, op.key, op.value ?? null, created);
-        } else {
-          stmtDeleteTag.run(target, op.key);
-        }
-      }
-      const rows = stmtGetTagsByTarget.all(target) as Record<
-        string,
-        unknown
-      >[];
-      return rows.map((r) => ({
-        key: r["key"] as string,
-        value: r["value"] as string | null,
-        target,
-        created: r["created"] as number,
-      }));
+      txnTagOps(target, operations, now);
+      return (
+        stmtGetTagsByTarget.all(target) as Record<string, unknown>[]
+      ).map((r) => toTag(r, target));
     },
 
     untag(target: Hash, keys: string[]): void {
-      for (const k of keys) {
-        stmtDeleteTag.run(target, k);
-      }
+      txnUntag(target, keys);
     },
 
     tags(target: Hash): Tag[] {
-      const rows = stmtGetTagsByTarget.all(target) as Record<
-        string,
-        unknown
-      >[];
-      return rows.map((r) => ({
-        key: r["key"] as string,
-        value: r["value"] as string | null,
-        target,
-        created: r["created"] as number,
-      }));
+      return (
+        stmtGetTagsByTarget.all(target) as Record<string, unknown>[]
+      ).map((r) => toTag(r, target));
     },
 
     listByTag(tag: string, options?: ListOptions): Hash[] {
@@ -474,38 +646,36 @@ export function createSqliteVarStore(
         value = tag.slice(eqIdx + 1);
       }
 
-      const rows = (
-        value !== undefined
-          ? stmtGetTagsByKeyValue.all(key, value)
-          : stmtGetTagsByKey.all(key)
-      ) as Record<string, unknown>[];
-
-      let entries: ListEntry[] = rows.map((r) => ({
-        hash: r["target"] as Hash,
-        created: r["created"] as number,
-        updated: r["created"] as number,
-      }));
-
-      // Apply sort/limit/offset from ListOptions
-      const sort = options?.sort ?? "created";
-      const desc = options?.desc ?? false;
-      entries.sort((a, b) => {
-        const av = sort === "updated" ? a.updated : a.created;
-        const bv = sort === "updated" ? b.updated : b.created;
-        return desc ? bv - av : av - bv;
-      });
+      // Build SQL with sort/limit/offset pushed down
+      const sortCol = "created"; // tags only have created
+      const sortDir = options?.desc ? "DESC" : "ASC";
       const offset = options?.offset ?? 0;
-      if (offset > 0) entries = entries.slice(offset);
       const limit = options?.limit;
-      if (limit !== undefined) entries = entries.slice(0, limit);
 
-      return entries.map((e) => e.hash);
+      let sql: string;
+      const params: unknown[] = [key];
+      if (value !== undefined) {
+        sql = `SELECT target FROM tags WHERE key = ? AND value = ? ORDER BY ${sortCol} ${sortDir}`;
+        params.push(value);
+      } else {
+        sql = `SELECT target FROM tags WHERE key = ? ORDER BY ${sortCol} ${sortDir}`;
+      }
+      if (limit !== undefined || offset > 0) {
+        sql += ` LIMIT ${limit ?? -1} OFFSET ${offset}`;
+      }
+
+      const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
+      return rows.map((r) => r.target as Hash);
     },
   };
 
   return {
     var: varStore,
     tag: tagStore,
-    close: () => db.close(),
+    close: () => {
+      if (closed) return;
+      closed = true;
+      db.close();
+    },
   };
 }
