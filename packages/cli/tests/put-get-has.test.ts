@@ -1,10 +1,11 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { envValue, stripVolatile } from "./helpers";
 
-const entrypoint = resolve(import.meta.dir, "../src/index.ts");
+const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
 
 let tmpStore: string;
 let typeHash: string;
@@ -41,17 +42,19 @@ afterAll(() => {
   rmSync(tmpStore, { recursive: true, force: true });
 });
 
-async function runCli(
+function runCli(
   args: string[],
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const exitCode = await proc.exited;
-  const stdout = (await new Response(proc.stdout).text()).trim();
-  const stderr = (await new Response(proc.stderr).text()).trim();
-  return { stdout, stderr, exitCode };
+): { stdout: string; stderr: string; exitCode: number } {
+  try {
+    const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+  } catch (e: unknown) {
+    const err = e as { stdout?: string; stderr?: string; status?: number };
+    return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+  }
 }
 
 describe("Phase 1: CAS Core", () => {

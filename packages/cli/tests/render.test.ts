@@ -1,12 +1,13 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { bootstrap } from "@ocas/core";
 import { openStore as openFsStore } from "@ocas/fs";
 import { envValue, putSchemaFile, runCli, runCliWithStdin } from "./helpers";
 
-const entrypoint = resolve(import.meta.dir, "../src/index.ts");
+const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
 
 // --- Standalone render tests from cli.test.ts ---
 
@@ -57,34 +58,34 @@ describe("Phase 5: Render", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  async function runCliE2e(
-    args: string[],
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const exitCode = await proc.exited;
-    const stdout = (await new Response(proc.stdout).text()).trim();
-    const stderr = (await new Response(proc.stderr).text()).trim();
-    return { stdout, stderr, exitCode };
+  function runCliE2e(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+    try {
+      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+      return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string; status?: number };
+      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    }
   }
 
   async function _runCliE2eWithStdin(
     args: string[],
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    proc.stdin.write(stdin);
-    proc.stdin.end();
-    const exitCode = await proc.exited;
-    const stdout = (await new Response(proc.stdout).text()).trim();
-    const stderr = (await new Response(proc.stderr).text()).trim();
-    return { stdout, stderr, exitCode };
+    try {
+      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+        input: stdin,
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+      return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string; status?: number };
+      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    }
   }
 
   beforeAll(async () => {

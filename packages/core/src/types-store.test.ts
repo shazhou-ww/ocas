@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
@@ -134,7 +134,7 @@ describe("Aggregate Store type", () => {
 
 describe("source convention", () => {
   test("types.ts uses 'type' not 'interface' for new types", () => {
-    const src = readFileSync(join(import.meta.dir, "types.ts"), "utf8");
+    const src = readFileSync(join(import.meta.dirname, "types.ts"), "utf8");
     for (const name of ["CasStore", "VarStore", "TagStore"]) {
       expect(src).toMatch(new RegExp(`export\\s+type\\s+${name}\\b`));
       expect(src).not.toMatch(new RegExp(`interface\\s+${name}\\b`));

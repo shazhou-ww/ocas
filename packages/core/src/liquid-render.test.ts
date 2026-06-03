@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { bootstrap } from "./bootstrap.js";
 import { renderWithTemplate } from "./liquid-render.js";
 import { putSchema } from "./schema.js";

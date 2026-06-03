@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { envValue, putSchemaFile, runCli } from "./helpers";
@@ -559,7 +560,7 @@ describe("Phase 2: Schema Validation", () => {
   let typeHash: string;
   let _nodeHash: string;
 
-  const entrypoint = resolve(import.meta.dir, "../src/index.ts");
+  const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
 
   beforeAll(async () => {
     tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
@@ -581,12 +582,10 @@ describe("Phase 2: Schema Validation", () => {
 
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "put", typeHash, nodeFile],
-      { stdout: "pipe", stderr: "pipe" },
-    );
-    await proc.exited;
-    const stdout = (await new Response(proc.stdout).text()).trim();
+    const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, "put", typeHash, nodeFile], {
+      encoding: "utf-8",
+      timeout: 10000,
+    }).trim();
     _nodeHash = envValue(stdout) as string;
   });
 
@@ -597,13 +596,18 @@ describe("Phase 2: Schema Validation", () => {
   test("2.1 put {name:123} against string-schema fails with non-zero exit", async () => {
     const badFile = join(tmpStore, "bad-node.json");
     writeFileSync(badFile, JSON.stringify({ name: 123 }));
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "put", typeHash, badFile],
-      { stdout: "pipe", stderr: "pipe" },
-    );
-    const exitCode = await proc.exited;
-    const stdout = (await new Response(proc.stdout).text()).trim();
-    const stderr = (await new Response(proc.stderr).text()).trim();
+    let stdout = "", stderr = "", exitCode = 0;
+    try {
+      stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, "put", typeHash, badFile], {
+        encoding: "utf-8",
+        timeout: 10000,
+      }).trim();
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string; status?: number };
+      stdout = (err.stdout ?? "").trim();
+      stderr = (err.stderr ?? "").trim();
+      exitCode = err.status ?? 1;
+    }
     expect(exitCode).not.toBe(0);
     expect(stdout).toBe("");
     expect(stderr).toContain("Validation failed");
@@ -612,12 +616,17 @@ describe("Phase 2: Schema Validation", () => {
 
   test("2.3 put against non-existent schema hash fails", async () => {
     const nodeFile = join(tmpStore, "test-node.json");
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", tmpStore, "put", "AAAAAAAAAAAAA", nodeFile],
-      { stdout: "pipe", stderr: "pipe" },
-    );
-    const exitCode = await proc.exited;
-    const stderr = (await new Response(proc.stderr).text()).trim();
+    let exitCode = 0, stderr = "";
+    try {
+      execFileSync("tsx", [entrypoint, "--home", tmpStore, "put", "AAAAAAAAAAAAA", nodeFile], {
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+    } catch (e: unknown) {
+      const err = e as { stderr?: string; status?: number };
+      stderr = (err.stderr ?? "").trim();
+      exitCode = err.status ?? 1;
+    }
     expect(exitCode).not.toBe(0);
     expect(stderr).toMatchSnapshot();
   });

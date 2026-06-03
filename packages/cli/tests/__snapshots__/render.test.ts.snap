@@ -1,4 +1,4 @@
-// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Phase 5: Render 5.1 render fills payload variables 1`] = `"Hello Alice!"`;
 

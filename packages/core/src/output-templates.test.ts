@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { bootstrap } from "./bootstrap.js";
 import { registerOutputTemplates } from "./output-templates.js";
 import { createMemoryStore } from "./store.js";

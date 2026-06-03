@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import type { Hash, ListEntry, ListOptions, Store, TagOp } from "@ocas/core";
 import {
   applyListOptions,
@@ -91,7 +94,7 @@ const { flags, positional } = parseArgs(process.argv.slice(2));
 
 // --- Handle --version early ---
 if (flags.version === true) {
-  const pkgPath = join(import.meta.dirname, "..", "package.json");
+  const pkgPath = join(__dirname, "..", "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
   process.stdout.write(`${pkg.version}\n`);
   process.exit(0);
@@ -1033,8 +1036,8 @@ async function cmdList(_args: string[]): Promise<void> {
 
   // Get all entries of the requested type (no limit/offset yet) and filter.
   const allOfType = store.cas.listByType(typeHash, {
-    ...(opts.sort !== undefined && { sort: opts.sort }),
-    ...(opts.desc !== undefined && { desc: opts.desc }),
+    ...(opts.sort !== undefined ? { sort: opts.sort } : {}),
+    ...(opts.desc !== undefined ? { desc: opts.desc } : {}),
   });
   const filtered: ListEntry[] = allOfType.filter((e) =>
     intersection!.has(e.hash),
@@ -1064,7 +1067,7 @@ async function cmdListSchema(_args: string[]): Promise<void> {
 }
 
 function printUsage(): void {
-  const pkgPath = join(import.meta.dirname, "..", "package.json");
+  const pkgPath = join(__dirname, "..", "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
   console.log(`\
 Usage: ocas [--home <path>] [--json] <command> [args]
@@ -1230,7 +1233,7 @@ switch (cmd) {
     switch (sub) {
       case "usage": {
         const content = readFileSync(
-          join(import.meta.dirname, "..", "prompts", "usage.md"),
+          join(__dirname, "prompts", "usage.md"),
           "utf-8",
         );
         process.stdout.write(content);
@@ -1238,7 +1241,7 @@ switch (cmd) {
       }
       case "setup": {
         const content = readFileSync(
-          join(import.meta.dirname, "..", "prompts", "setup.md"),
+          join(__dirname, "prompts", "setup.md"),
           "utf-8",
         );
         process.stdout.write(content);

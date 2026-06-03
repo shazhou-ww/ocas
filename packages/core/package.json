@@ -28,5 +28,8 @@
   "homepage": "https://github.com/shazhou-ww/ocas/tree/main/packages/core",
   "bugs": {
     "url": "https://github.com/shazhou-ww/ocas/issues"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1"
   }
 }
