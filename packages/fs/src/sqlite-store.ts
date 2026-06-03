@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import type {
   CasStore,
   Hash,
@@ -27,19 +27,31 @@ import {
   varKey,
 } from "@ocas/core";
 
+function transaction<T>(db: DatabaseSync, fn: () => T): T {
+  db.exec("BEGIN");
+  try {
+    const r = fn();
+    db.exec("COMMIT");
+    return r;
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
 const DB_FILE = "_store.db";
 const VARS_FILE = "_vars.jsonl";
 const TAGS_FILE = "_tags.jsonl";
 
-function openDb(dir: string): Database.Database {
+function openDb(dir: string): DatabaseSync {
   mkdirSync(dir, { recursive: true });
-  const db = new Database(join(dir, DB_FILE));
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+  const db = new DatabaseSync(join(dir, DB_FILE));
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA foreign_keys = ON");
   return db;
 }
 
-function initVarTables(db: Database.Database): void {
+function initVarTables(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS vars (
       name     TEXT NOT NULL,
@@ -67,7 +79,7 @@ function initVarTables(db: Database.Database): void {
   `);
 }
 
-function initTagTables(db: Database.Database): void {
+function initTagTables(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS tags (
       target   TEXT NOT NULL,
@@ -90,11 +102,7 @@ type StoredTag = {
   created: number;
 };
 
-function migrateJsonlVars(
-  db: Database.Database,
-  dir: string,
-  _cas: CasStore,
-): void {
+function migrateJsonlVars(db: DatabaseSync, dir: string, _cas: CasStore): void {
   const path = join(dir, VARS_FILE);
   if (!existsSync(path)) return;
 
@@ -131,7 +139,7 @@ function migrateJsonlVars(
     VALUES (?, ?, ?, ?, ?)
   `);
 
-  const migrate = db.transaction(() => {
+  transaction(db, () => {
     for (const rec of records.values()) {
       insertVar.run(
         rec.name,
@@ -147,10 +155,9 @@ function migrateJsonlVars(
       }
     }
   });
-  migrate();
 }
 
-function migrateJsonlTags(db: Database.Database, dir: string): void {
+function migrateJsonlTags(db: DatabaseSync, dir: string): void {
   const path = join(dir, TAGS_FILE);
   if (!existsSync(path)) return;
 
@@ -196,14 +203,13 @@ function migrateJsonlTags(db: Database.Database, dir: string): void {
     VALUES (?, ?, ?, ?)
   `);
 
-  const migrate = db.transaction(() => {
+  transaction(db, () => {
     for (const tm of byTarget.values()) {
       for (const tag of tm.values()) {
         insertTag.run(tag.target, tag.key, tag.value, tag.created);
       }
     }
   });
-  migrate();
 }
 
 // ── Row helpers ──
@@ -304,17 +310,17 @@ export function createSqliteVarStore(
 
   // ── Transactional helpers ──
 
-  const txnSetVar = db.transaction(
-    (
-      name: string,
-      schema: Hash,
-      hash: Hash,
-      now: number,
-      tagsJson: string,
-      labelsJson: string,
-      isNew: boolean,
-      valueChanged: boolean,
-    ) => {
+  function txnSetVar(
+    name: string,
+    schema: Hash,
+    hash: Hash,
+    now: number,
+    tagsJson: string,
+    labelsJson: string,
+    isNew: boolean,
+    valueChanged: boolean,
+  ): void {
+    transaction(db, () => {
       if (isNew) {
         stmtInsertVar.run(name, schema, hash, now, now, tagsJson, labelsJson);
         stmtInsertHistory.run(name, schema, hash, 0, now);
@@ -329,11 +335,11 @@ export function createSqliteVarStore(
       } else {
         stmtUpdateVar.run(hash, now, tagsJson, labelsJson, name, schema);
       }
-    },
-  );
+    });
+  }
 
-  const txnTagOps = db.transaction(
-    (target: Hash, operations: TagOp[], now: number) => {
+  function txnTagOps(target: Hash, operations: TagOp[], now: number): void {
+    transaction(db, () => {
       for (const op of operations) {
         if (op.op === "set") {
           // Use ON CONFLICT to preserve created time — but we need existing created
@@ -346,14 +352,16 @@ export function createSqliteVarStore(
           stmtDeleteTag.run(target, op.key);
         }
       }
-    },
-  );
+    });
+  }
 
-  const txnUntag = db.transaction((target: Hash, keys: string[]) => {
-    for (const k of keys) {
-      stmtDeleteTag.run(target, k);
-    }
-  });
+  function txnUntag(target: Hash, keys: string[]): void {
+    transaction(db, () => {
+      for (const k of keys) {
+        stmtDeleteTag.run(target, k);
+      }
+    });
+  }
 
   // ── VarStore implementation ──
   const varStore: VarStore = {
@@ -516,7 +524,7 @@ export function createSqliteVarStore(
 
       // Build dynamic query
       const conditions: string[] = [];
-      const params: unknown[] = [];
+      const params: (string | number | null)[] = [];
 
       if (options?.exactName !== undefined) {
         conditions.push("name = ?");
@@ -650,7 +658,7 @@ export function createSqliteVarStore(
       const limit = options?.limit;
 
       let sql: string;
-      const params: unknown[] = [key];
+      const params: (string | number | null)[] = [key];
       if (value !== undefined) {
         sql = `SELECT target FROM tags WHERE key = ? AND value = ? ORDER BY ${sortCol} ${sortDir}`;
         params.push(value);

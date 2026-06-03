@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { mkdirSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Hash, Store } from "@ocas/core";
 import { bootstrap } from "@ocas/core";
 import { openStore as openFsStore } from "@ocas/fs";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 let testDir: string;
 let storePath: string;

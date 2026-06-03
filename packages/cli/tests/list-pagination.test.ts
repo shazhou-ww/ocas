@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { envValue, runCli } from "./helpers.js";
 
 const HASH_RE = /^[0-9A-HJKMNP-TV-Z]{13}$/;

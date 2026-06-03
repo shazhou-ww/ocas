@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
 import type { Hash, ListEntry, ListOptions, Store, TagOp } from "@ocas/core";
 import {
   applyListOptions,

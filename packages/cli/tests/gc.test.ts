@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { envValue } from "./helpers";
 
 const entrypoint = resolve(import.meta.dirname, "../dist/index.js");

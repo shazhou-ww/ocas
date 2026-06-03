@@ -1,4 +1,3 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   existsSync,
   mkdtempSync,
@@ -17,6 +16,7 @@ import {
   computeSelfHash,
   verify,
 } from "@ocas/core";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { createFsStore, openStore } from "./store.js";
 

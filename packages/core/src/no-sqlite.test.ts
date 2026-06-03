@@ -1,6 +1,6 @@
-import { describe, expect, test } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { describe, expect, test } from "vitest";
 
 function* walk(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {

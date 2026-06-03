@@ -1,6 +1,6 @@
-import { describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { describe, expect, test } from "vitest";
 
 const usagePath = join(import.meta.dirname, "..", "prompts", "usage.md");
 

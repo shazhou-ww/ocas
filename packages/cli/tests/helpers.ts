@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -5,7 +6,6 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { JSONSchema } from "@ocas/core";
@@ -59,7 +59,7 @@ export function runCli(
     ? [entrypoint, "--home", storePath, ...args]
     : [entrypoint, ...args];
   try {
-    const stdout = execFileSync("node", finalArgs, {
+    const stdout = execFileSync("node", ["--no-warnings", ...finalArgs], {
       encoding: "utf-8",
       timeout: 10000,
     });
@@ -81,7 +81,7 @@ export function runCliWithStdin(
 ): { stdout: string; stderr: string; exitCode: number } {
   const finalArgs = [entrypoint, "--home", storePath, ...args];
   try {
-    const stdout = execFileSync("node", finalArgs, {
+    const stdout = execFileSync("node", ["--no-warnings", ...finalArgs], {
       input: stdin,
       encoding: "utf-8",
       timeout: 10000,
