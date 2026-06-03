@@ -53,7 +53,7 @@ In-memory `Map<Hash, CasNode>`. Used in tests and for ephemeral computation (e.g
 
 ### FsStore (`@ocas/fs`)
 
-Filesystem-backed store. Nodes are serialized as CBOR files under a content-addressed directory tree. Created via `openStore(path)`, which:
+Filesystem-backed store. CAS nodes are stored as CBOR files; variables and tags use SQLite (`node:sqlite`). Created via `openStore(path)`, which:
 
 1. Creates the directory if it doesn't exist
 2. Runs [[Bootstrap]] automatically

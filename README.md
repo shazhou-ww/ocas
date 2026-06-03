@@ -7,10 +7,12 @@ Every node has a typed payload: its `type` field is the hash of a JSON Schema th
 ## Install
 
 ```bash
-bun add -g @ocas/cli
+pnpm add -g @ocas/cli
 ```
 
 The store is auto-created and bootstrapped on first use — no `init` command needed.
+
+> Requires Node.js >= 22.5.0 (uses built-in node:sqlite)
 
 ## Quick Start
 
@@ -190,8 +192,8 @@ Nodes reachable from any variable binding are kept; everything else is swept.
 ## Using as a Library
 
 ```bash
-bun add @ocas/core              # in-memory store
-bun add @ocas/core @ocas/fs     # + filesystem persistence
+pnpm add @ocas/core              # in-memory store
+pnpm add @ocas/core @ocas/fs     # + filesystem persistence
 ```
 
 ```typescript
@@ -214,9 +216,9 @@ const node = store.get(hash);
 For filesystem persistence, use `@ocas/fs`:
 
 ```typescript
-import { openStoreAndVarStore } from "@ocas/fs";
+import { openStore } from "@ocas/fs";
 
-const { store, varStore } = await openStoreAndVarStore("/path/to/store");
+const store = await openStore("/path/to/store");
 ```
 
 See individual package READMEs for full API docs:
@@ -228,11 +230,11 @@ See individual package READMEs for full API docs:
 
 ```bash
 git clone <repo-url> && cd ocas
-bun install --no-cache
-bun run build     # tsc --build
-bun test          # run all tests
-bun run check     # biome lint
-bun run format    # biome format
+pnpm install
+pnpm run build     # tsc --build
+pnpm test          # run all tests
+pnpm run check     # biome lint
+pnpm run format    # biome format
 ```
 
 ## License

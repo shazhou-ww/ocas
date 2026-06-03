@@ -6,14 +6,14 @@ Core CAS engine — hashing, schema, store, verify, bootstrap.
 
 `@ocas/core` is the foundation of the ocas monorepo. It defines content-addressed nodes (`CasNode`), the `Store` interface, XXH64-based hashing with deterministic CBOR, JSON Schema registration and validation (including `cas_ref` links between nodes), bootstrap seeding, and integrity verification.
 
-Other packages build on this layer: `ocas-fs` provides persistence, and `cli-ocas` exposes store operations on the command line.
+Other packages build on this layer: `@ocas/fs` provides persistence, and `@ocas/cli` exposes store operations on the command line.
 
 **Dependencies:** `ajv`, `cborg`, `xxhash-wasm`
 
 ## Installation
 
 ```bash
-bun add @ocas/core
+pnpm add @ocas/core
 ```
 
 ## API

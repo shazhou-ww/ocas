@@ -17,7 +17,7 @@ The `ocas` CLI is the primary interface for interacting with an OCAS [[Store]]. 
 | 2 | `OCAS_HOME` env var | `export OCAS_HOME=/data/ocas` |
 | 3 | Default | `~/.ocas` |
 
-The variable database lives at `<home>/variables.db` by default, overridable with `--var-db <path>`.
+The SQLite database lives at `<home>/_store.db`.
 
 ## Commands
 

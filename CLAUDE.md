@@ -20,7 +20,7 @@ Monorepo with 3 packages under `packages/`:
 - **Test:** Vitest (`npx vitest run`)
 - **Package Manager:** pnpm (workspace)
 - **Lint/Format:** Biome (`biome check .` / `biome format --write .`)
-- **Publish:** Changesets + `pnpm publish` → npmjs (`@ocas/*`)
+- **Publish:** @shazhou/proman (`proman bump` + `proman publish`)
 
 ## Commands
 
@@ -98,10 +98,7 @@ This is resolved to real version numbers only during publishing (see below).
 
 ## Release Process
 
-Releases use a **release branch** workflow with three phases: prepare → candidate → finalize.
-
-`main` always keeps `workspace:*` for internal deps; release branches fix them to real versions.
-Changeset files are **only consumed once** during finalize — prerelease (rc) never touches them.
+Uses `@shazhou/proman` for releases. No release branches needed.
 
 ### Adding a Changeset
 
@@ -110,7 +107,7 @@ Add changesets alongside feature PRs on `main`:
 ```markdown
 <!-- .changeset/my-change.md -->
 ---
-"@ocas/cli": patch
+"@ocas/fs": minor
 ---
 
 Description of the change
@@ -119,44 +116,15 @@ Description of the change
 Changesets live in `.changeset/` as markdown files. Bump types: `patch` / `minor` / `major`.
 One changeset can cover multiple packages.
 
-### Phase 1: Prepare (cut release branch)
+### Release Steps
 
-- **Precondition:** on `main`, clean tree, `.changeset/` has pending changesets
-- **Steps:**
-  1. Determine target version (from changeset bump types or manually)
-  2. `git checkout -b release/<version>`
-  3. Fix `workspace:*` → real version numbers in all `package.json`
-  4. Commit
-- **Does NOT** run `changeset version`, does NOT write CHANGELOG
+1. `proman bump` — consume changesets and bump versions
+2. `proman publish` — build → test → check → publish → changelog → tag → push
 
-### Phase 2: Candidate (publish rc for validation)
-
-- **Precondition:** on `release/*` branch
-- **Steps:**
-  1. Set version to `<version>-rc.N` (first time rc.1, increment on subsequent runs)
-  2. `pnpm install && pnpm run build && pnpm run test && pnpm run check`
-  3. Publish: `pnpm publish --tag rc` (order: core → fs → cli)
-  4. Commit + push
-- **Repeatable:** fix bugs → add new changesets on the release branch → rc.N+1
-- **Does NOT** consume changesets, does NOT write CHANGELOG
-- Install for testing: `pnpm add -g @ocas/cli@rc`
-
-### Phase 3: Finalize (official release)
-
-- **Precondition:** on `release/*` branch, rc validated
-- **Steps:**
-  1. Consume all `.changeset/*.md` → write CHANGELOG entries (use `changeset version` or manual)
-  2. Set final version `<version>` (remove `-rc.N`)
-  3. `pnpm install && pnpm run build && pnpm run test && pnpm run check`
-  4. Publish: `pnpm publish --tag latest` (order: core → fs → cli)
-  5. Git tag `v<version>`
-  6. Merge back to `main` (CHANGELOG comes along)
-  7. Restore `workspace:*` on `main`
-  8. Delete release branch
+The publish command handles everything: workspace dependency resolution, npm publish order (core → fs → cli), changelog generation, git tagging, and pushing.
 
 ### Key Rules
 
 - **Publish order** is always `@ocas/core` → `@ocas/fs` → `@ocas/cli`
-- **`workspace:*`** must be fixed before any publish — `pnpm publish` does NOT auto-replace them
-- **CHANGELOG** only contains official releases, never rc entries
-- **Changesets added on release branch** (bug fixes during rc) are consumed together at finalize
+- **`workspace:*`** is auto-resolved by pnpm during publish
+- **CHANGELOG** only contains official releases

@@ -15,17 +15,17 @@ The store is **auto-created and bootstrapped** on first use, so there is no `ini
 Published as an npm package with a binary entry:
 
 ```bash
-bun add -g @ocas/cli
+pnpm add -g @ocas/cli
 # or from the monorepo workspace:
-bun link
+pnpm link
 ```
 
-**Binary name:** `ocas` (points to `src/index.ts`, run with Bun).
+**Binary name:** `ocas` (points to `dist/index.js`, run with Node).
 
 In development:
 
 ```bash
-bun packages/cli-ocas/src/index.ts <command> [args]
+node packages/cli/dist/index.js <command> [args]
 ```
 
 ## CLI Usage
