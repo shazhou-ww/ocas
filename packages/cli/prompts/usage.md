@@ -6,7 +6,7 @@ OCAS is a self-describing content-addressable store for typed JSON data. Every n
 
 All commands output `{ type, value }` JSON envelopes, making them composable via pipes.
 
-**Install:** `bun add -g @ocas/cli`
+**Install:** `pnpm add -g @ocas/cli`
 
 **Packages:** `@ocas/core` (engine) · `@ocas/fs` (filesystem store) · `@ocas/cli` (CLI)
 
@@ -138,7 +138,6 @@ ocas gc | ocas render -p   # human-readable stats
 | Flag | Description |
 |------|-------------|
 | `--home <path>` | Store directory (default: `$OCAS_HOME` or `~/.ocas`) |
-| `--var-db <path>` | Variable database path |
 | `--json` | Compact JSON output |
 | `-p`, `--pipe` | Read from stdin |
 | `-r`, `--render` | Render output inline |

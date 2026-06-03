@@ -9,7 +9,7 @@ so that you know how to use the `ocas` CLI.
    ```bash
    ocas --help
    ```
-   If not installed: `bun add -g @ocas/cli`
+   If not installed: `pnpm add -g @ocas/cli`
 
 2. **Clean up old versions of the skill** (if any exist):
    - Look for any existing OCAS/ocas skill files in your skill directories
