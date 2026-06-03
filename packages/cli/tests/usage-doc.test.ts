@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const usagePath = join(import.meta.dir, "usage.md");
+const usagePath = join(import.meta.dir, "..", "prompts", "usage.md");
 
 describe("usage.md doc cleanup (D)", () => {
   test("D3. usage.md does not reference legacy openStoreAndVarStore / createVariableStore", () => {

@@ -12,7 +12,7 @@ const pkgPath = resolve(import.meta.dir, "../package.json");
 describe("ocas binary", () => {
   test("T1: ocas bin entry exists in package.json", async () => {
     const pkg = await Bun.file(pkgPath).json();
-    expect(pkg.bin.ocas).toBe("src/index.ts");
+    expect(pkg.bin.ocas).toBe("dist/index.js");
   });
 
   test("T2: no legacy bin entries (json-cas, ucas)", async () => {
