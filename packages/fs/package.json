@@ -1,6 +1,6 @@
 {
   "name": "@ocas/fs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,7 +15,7 @@
     "src"
   ],
   "dependencies": {
-    "@ocas/core": "workspace:*",
+    "@ocas/core": "0.2.1",
     "better-sqlite3": "^12.10.0",
     "cborg": "^4.2.3"
   },
