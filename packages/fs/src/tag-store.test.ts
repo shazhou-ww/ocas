@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "./store.js";
@@ -16,7 +16,7 @@ describe("FsTagStore", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("B1. set tag with key/value round-trip + JSONL persisted", async () => {
+  test("B1. set tag with key/value round-trip + SQLite persisted", async () => {
     const store = await openStore(dir);
     const result = store.tag.tag(T1, [
       { op: "set", key: "env", value: "prod" },
@@ -26,17 +26,8 @@ describe("FsTagStore", () => {
     expect(result[0]?.value).toBe("prod");
     expect(store.tag.tags(T1)).toEqual(result);
 
-    const jsonl = join(dir, "_tags.jsonl");
-    expect(existsSync(jsonl)).toBe(true);
-    const content = readFileSync(jsonl, "utf8");
-    const lines = content.split("\n").filter((l) => l.length > 0);
-    expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0] as string) as {
-      key: string;
-      value: string;
-    };
-    expect(parsed.key).toBe("env");
-    expect(parsed.value).toBe("prod");
+    const dbFile = join(dir, "_store.db");
+    expect(existsSync(dbFile)).toBe(true);
   });
 
   test("B2. label tag (no value) records value: null", async () => {
@@ -120,7 +111,7 @@ describe("FsTagStore", () => {
     expect(tags.map((t) => t.value)).toEqual(["prod", "platform"]);
   });
 
-  test("B11. JSONL replay fidelity (set/delete/untag mix)", async () => {
+  test("B11. SQLite replay fidelity (set/delete/untag mix)", async () => {
     const store = await openStore(dir);
     store.tag.tag(T1, [{ op: "set", key: "a", value: "1" }]);
     store.tag.tag(T1, [{ op: "set", key: "b", value: "2" }]);

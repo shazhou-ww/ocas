@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Hash, Store } from "@ocas/core";
@@ -40,7 +40,7 @@ describe("FsVarStore", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("A1. set + get round-trip persists to JSONL", async () => {
+  test("A1. set + get round-trip persists to SQLite", async () => {
     const { store, schema, put } = await setupStore(dir);
     const h = put("hello");
     const v = store.var.set("@app/x", h);
@@ -51,17 +51,8 @@ describe("FsVarStore", () => {
     const got = store.var.get("@app/x", schema);
     expect(got?.value).toBe(h);
 
-    const jsonl = join(dir, "_vars.jsonl");
-    expect(existsSync(jsonl)).toBe(true);
-    const content = readFileSync(jsonl, "utf8");
-    expect(content.length).toBeGreaterThan(0);
-    const lines = content.split("\n").filter((l) => l.length > 0);
-    expect(lines.length).toBeGreaterThanOrEqual(1);
-    const matching = lines
-      .map((l) => JSON.parse(l) as { name?: string; value?: Hash })
-      .find((r) => r.name === "@app/x");
-    expect(matching).toBeDefined();
-    expect(matching?.value).toBe(h);
+    const dbFile = join(dir, "_store.db");
+    expect(existsSync(dbFile)).toBe(true);
   });
 
   test("A2. name validation", async () => {
