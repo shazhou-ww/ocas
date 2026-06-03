@@ -258,7 +258,9 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
   test("3.1: Reject schema with invalid type value", async () => {
     const store = new MemStore();
     bootstrap(store);
-    await expect(async () => putSchema(store, { type: "garbage" })).rejects.toThrow();
+    await expect(async () =>
+      putSchema(store, { type: "garbage" }),
+    ).rejects.toThrow();
   });
 
   test("3.2: Reject schema with type as number", async () => {

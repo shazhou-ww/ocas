@@ -38,17 +38,29 @@ afterEach(() => {
 /**
  * Run CLI command and return stdout, stderr, and exit code
  */
-function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+function runCli(...rawArgs: (string | string[])[]): {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+} {
   const args = rawArgs.flat();
   try {
-    const stdout = execFileSync("node", [cliPath, "--home", storePath, ...args], {
-      encoding: "utf-8",
-      timeout: 10000,
-    });
+    const stdout = execFileSync(
+      "node",
+      [cliPath, "--home", storePath, ...args],
+      {
+        encoding: "utf-8",
+        timeout: 10000,
+      },
+    );
     return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string; status?: number };
-    return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    return {
+      stdout: (err.stdout ?? "").trim(),
+      stderr: (err.stderr ?? "").trim(),
+      exitCode: err.status ?? 1,
+    };
   }
 }
 
@@ -771,10 +783,14 @@ describe("global options", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Override with custom store path
-    execFileSync("node", [cliPath, "--home", customStorePath, "var", "set", "@test/x", hash], {
-      encoding: "utf-8",
-      timeout: 10000,
-    });
+    execFileSync(
+      "node",
+      [cliPath, "--home", customStorePath, "var", "set", "@test/x", hash],
+      {
+        encoding: "utf-8",
+        timeout: 10000,
+      },
+    );
   });
 });
 

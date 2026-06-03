@@ -582,10 +582,14 @@ describe("Phase 2: Schema Validation", () => {
 
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
-    const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, "put", typeHash, nodeFile], {
-      encoding: "utf-8",
-      timeout: 10000,
-    }).trim();
+    const stdout = execFileSync(
+      "node",
+      [entrypoint, "--home", tmpStore, "put", typeHash, nodeFile],
+      {
+        encoding: "utf-8",
+        timeout: 10000,
+      },
+    ).trim();
     _nodeHash = envValue(stdout) as string;
   });
 
@@ -596,12 +600,18 @@ describe("Phase 2: Schema Validation", () => {
   test("2.1 put {name:123} against string-schema fails with non-zero exit", async () => {
     const badFile = join(tmpStore, "bad-node.json");
     writeFileSync(badFile, JSON.stringify({ name: 123 }));
-    let stdout = "", stderr = "", exitCode = 0;
+    let stdout = "",
+      stderr = "",
+      exitCode = 0;
     try {
-      stdout = execFileSync("node", [entrypoint, "--home", tmpStore, "put", typeHash, badFile], {
-        encoding: "utf-8",
-        timeout: 10000,
-      }).trim();
+      stdout = execFileSync(
+        "node",
+        [entrypoint, "--home", tmpStore, "put", typeHash, badFile],
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      ).trim();
     } catch (e: unknown) {
       const err = e as { stdout?: string; stderr?: string; status?: number };
       stdout = (err.stdout ?? "").trim();
@@ -616,12 +626,17 @@ describe("Phase 2: Schema Validation", () => {
 
   test("2.3 put against non-existent schema hash fails", async () => {
     const nodeFile = join(tmpStore, "test-node.json");
-    let exitCode = 0, stderr = "";
+    let exitCode = 0,
+      stderr = "";
     try {
-      execFileSync("node", [entrypoint, "--home", tmpStore, "put", "AAAAAAAAAAAAA", nodeFile], {
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      execFileSync(
+        "node",
+        [entrypoint, "--home", tmpStore, "put", "AAAAAAAAAAAAA", nodeFile],
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
     } catch (e: unknown) {
       const err = e as { stderr?: string; status?: number };
       stderr = (err.stderr ?? "").trim();

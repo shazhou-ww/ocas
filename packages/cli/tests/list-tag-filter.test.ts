@@ -27,27 +27,43 @@ afterEach(() => {
   }
 });
 
-function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+function runCli(...rawArgs: (string | string[])[]): {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+} {
   const args = rawArgs.flat();
   try {
-    const stdout = execFileSync("node", [cliPath, "--home", storePath, ...args], {
-      encoding: "utf-8",
-      timeout: 10000,
-    });
+    const stdout = execFileSync(
+      "node",
+      [cliPath, "--home", storePath, ...args],
+      {
+        encoding: "utf-8",
+        timeout: 10000,
+      },
+    );
     return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string; status?: number };
-    return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    return {
+      stdout: (err.stdout ?? "").trim(),
+      stderr: (err.stderr ?? "").trim(),
+      exitCode: err.status ?? 1,
+    };
   }
 }
 
 function putString(value: string): string {
   try {
-    const out = execFileSync("node", [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe"], {
-      input: JSON.stringify(value),
-      encoding: "utf-8",
-      timeout: 10000,
-    });
+    const out = execFileSync(
+      "node",
+      [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe"],
+      {
+        input: JSON.stringify(value),
+        encoding: "utf-8",
+        timeout: 10000,
+      },
+    );
     return JSON.parse(out.trim()).value as string;
   } catch (e: unknown) {
     const err = e as { stderr?: string };

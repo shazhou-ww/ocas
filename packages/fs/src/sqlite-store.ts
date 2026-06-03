@@ -5,7 +5,6 @@ import type {
   CasStore,
   Hash,
   HistoryEntry,
-  ListEntry,
   ListOptions,
   Tag,
   TagOp,
@@ -20,14 +19,12 @@ import {
   checkTagLabelConflict,
   extractSchema,
   MAX_HISTORY,
-  pushHistory,
   removeNameIndex,
   SchemaMismatchError,
   VariableNotFoundError,
   type VarRecord,
   validateName,
   varKey,
-  cloneVarRecord,
 } from "@ocas/core";
 
 const DB_FILE = "_store.db";
@@ -96,7 +93,7 @@ type StoredTag = {
 function migrateJsonlVars(
   db: Database.Database,
   dir: string,
-  cas: CasStore,
+  _cas: CasStore,
 ): void {
   const path = join(dir, VARS_FILE);
   if (!existsSync(path)) return;
@@ -622,9 +619,9 @@ export function createSqliteVarStore(
     tag(target: Hash, operations: TagOp[]): Tag[] {
       const now = Date.now();
       txnTagOps(target, operations, now);
-      return (
-        stmtGetTagsByTarget.all(target) as Record<string, unknown>[]
-      ).map((r) => toTag(r, target));
+      return (stmtGetTagsByTarget.all(target) as Record<string, unknown>[]).map(
+        (r) => toTag(r, target),
+      );
     },
 
     untag(target: Hash, keys: string[]): void {
@@ -632,9 +629,9 @@ export function createSqliteVarStore(
     },
 
     tags(target: Hash): Tag[] {
-      return (
-        stmtGetTagsByTarget.all(target) as Record<string, unknown>[]
-      ).map((r) => toTag(r, target));
+      return (stmtGetTagsByTarget.all(target) as Record<string, unknown>[]).map(
+        (r) => toTag(r, target),
+      );
     },
 
     listByTag(tag: string, options?: ListOptions): Hash[] {

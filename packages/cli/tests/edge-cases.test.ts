@@ -39,17 +39,29 @@ describe("Phase 7: Edge Cases", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(...rawArgs: (string | string[])[]): {
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  } {
     const args = rawArgs.flat();
     try {
-      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      const stdout = execFileSync(
+        "node",
+        [entrypoint, "--home", tmpStore, ...args],
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
     } catch (e: unknown) {
       const err = e as { stdout?: string; stderr?: string; status?: number };
-      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+      return {
+        stdout: (err.stdout ?? "").trim(),
+        stderr: (err.stderr ?? "").trim(),
+        exitCode: err.status ?? 1,
+      };
     }
   }
 
@@ -128,10 +140,14 @@ describe("Phase 7: Edge Cases", () => {
     const fileAsStore = join(tmpStore, "not-a-directory");
     writeFileSync(fileAsStore, "test");
     try {
-      execFileSync("node", [entrypoint, "--home", fileAsStore, "get", "AAAAAAAAAAAAA"], {
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      execFileSync(
+        "node",
+        [entrypoint, "--home", fileAsStore, "get", "AAAAAAAAAAAAA"],
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
       expect.unreachable("should have thrown");
     } catch (e: unknown) {
       const err = e as { stderr?: string; status?: number };
@@ -148,17 +164,29 @@ describe("Phase 3: Variable System", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(...rawArgs: (string | string[])[]): {
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  } {
     const args = rawArgs.flat();
     try {
-      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      const stdout = execFileSync(
+        "node",
+        [entrypoint, "--home", tmpStore, ...args],
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
     } catch (e: unknown) {
       const err = e as { stdout?: string; stderr?: string; status?: number };
-      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+      return {
+        stdout: (err.stdout ?? "").trim(),
+        stderr: (err.stderr ?? "").trim(),
+        exitCode: err.status ?? 1,
+      };
     }
   }
 
@@ -338,17 +366,29 @@ describe("Phase 4: Template System", () => {
   let tmpStore: string;
   let typeHash: string;
 
-  function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(...rawArgs: (string | string[])[]): {
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  } {
     const args = rawArgs.flat();
     try {
-      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      const stdout = execFileSync(
+        "node",
+        [entrypoint, "--home", tmpStore, ...args],
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
     } catch (e: unknown) {
       const err = e as { stdout?: string; stderr?: string; status?: number };
-      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+      return {
+        stdout: (err.stdout ?? "").trim(),
+        stderr: (err.stderr ?? "").trim(),
+        exitCode: err.status ?? 1,
+      };
     }
   }
 

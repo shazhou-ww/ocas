@@ -58,17 +58,29 @@ describe("Phase 5: Render", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCliE2e(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCliE2e(...rawArgs: (string | string[])[]): {
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  } {
     const args = rawArgs.flat();
     try {
-      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      const stdout = execFileSync(
+        "node",
+        [entrypoint, "--home", tmpStore, ...args],
+        {
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
     } catch (e: unknown) {
       const err = e as { stdout?: string; stderr?: string; status?: number };
-      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+      return {
+        stdout: (err.stdout ?? "").trim(),
+        stderr: (err.stderr ?? "").trim(),
+        exitCode: err.status ?? 1,
+      };
     }
   }
 
@@ -77,15 +89,23 @@ describe("Phase 5: Render", () => {
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     try {
-      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
-        input: stdin,
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      const stdout = execFileSync(
+        "node",
+        [entrypoint, "--home", tmpStore, ...args],
+        {
+          input: stdin,
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
     } catch (e: unknown) {
       const err = e as { stdout?: string; stderr?: string; status?: number };
-      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+      return {
+        stdout: (err.stdout ?? "").trim(),
+        stderr: (err.stderr ?? "").trim(),
+        exitCode: err.status ?? 1,
+      };
     }
   }
 

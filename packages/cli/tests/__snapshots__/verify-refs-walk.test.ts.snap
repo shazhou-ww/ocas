@@ -22,26 +22,3 @@ exports[`Phase 1: CAS Core > 1.11 walk shows traversal tree (snapshot) 1`] = `
   ]
 }"
 `;
-
-exports[`Phase 1: CAS Core 1.9 verify returns ok for valid node 1`] = `
-{
-  "type": "52HEFB52BD0GF",
-  "value": "ok",
-}
-`;
-
-exports[`Phase 1: CAS Core 1.10 refs lists direct references (snapshot) 1`] = `
-"{
-  "type": "2TKP4RGBJ4V43",
-  "value": []
-}"
-`;
-
-exports[`Phase 1: CAS Core 1.11 walk shows traversal tree (snapshot) 1`] = `
-"{
-  "type": "4HG6MD3XG5H5C",
-  "value": [
-    "9W3MGR3184QYE"
-  ]
-}"
-`;

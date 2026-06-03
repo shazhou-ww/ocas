@@ -39,18 +39,28 @@ afterAll(() => {
   rmSync(tmpStore, { recursive: true, force: true });
 });
 
-function runCli(
-  args: string[],
-): { stdout: string; stderr: string; exitCode: number } {
+function runCli(args: string[]): {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+} {
   try {
-    const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
-      encoding: "utf-8",
-      timeout: 10000,
-    });
+    const stdout = execFileSync(
+      "node",
+      [entrypoint, "--home", tmpStore, ...args],
+      {
+        encoding: "utf-8",
+        timeout: 10000,
+      },
+    );
     return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string; status?: number };
-    return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    return {
+      stdout: (err.stdout ?? "").trim(),
+      stderr: (err.stderr ?? "").trim(),
+      exitCode: err.status ?? 1,
+    };
   }
 }
 

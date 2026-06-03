@@ -1040,7 +1040,7 @@ async function cmdList(_args: string[]): Promise<void> {
     ...(opts.desc !== undefined ? { desc: opts.desc } : {}),
   });
   const filtered: ListEntry[] = allOfType.filter((e) =>
-    intersection!.has(e.hash),
+    intersection?.has(e.hash),
   );
   const paged = applyListOptions(filtered, opts);
   await out(await wrapEnvelope(store, "@ocas/output/list", paged), store);
