@@ -5,9 +5,7 @@
     "@shazhou/proman": "0.2.2",
     "@types/node": "^25.9.1",
     "tsx": "^4.22.4",
-    "ulidx": "^2.4.1",
-    "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "ulidx": "^2.4.1"
   },
   "scripts": {
     "build": "proman build",
