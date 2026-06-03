@@ -58,9 +58,9 @@ describe("Phase 5: Render", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCliE2e(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCliE2e(args: string[]): { stdout: string; stderr: string; exitCode: number } {
     try {
-      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",
         timeout: 10000,
       });
@@ -76,7 +76,7 @@ describe("Phase 5: Render", () => {
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     try {
-      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         input: stdin,
         encoding: "utf-8",
         timeout: 10000,

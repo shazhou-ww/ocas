@@ -20,7 +20,7 @@ afterEach(() => {
 
 async function putString(text: string): Promise<string> {
   const entrypoint = join(import.meta.dirname, "../src/index.ts");
-  const out = execFileSync("tsx", [entrypoint, "--home", storePath, "put", "@ocas/string", "--pipe"], {
+  const out = execFileSync("node", [entrypoint, "--home", storePath, "put", "@ocas/string", "--pipe"], {
     input: JSON.stringify(text),
     encoding: "utf-8",
     timeout: 10000,

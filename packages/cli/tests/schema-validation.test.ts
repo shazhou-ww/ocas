@@ -582,7 +582,7 @@ describe("Phase 2: Schema Validation", () => {
 
     const nodeFile = join(tmpStore, "test-node.json");
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
-    const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, "put", typeHash, nodeFile], {
+    const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, "put", typeHash, nodeFile], {
       encoding: "utf-8",
       timeout: 10000,
     }).trim();
@@ -598,7 +598,7 @@ describe("Phase 2: Schema Validation", () => {
     writeFileSync(badFile, JSON.stringify({ name: 123 }));
     let stdout = "", stderr = "", exitCode = 0;
     try {
-      stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, "put", typeHash, badFile], {
+      stdout = execFileSync("node", [entrypoint, "--home", tmpStore, "put", typeHash, badFile], {
         encoding: "utf-8",
         timeout: 10000,
       }).trim();
@@ -618,7 +618,7 @@ describe("Phase 2: Schema Validation", () => {
     const nodeFile = join(tmpStore, "test-node.json");
     let exitCode = 0, stderr = "";
     try {
-      execFileSync("tsx", [entrypoint, "--home", tmpStore, "put", "AAAAAAAAAAAAA", nodeFile], {
+      execFileSync("node", [entrypoint, "--home", tmpStore, "put", "AAAAAAAAAAAAA", nodeFile], {
         encoding: "utf-8",
         timeout: 10000,
       });

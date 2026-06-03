@@ -43,7 +43,7 @@ function runCli(
   args: string[],
 ): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+    const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
       encoding: "utf-8",
       timeout: 10000,
     });

@@ -37,7 +37,7 @@ afterEach(() => {
  */
 function runCliAlias(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const stdout = execFileSync("tsx", [cliPath, "--home", storePath, ...args], {
+    const stdout = execFileSync("node", [cliPath, "--home", storePath, ...args], {
       encoding: "utf-8",
       timeout: 10000,
     });

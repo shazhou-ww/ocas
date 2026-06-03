@@ -42,9 +42,9 @@ afterAll(() => {
   rmSync(tmpStore, { recursive: true, force: true });
 });
 
-function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+    const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
       encoding: "utf-8",
       timeout: 10000,
     });
@@ -76,7 +76,7 @@ describe("Phase 6: GC", () => {
     const { stdout: gcOut, exitCode: gcExit } = runCli(["gc"]);
     expect(gcExit).toBe(0);
 
-    const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, "render", "--pipe"], {
+    const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, "render", "--pipe"], {
       input: gcOut,
       encoding: "utf-8",
       timeout: 10000,
