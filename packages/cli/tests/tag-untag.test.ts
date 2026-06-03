@@ -17,7 +17,7 @@ beforeEach(() => {
     `ocas-tag-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   storePath = join(testDir, "store");
-  cliPath = join(import.meta.dirname, "../src/index.ts");
+  cliPath = join(import.meta.dirname, "../dist/index.js");
   mkdirSync(testDir, { recursive: true });
   mkdirSync(storePath, { recursive: true });
 });
@@ -30,7 +30,8 @@ afterEach(() => {
   }
 });
 
-function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+  const args = rawArgs.flat();
   try {
     const stdout = execFileSync("node", [cliPath, "--home", storePath, ...args], {
       encoding: "utf-8",

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { envValue, stripVolatile } from "./helpers";
 
-const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
+const entrypoint = resolve(import.meta.dirname, "../dist/index.js");
 const pkgPath = resolve(import.meta.dirname, "../package.json");
 
 // --- ocas command alias tests (from cli.test.ts) ---
@@ -39,7 +39,8 @@ describe("Phase 7: Edge Cases", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+    const args = rawArgs.flat();
     try {
       const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",
@@ -147,7 +148,8 @@ describe("Phase 3: Variable System", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+    const args = rawArgs.flat();
     try {
       const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",
@@ -336,7 +338,8 @@ describe("Phase 4: Template System", () => {
   let tmpStore: string;
   let typeHash: string;
 
-  function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+    const args = rawArgs.flat();
     try {
       const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",

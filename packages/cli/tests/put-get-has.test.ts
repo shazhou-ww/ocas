@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { envValue, stripVolatile } from "./helpers";
 
-const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
+const entrypoint = resolve(import.meta.dirname, "../dist/index.js");
 
 let tmpStore: string;
 let typeHash: string;

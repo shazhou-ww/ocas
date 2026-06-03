@@ -375,154 +375,6 @@ exports[`Phase 3: Variable System > 3.10 var delete removes variable 1`] = `
 
 exports[`Phase 3: Variable System > 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=@myapp/config, schema=FRBAB1BF0ZBCS"`;
 
-exports[`Phase 4: Template System > 4.1 template set registers template 1`] = `
-{
-  "type": "BJDHPAE4Q8TXM",
-  "value": {
-    "contentHash": "6WW8WNB38GTTP",
-    "schemaHash": "FRBAB1BF0ZBCS",
-  },
-}
-`;
-
-exports[`Phase 4: Template System > 4.2 template get returns template text 1`] = `
-{
-  "type": "0B0HBHZGYHR84",
-  "value": "Name: {{ payload.name }}, Age: {{ payload.age }}",
-}
-`;
-
-exports[`Phase 4: Template System > 4.3 template list shows registered templates 1`] = `
-{
-  "type": "8917JQTD1R5JF",
-  "value": [
-    {
-      "contentHash": "6WW8WNB38GTTP",
-      "schemaHash": "FRBAB1BF0ZBCS",
-    },
-  ],
-}
-`;
-
-exports[`Phase 4: Template System > 4.4 template delete removes template 1`] = `
-{
-  "type": "BY7BGZJND3N7R",
-  "value": {
-    "deleted": true,
-  },
-}
-`;
-
-exports[`Phase 4: Template System > 4.5 template get deleted template returns not found 1`] = `"Error: Template not found for schema: FRBAB1BF0ZBCS"`;
-
-exports[`Phase 7: Edge Cases > 7.1 get non-existent hash errors gracefully 1`] = `"Node not found: AAAAAAAAAAAAA"`;
-
-exports[`Phase 7: Edge Cases > 7.3 var set empty name errors 1`] = `"Usage: ocas var set <name> <hash> [--tag <tag>...]"`;
-
-exports[`Phase 7: Edge Cases > 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Name must follow @scope/name format (e.g. @myapp/config)"`;
-
-exports[`Phase 7: Edge Cases > 7.5 no subcommand shows help text 1`] = `
-"Usage: ocas [--home <path>] [--json] <command> [args]
-
-All JSON commands emit a { type, value } envelope. The type is the hash of the
-command's @ocas/output/* schema (shown in parentheses); pipe any envelope into
-\`render -p\` to render its value (ocas_ref hashes are expanded).
-
-Commands:
-  put <type-hash> <file.json|--pipe> Store node, print envelope (value=hash)            (@ocas/output/put)
-  get <hash>                        Print node as envelope                             (@ocas/output/get)
-  has <hash>                        Print envelope (value=boolean)                     (@ocas/output/has)
-  verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@ocas/output/verify)
-  refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
-  walk <hash> [--format tree]       Recursive traversal                                (@ocas/output/walk)
-  hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
-  render <hash> [options]           Render node as text with resolution decay (raw output)
-  render --pipe/-p [options]        Render { type, value } from stdin (raw output)
-  list --type <hash-or-name> [--tag <tag>...]  List hashes for a type, optionally filtered by tags    (@ocas/output/list)
-  list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
-  list-schema                       List all schema hashes (value=string[])           (@ocas/output/list-schema)
-  tag <target> <tag>...             Apply tags/labels to a target                      (@ocas/output/tag)
-  untag <target> <tag>...           Remove tags/labels from a target                   (@ocas/output/untag)
-  var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
-  var get <name> --schema <hash>    Get a variable by name + schema                    (@ocas/output/var-get)
-  var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
-  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
-  var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
-  template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
-  template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
-  template list                     List all templates                                 (@ocas/output/template-list)
-  template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
-  gc                                Run garbage collection                             (@ocas/output/gc)
-
-Flags:
-  --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
-  --json              Compact JSON output
-  --render, -r        Render output inline (equivalent to | ocas render -p)
-  --schema <hash>     Schema hash filter for var get/delete/tag/list
-  --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
-  --inline <text>     Inline text content for template set
-  --resolution <n>    Initial resolution for render (default: 1.0)
-  --decay <n>         Decay factor for render (default: 0.5)
-  --epsilon <n>       Cutoff threshold for render (default: 0.01)
-  --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
-
-Agent: If you have not installed the ocas skill for this version (0.2.0), run \`ocas prompt setup\` and follow the instructions."
-`;
-
-exports[`Phase 7: Edge Cases 7.1 get non-existent hash errors gracefully 1`] = `"Node not found: AAAAAAAAAAAAA"`;
-
-exports[`Phase 7: Edge Cases 7.3 var set empty name errors 1`] = `"Usage: ocas var set <name> <hash> [--tag <tag>...]"`;
-
-exports[`Phase 7: Edge Cases 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Name must follow @scope/name format (e.g. @myapp/config)"`;
-
-exports[`Phase 7: Edge Cases 7.5 no subcommand shows help text 1`] = `
-"Usage: ocas [--home <path>] [--json] <command> [args]
-
-All JSON commands emit a { type, value } envelope. The type is the hash of the
-command's @ocas/output/* schema (shown in parentheses); pipe any envelope into
-\`render -p\` to render its value (ocas_ref hashes are expanded).
-
-Commands:
-  put <type-hash> <file.json|--pipe> Store node, print envelope (value=hash)            (@ocas/output/put)
-  get <hash>                        Print node as envelope                             (@ocas/output/get)
-  has <hash>                        Print envelope (value=boolean)                     (@ocas/output/has)
-  verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@ocas/output/verify)
-  refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
-  walk <hash> [--format tree]       Recursive traversal                                (@ocas/output/walk)
-  hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
-  render <hash> [options]           Render node as text with resolution decay (raw output)
-  render --pipe/-p [options]        Render { type, value } from stdin (raw output)
-  list --type <hash-or-name> [--tag <tag>...]  List hashes for a type, optionally filtered by tags    (@ocas/output/list)
-  list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
-  list-schema                       List all schema hashes (value=string[])           (@ocas/output/list-schema)
-  tag <target> <tag>...             Apply tags/labels to a target                      (@ocas/output/tag)
-  untag <target> <tag>...           Remove tags/labels from a target                   (@ocas/output/untag)
-  var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
-  var get <name> --schema <hash>    Get a variable by name + schema                    (@ocas/output/var-get)
-  var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
-  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
-  var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
-  template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
-  template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
-  template list                     List all templates                                 (@ocas/output/template-list)
-  template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
-  gc                                Run garbage collection                             (@ocas/output/gc)
-
-Flags:
-  --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
-  --json              Compact JSON output
-  --render, -r        Render output inline (equivalent to | ocas render -p)
-  --schema <hash>     Schema hash filter for var get/delete/tag/list
-  --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
-  --inline <text>     Inline text content for template set
-  --resolution <n>    Initial resolution for render (default: 1.0)
-  --decay <n>         Decay factor for render (default: 0.5)
-  --epsilon <n>       Cutoff threshold for render (default: 0.01)
-  --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
-
-Agent: If you have not installed the ocas skill for this version (0.2.0), run \`ocas prompt setup\` and follow the instructions."
-`;
-
 exports[`Phase 3: Variable System 3.1 var set creates variable 1`] = `
 {
   "type": "0Q5EMYK4SYSS9",
@@ -898,6 +750,46 @@ exports[`Phase 3: Variable System 3.10 var delete removes variable 1`] = `
 
 exports[`Phase 3: Variable System 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=@myapp/config, schema=FRBAB1BF0ZBCS"`;
 
+exports[`Phase 4: Template System > 4.1 template set registers template 1`] = `
+{
+  "type": "BJDHPAE4Q8TXM",
+  "value": {
+    "contentHash": "6WW8WNB38GTTP",
+    "schemaHash": "FRBAB1BF0ZBCS",
+  },
+}
+`;
+
+exports[`Phase 4: Template System > 4.2 template get returns template text 1`] = `
+{
+  "type": "0B0HBHZGYHR84",
+  "value": "Name: {{ payload.name }}, Age: {{ payload.age }}",
+}
+`;
+
+exports[`Phase 4: Template System > 4.3 template list shows registered templates 1`] = `
+{
+  "type": "8917JQTD1R5JF",
+  "value": [
+    {
+      "contentHash": "6WW8WNB38GTTP",
+      "schemaHash": "FRBAB1BF0ZBCS",
+    },
+  ],
+}
+`;
+
+exports[`Phase 4: Template System > 4.4 template delete removes template 1`] = `
+{
+  "type": "BY7BGZJND3N7R",
+  "value": {
+    "deleted": true,
+  },
+}
+`;
+
+exports[`Phase 4: Template System > 4.5 template get deleted template returns not found 1`] = `"Error: Template not found for schema: FRBAB1BF0ZBCS"`;
+
 exports[`Phase 4: Template System 4.1 template set registers template 1`] = `
 {
   "type": "BJDHPAE4Q8TXM",
@@ -937,3 +829,111 @@ exports[`Phase 4: Template System 4.4 template delete removes template 1`] = `
 `;
 
 exports[`Phase 4: Template System 4.5 template get deleted template returns not found 1`] = `"Error: Template not found for schema: FRBAB1BF0ZBCS"`;
+
+exports[`Phase 7: Edge Cases > 7.1 get non-existent hash errors gracefully 1`] = `"Node not found: AAAAAAAAAAAAA"`;
+
+exports[`Phase 7: Edge Cases > 7.3 var set empty name errors 1`] = `"Usage: ocas var set <name> <hash> [--tag <tag>...]"`;
+
+exports[`Phase 7: Edge Cases > 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Name must follow @scope/name format (e.g. @myapp/config)"`;
+
+exports[`Phase 7: Edge Cases > 7.5 no subcommand shows help text 1`] = `
+"Usage: ocas [--home <path>] [--json] <command> [args]
+
+All JSON commands emit a { type, value } envelope. The type is the hash of the
+command's @ocas/output/* schema (shown in parentheses); pipe any envelope into
+\`render -p\` to render its value (ocas_ref hashes are expanded).
+
+Commands:
+  put <type-hash> <file.json|--pipe> Store node, print envelope (value=hash)            (@ocas/output/put)
+  get <hash>                        Print node as envelope                             (@ocas/output/get)
+  has <hash>                        Print envelope (value=boolean)                     (@ocas/output/has)
+  verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@ocas/output/verify)
+  refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
+  walk <hash> [--format tree]       Recursive traversal                                (@ocas/output/walk)
+  hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
+  render <hash> [options]           Render node as text with resolution decay (raw output)
+  render --pipe/-p [options]        Render { type, value } from stdin (raw output)
+  list --type <hash-or-name> [--tag <tag>...]  List hashes for a type, optionally filtered by tags    (@ocas/output/list)
+  list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
+  list-schema                       List all schema hashes (value=string[])           (@ocas/output/list-schema)
+  tag <target> <tag>...             Apply tags/labels to a target                      (@ocas/output/tag)
+  untag <target> <tag>...           Remove tags/labels from a target                   (@ocas/output/untag)
+  var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
+  var get <name> --schema <hash>    Get a variable by name + schema                    (@ocas/output/var-get)
+  var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
+  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
+  var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
+  template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
+  template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
+  template list                     List all templates                                 (@ocas/output/template-list)
+  template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
+  gc                                Run garbage collection                             (@ocas/output/gc)
+
+Flags:
+  --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
+  --json              Compact JSON output
+  --render, -r        Render output inline (equivalent to | ocas render -p)
+  --schema <hash>     Schema hash filter for var get/delete/tag/list
+  --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
+  --inline <text>     Inline text content for template set
+  --resolution <n>    Initial resolution for render (default: 1.0)
+  --decay <n>         Decay factor for render (default: 0.5)
+  --epsilon <n>       Cutoff threshold for render (default: 0.01)
+  --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
+
+Agent: If you have not installed the ocas skill for this version (0.2.0), run \`ocas prompt setup\` and follow the instructions."
+`;
+
+exports[`Phase 7: Edge Cases 7.1 get non-existent hash errors gracefully 1`] = `"Node not found: AAAAAAAAAAAAA"`;
+
+exports[`Phase 7: Edge Cases 7.3 var set empty name errors 1`] = `"Usage: ocas var set <name> <hash> [--tag <tag>...]"`;
+
+exports[`Phase 7: Edge Cases 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Name must follow @scope/name format (e.g. @myapp/config)"`;
+
+exports[`Phase 7: Edge Cases 7.5 no subcommand shows help text 1`] = `
+"Usage: ocas [--home <path>] [--json] <command> [args]
+
+All JSON commands emit a { type, value } envelope. The type is the hash of the
+command's @ocas/output/* schema (shown in parentheses); pipe any envelope into
+\`render -p\` to render its value (ocas_ref hashes are expanded).
+
+Commands:
+  put <type-hash> <file.json|--pipe> Store node, print envelope (value=hash)            (@ocas/output/put)
+  get <hash>                        Print node as envelope                             (@ocas/output/get)
+  has <hash>                        Print envelope (value=boolean)                     (@ocas/output/has)
+  verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@ocas/output/verify)
+  refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
+  walk <hash> [--format tree]       Recursive traversal                                (@ocas/output/walk)
+  hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
+  render <hash> [options]           Render node as text with resolution decay (raw output)
+  render --pipe/-p [options]        Render { type, value } from stdin (raw output)
+  list --type <hash-or-name> [--tag <tag>...]  List hashes for a type, optionally filtered by tags    (@ocas/output/list)
+  list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
+  list-schema                       List all schema hashes (value=string[])           (@ocas/output/list-schema)
+  tag <target> <tag>...             Apply tags/labels to a target                      (@ocas/output/tag)
+  untag <target> <tag>...           Remove tags/labels from a target                   (@ocas/output/untag)
+  var set <name> <hash> [--tag <tag>...] Create/update a variable                      (@ocas/output/var-set)
+  var get <name> --schema <hash>    Get a variable by name + schema                    (@ocas/output/var-get)
+  var delete <name> [--schema <hash>] Delete variable(s)                               (@ocas/output/var-delete)
+  var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
+  var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
+  template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
+  template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
+  template list                     List all templates                                 (@ocas/output/template-list)
+  template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
+  gc                                Run garbage collection                             (@ocas/output/gc)
+
+Flags:
+  --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
+  --json              Compact JSON output
+  --render, -r        Render output inline (equivalent to | ocas render -p)
+  --schema <hash>     Schema hash filter for var get/delete/tag/list
+  --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
+  --inline <text>     Inline text content for template set
+  --resolution <n>    Initial resolution for render (default: 1.0)
+  --decay <n>         Decay factor for render (default: 0.5)
+  --epsilon <n>       Cutoff threshold for render (default: 0.01)
+  --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
+
+Agent: If you have not installed the ocas skill for this version (0.2.0), run \`ocas prompt setup\` and follow the instructions."
+`;

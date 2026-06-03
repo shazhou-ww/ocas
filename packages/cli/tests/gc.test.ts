@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { envValue } from "./helpers";
 
-const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
+const entrypoint = resolve(import.meta.dirname, "../dist/index.js");
 
 let tmpStore: string;
 let typeHash: string;
@@ -42,7 +42,8 @@ afterAll(() => {
   rmSync(tmpStore, { recursive: true, force: true });
 });
 
-function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
+function runCli(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+  const args = rawArgs.flat();
   try {
     const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
       encoding: "utf-8",

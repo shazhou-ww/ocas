@@ -7,7 +7,7 @@ import { bootstrap } from "@ocas/core";
 import { openStore as openFsStore } from "@ocas/fs";
 import { envValue, putSchemaFile, runCli, runCliWithStdin } from "./helpers";
 
-const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
+const entrypoint = resolve(import.meta.dirname, "../dist/index.js");
 
 // --- Standalone render tests from cli.test.ts ---
 
@@ -58,7 +58,8 @@ describe("Phase 5: Render", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCliE2e(args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCliE2e(...rawArgs: (string | string[])[]): { stdout: string; stderr: string; exitCode: number } {
+    const args = rawArgs.flat();
     try {
       const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",

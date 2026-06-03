@@ -560,7 +560,7 @@ describe("Phase 2: Schema Validation", () => {
   let typeHash: string;
   let _nodeHash: string;
 
-  const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
+  const entrypoint = resolve(import.meta.dirname, "../dist/index.js");
 
   beforeAll(async () => {
     tmpStore = mkdtempSync(join(tmpdir(), "ocas-e2e-"));
