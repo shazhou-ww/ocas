@@ -258,169 +258,169 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
   test("3.1: Reject schema with invalid type value", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () => putSchema(store, { type: "garbage" })).toThrow();
+    await expect(async () => putSchema(store, { type: "garbage" })).rejects.toThrow();
   });
 
   test("3.2: Reject schema with type as number", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, { type: 123 } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.3: Reject schema with properties not an object", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "object",
         properties: "not-an-object",
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.4: Reject schema with required not an array", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "object",
         required: "name",
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.5: Reject schema with required containing non-strings", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "object",
         required: ["name", 123, true],
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.6: Reject schema with additionalProperties as string", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "object",
         additionalProperties: "yes",
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.7: Reject schema with anyOf not an array", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         anyOf: { type: "string" },
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.8: Reject schema with empty anyOf array", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () => putSchema(store, { anyOf: [] })).toThrow();
+    await expect(async () => putSchema(store, { anyOf: [] })).rejects.toThrow();
   });
 
   test("3.9: Reject schema with items not an object", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "array",
         items: "string",
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.10: Reject schema with format not a string", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "string",
         format: 123,
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.11: Reject schema with enum not an array", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "string",
         enum: "red",
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.12: Reject schema with empty enum array", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, { type: "string", enum: [] }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.13: Reject schema with title not a string", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "string",
         title: 123,
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.14: Reject schema with description not a string", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "string",
         description: ["not a string"],
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.15: Reject schema with unsupported $ref keyword", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         $ref: "#/definitions/user",
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.16: Reject completely invalid data (non-object)", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, "not-a-schema" as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   test("3.17: Reject nested invalid schema in properties", async () => {
     const store = new MemStore();
     bootstrap(store);
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, {
         type: "object",
         properties: {
           name: { type: "invalid-type" },
         },
       } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 });
 
@@ -641,9 +641,9 @@ describe("Test Suite 7: Meta-Schema Content Validation", () => {
     expect(hash2).toBeTruthy();
 
     // Invalid type (number)
-    expect(async () =>
+    await expect(async () =>
       putSchema(store, { type: 123 } as unknown as JSONSchema),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 });
 

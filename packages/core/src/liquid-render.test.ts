@@ -598,7 +598,7 @@ describe("Suite 4: Render Flow Integration", () => {
         epsilon: 0.01,
       });
 
-      expect(output.length).toBe(0);
+      await expect(output.length).toBe(0);
     } finally {
       await cleanup();
     }
@@ -629,7 +629,7 @@ describe("Suite 4: Render Flow Integration", () => {
           decay: 0.5,
           epsilon: 0.01,
         });
-      }).toThrow();
+      }).rejects.toThrow();
     } finally {
       await cleanup();
     }
@@ -905,8 +905,8 @@ describe("Suite 6: Recursive Rendering Edge Cases", () => {
       });
 
       expect(output).toContain("Item: item1");
-      expect(output).toContain("Item: item2");
-      expect(output).toContain("Item: item3");
+      await expect(output).toContain("Item: item2");
+      await expect(output).toContain("Item: item3");
     } finally {
       await cleanup();
     }
@@ -937,7 +937,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
         epsilon: 0.01,
       });
 
-      expect(output).toBeDefined();
+      await expect(output).toBeDefined();
     } finally {
       await cleanup();
     }
@@ -976,7 +976,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
           decay: 0.5,
           epsilon: 0.01,
         });
-      }).toThrow(/decay/);
+      }).rejects.toThrow(/decay/);
     } finally {
       await cleanup();
     }
@@ -1015,7 +1015,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
           decay: 0.5,
           epsilon: 0.01,
         });
-      }).toThrow();
+      }).rejects.toThrow();
     } finally {
       await cleanup();
     }
@@ -1054,7 +1054,7 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
           decay: 0.5,
           epsilon: 0.01,
         });
-      }).toThrow(/decay/);
+      }).rejects.toThrow(/decay/);
     } finally {
       await cleanup();
     }

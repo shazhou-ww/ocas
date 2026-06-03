@@ -40,7 +40,7 @@ afterEach(() => {
  */
 function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const stdout = execFileSync("tsx", [cliPath, "--home", storePath, ...args], {
+    const stdout = execFileSync("node", [cliPath, "--home", storePath, ...args], {
       encoding: "utf-8",
       timeout: 10000,
     });
@@ -770,7 +770,7 @@ describe("global options", () => {
     const hash = await createTestNode(store, typeHash, { test: "data" });
 
     // Override with custom store path
-    execFileSync("tsx", [cliPath, "--home", customStorePath, "var", "set", "@test/x", hash], {
+    execFileSync("node", [cliPath, "--home", customStorePath, "var", "set", "@test/x", hash], {
       encoding: "utf-8",
       timeout: 10000,
     });

@@ -24,7 +24,7 @@ describe("ocas binary", () => {
   });
 
   test("T3: ocas command is executable and shows help", () => {
-    const stdout = execFileSync("tsx", [entrypoint, "--help"], {
+    const stdout = execFileSync("node", [entrypoint, "--help"], {
       encoding: "utf-8",
       timeout: 10000,
     });
@@ -39,9 +39,9 @@ describe("Phase 7: Edge Cases", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
     try {
-      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",
         timeout: 10000,
       });
@@ -127,7 +127,7 @@ describe("Phase 7: Edge Cases", () => {
     const fileAsStore = join(tmpStore, "not-a-directory");
     writeFileSync(fileAsStore, "test");
     try {
-      execFileSync("tsx", [entrypoint, "--home", fileAsStore, "get", "AAAAAAAAAAAAA"], {
+      execFileSync("node", [entrypoint, "--home", fileAsStore, "get", "AAAAAAAAAAAAA"], {
         encoding: "utf-8",
         timeout: 10000,
       });
@@ -147,9 +147,9 @@ describe("Phase 3: Variable System", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
     try {
-      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",
         timeout: 10000,
       });
@@ -336,9 +336,9 @@ describe("Phase 4: Template System", () => {
   let tmpStore: string;
   let typeHash: string;
 
-  function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  function runCli(args: string[]): { stdout: string; stderr: string; exitCode: number } {
     try {
-      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+      const stdout = execFileSync("node", [entrypoint, "--home", tmpStore, ...args], {
         encoding: "utf-8",
         timeout: 10000,
       });

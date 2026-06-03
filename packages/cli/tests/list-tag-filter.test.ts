@@ -29,7 +29,7 @@ afterEach(() => {
 
 function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const stdout = execFileSync("tsx", [cliPath, "--home", storePath, ...args], {
+    const stdout = execFileSync("node", [cliPath, "--home", storePath, ...args], {
       encoding: "utf-8",
       timeout: 10000,
     });
@@ -42,7 +42,7 @@ function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: 
 
 function putString(value: string): string {
   try {
-    const out = execFileSync("tsx", [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe"], {
+    const out = execFileSync("node", [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe"], {
       input: JSON.stringify(value),
       encoding: "utf-8",
       timeout: 10000,
