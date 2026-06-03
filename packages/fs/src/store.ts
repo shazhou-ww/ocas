@@ -27,7 +27,7 @@ import {
   type Store,
 } from "@ocas/core";
 import { decode } from "cborg";
-import { createFsTagStore, createFsVarStoreFor } from "./var-store.js";
+import { createSqliteVarStore } from "./sqlite-store.js";
 
 const INDEX_DIR = "_index";
 const META_FILE = "_meta";
@@ -393,10 +393,11 @@ export async function prepareStore(dir: string): Promise<FsCasStore> {
  */
 export async function openStore(dir: string): Promise<Store> {
   const cas = await prepareStore(dir);
+  const sqlite = createSqliteVarStore(dir, cas);
   const ocas: Store = {
     cas,
-    var: createFsVarStoreFor(dir, cas),
-    tag: createFsTagStore(dir),
+    var: sqlite.var,
+    tag: sqlite.tag,
   };
   bootstrap(ocas);
   return ocas;
