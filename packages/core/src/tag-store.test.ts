@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { createMemoryStore } from "./store.js";
 
 const T1 = "AAAAAAAAAAAAA";

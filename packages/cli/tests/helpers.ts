@@ -5,6 +5,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { JSONSchema } from "@ocas/core";
@@ -22,8 +23,8 @@ export {
   writeFileSync,
 };
 
-export const entrypoint = resolve(import.meta.dir, "../src/index.ts");
-export const pkgPath = resolve(import.meta.dir, "../package.json");
+export const entrypoint = resolve(import.meta.dirname, "../dist/index.js");
+export const pkgPath = resolve(import.meta.dirname, "../package.json");
 
 /** Extract the `value` field from a { type, value } envelope JSON string. */
 export function envValue(json: string): unknown {
@@ -50,40 +51,42 @@ export async function putSchemaFile(
  * Run CLI command. Accepts either a string[] or ...string[] (rest args).
  * If first arg is an array, uses that as args. Otherwise treats all args as the command.
  */
-export async function runCli(
+export function runCli(
   args: string[],
   storePath?: string,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+): { stdout: string; stderr: string; exitCode: number } {
   const finalArgs = storePath
-    ? ["bun", entrypoint, "--home", storePath, ...args]
-    : ["bun", entrypoint, ...args];
-  const proc = Bun.spawn(finalArgs, {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const exitCode = await proc.exited;
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
-  return { stdout, stderr, exitCode };
+    ? [entrypoint, "--home", storePath, ...args]
+    : [entrypoint, ...args];
+  try {
+    const stdout = execFileSync("node", finalArgs, {
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    return { stdout, stderr: "", exitCode: 0 };
+  } catch (e: unknown) {
+    const err = e as { stdout?: string; stderr?: string; status?: number };
+    return { stdout: err.stdout ?? "", stderr: err.stderr ?? "", exitCode: err.status ?? 1 };
+  }
 }
 
-export async function runCliWithStdin(
+export function runCliWithStdin(
   args: string[],
   storePath: string,
   stdin: string,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const finalArgs = ["bun", entrypoint, "--home", storePath, ...args];
-  const proc = Bun.spawn(finalArgs, {
-    stdout: "pipe",
-    stderr: "pipe",
-    stdin: "pipe",
-  });
-  proc.stdin.write(stdin);
-  proc.stdin.end();
-  const exitCode = await proc.exited;
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
-  return { stdout, stderr, exitCode };
+): { stdout: string; stderr: string; exitCode: number } {
+  const finalArgs = [entrypoint, "--home", storePath, ...args];
+  try {
+    const stdout = execFileSync("node", finalArgs, {
+      input: stdin,
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    return { stdout, stderr: "", exitCode: 0 };
+  } catch (e: unknown) {
+    const err = e as { stdout?: string; stderr?: string; status?: number };
+    return { stdout: err.stdout ?? "", stderr: err.stderr ?? "", exitCode: err.status ?? 1 };
+  }
 }
 
 /**

@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { mkdirSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,7 +14,7 @@ beforeEach(() => {
     `ocas-list-tag-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   storePath = join(testDir, "store");
-  cliPath = join(import.meta.dir, "../src/index.ts");
+  cliPath = join(import.meta.dirname, "../src/index.ts");
   mkdirSync(testDir, { recursive: true });
   mkdirSync(storePath, { recursive: true });
 });
@@ -26,50 +27,31 @@ afterEach(() => {
   }
 });
 
-async function runCli(...args: string[]): Promise<{
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}> {
-  const proc = Bun.spawn(
-    ["bun", "run", cliPath, "--home", storePath, ...args],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ]);
-  await proc.exited;
-  return {
-    stdout: stdout.trim(),
-    stderr: stderr.trim(),
-    exitCode: proc.exitCode ?? 0,
-  };
+function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  try {
+    const stdout = execFileSync("tsx", [cliPath, "--home", storePath, ...args], {
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+  } catch (e: unknown) {
+    const err = e as { stdout?: string; stderr?: string; status?: number };
+    return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+  }
 }
 
-async function putString(value: string): Promise<string> {
-  const proc = Bun.spawn(
-    [
-      "bun",
-      "run",
-      cliPath,
-      "--home",
-      storePath,
-      "put",
-      "@ocas/string",
-      "--pipe",
-    ],
-    { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
-  );
-  proc.stdin.write(JSON.stringify(value));
-  await proc.stdin.end();
-  const out = await new Response(proc.stdout).text();
-  const err = await new Response(proc.stderr).text();
-  await proc.exited;
-  if ((proc.exitCode ?? 0) !== 0) {
-    throw new Error(`put failed: ${err}`);
+function putString(value: string): string {
+  try {
+    const out = execFileSync("tsx", [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe"], {
+      input: JSON.stringify(value),
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    return JSON.parse(out.trim()).value as string;
+  } catch (e: unknown) {
+    const err = e as { stderr?: string };
+    throw new Error(`put failed: ${err.stderr ?? ""}`);
   }
-  return JSON.parse(out.trim()).value as string;
 }
 
 async function tag(target: string, ...tagSpecs: string[]): Promise<void> {

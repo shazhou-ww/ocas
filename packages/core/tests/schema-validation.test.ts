@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { bootstrap } from "../src/bootstrap.js";
 import { MemStore } from "../src/mem-store.js";
 import type { JSONSchema } from "../src/schema.js";

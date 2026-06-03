@@ -1,35 +1,33 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { envValue, stripVolatile } from "./helpers";
 
-const entrypoint = resolve(import.meta.dir, "../src/index.ts");
-const pkgPath = resolve(import.meta.dir, "../package.json");
+const entrypoint = resolve(import.meta.dirname, "../src/index.ts");
+const pkgPath = resolve(import.meta.dirname, "../package.json");
 
 // --- ocas command alias tests (from cli.test.ts) ---
 
 describe("ocas binary", () => {
   test("T1: ocas bin entry exists in package.json", async () => {
-    const pkg = await Bun.file(pkgPath).json();
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
     expect(pkg.bin.ocas).toBe("dist/index.js");
   });
 
   test("T2: no legacy bin entries (json-cas, ucas)", async () => {
-    const pkg = await Bun.file(pkgPath).json();
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
     expect(pkg.bin["json-cas"]).toBeUndefined();
     expect(pkg.bin.ucas).toBeUndefined();
     expect(Object.keys(pkg.bin)).toEqual(["ocas"]);
   });
 
-  test("T3: ocas command is executable and shows help", async () => {
-    const proc = Bun.spawn(["bun", entrypoint, "--help"], {
-      stdout: "pipe",
-      stderr: "pipe",
+  test("T3: ocas command is executable and shows help", () => {
+    const stdout = execFileSync("tsx", [entrypoint, "--help"], {
+      encoding: "utf-8",
+      timeout: 10000,
     });
-    const exitCode = await proc.exited;
-    const stdout = await new Response(proc.stdout).text();
-    expect(exitCode).toBe(0);
     expect(stdout.length).toBeGreaterThan(0);
   });
 });
@@ -41,17 +39,17 @@ describe("Phase 7: Edge Cases", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  async function runCli(
-    args: string[],
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const exitCode = await proc.exited;
-    const stdout = (await new Response(proc.stdout).text()).trim();
-    const stderr = (await new Response(proc.stderr).text()).trim();
-    return { stdout, stderr, exitCode };
+  function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+    try {
+      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+      return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string; status?: number };
+      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    }
   }
 
   beforeAll(async () => {
@@ -125,17 +123,20 @@ describe("Phase 7: Edge Cases", () => {
     expect(combined.toLowerCase()).toContain("usage");
   });
 
-  test("7.6 --home path is a file errors", async () => {
+  test("7.6 --home path is a file errors", () => {
     const fileAsStore = join(tmpStore, "not-a-directory");
     writeFileSync(fileAsStore, "test");
-    const proc = Bun.spawn(
-      ["bun", entrypoint, "--home", fileAsStore, "get", "AAAAAAAAAAAAA"],
-      { stdout: "pipe", stderr: "pipe" },
-    );
-    const exitCode = await proc.exited;
-    const stderr = (await new Response(proc.stderr).text()).trim();
-    expect(exitCode).not.toBe(0);
-    expect(stderr).toContain("not a directory");
+    try {
+      execFileSync("tsx", [entrypoint, "--home", fileAsStore, "get", "AAAAAAAAAAAAA"], {
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+      expect.unreachable("should have thrown");
+    } catch (e: unknown) {
+      const err = e as { stderr?: string; status?: number };
+      expect(err.status).not.toBe(0);
+      expect((err.stderr ?? "").trim()).toContain("not a directory");
+    }
   });
 });
 
@@ -146,17 +147,17 @@ describe("Phase 3: Variable System", () => {
   let typeHash: string;
   let nodeHash: string;
 
-  async function runCli(
-    args: string[],
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const exitCode = await proc.exited;
-    const stdout = (await new Response(proc.stdout).text()).trim();
-    const stderr = (await new Response(proc.stderr).text()).trim();
-    return { stdout, stderr, exitCode };
+  function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+    try {
+      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+      return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string; status?: number };
+      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    }
   }
 
   beforeAll(async () => {
@@ -335,17 +336,17 @@ describe("Phase 4: Template System", () => {
   let tmpStore: string;
   let typeHash: string;
 
-  async function runCli(
-    args: string[],
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const proc = Bun.spawn(["bun", entrypoint, "--home", tmpStore, ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const exitCode = await proc.exited;
-    const stdout = (await new Response(proc.stdout).text()).trim();
-    const stderr = (await new Response(proc.stderr).text()).trim();
-    return { stdout, stderr, exitCode };
+  function runCli(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+    try {
+      const stdout = execFileSync("tsx", [entrypoint, "--home", tmpStore, ...args], {
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+      return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string; status?: number };
+      return { stdout: (err.stdout ?? "").trim(), stderr: (err.stderr ?? "").trim(), exitCode: err.status ?? 1 };
+    }
   }
 
   beforeAll(async () => {

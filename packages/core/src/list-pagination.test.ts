@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import { createMemoryStore } from "./store.js";
 

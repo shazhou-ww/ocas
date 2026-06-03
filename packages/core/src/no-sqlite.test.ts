@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -16,7 +16,7 @@ function* walk(dir: string): Generator<string> {
 
 describe("no SQLite in @ocas/core", () => {
   test("source files do not import sqlite", () => {
-    const srcDir = import.meta.dir;
+    const srcDir = import.meta.dirname;
     const needle = ["bun", "sqlite"].join(":");
     for (const file of walk(srcDir)) {
       if (!file.endsWith(".ts")) continue;

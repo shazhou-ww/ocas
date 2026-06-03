@@ -1,3 +1,5 @@
-// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Phase 2: Schema Validation > 2.3 put against non-existent schema hash fails 1`] = `"Schema not found: AAAAAAAAAAAAA"`;
 
 exports[`Phase 2: Schema Validation 2.3 put against non-existent schema hash fails 1`] = `"Schema not found: AAAAAAAAAAAAA"`;

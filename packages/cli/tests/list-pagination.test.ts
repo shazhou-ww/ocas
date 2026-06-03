@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { envValue, runCli } from "./helpers.js";
@@ -18,24 +19,12 @@ afterEach(() => {
 });
 
 async function putString(text: string): Promise<string> {
-  // Use the @ocas/string built-in via library; CLI doesn't expose put-text but
-  // `put @ocas/string --pipe` works. We'll use --pipe with stdin.
-  const proc = Bun.spawn(
-    [
-      "bun",
-      join(import.meta.dir, "../src/index.ts"),
-      "--home",
-      storePath,
-      "put",
-      "@ocas/string",
-      "--pipe",
-    ],
-    { stdout: "pipe", stderr: "pipe", stdin: "pipe" },
-  );
-  proc.stdin.write(JSON.stringify(text));
-  proc.stdin.end();
-  await proc.exited;
-  const out = await new Response(proc.stdout).text();
+  const entrypoint = join(import.meta.dirname, "../src/index.ts");
+  const out = execFileSync("tsx", [entrypoint, "--home", storePath, "put", "@ocas/string", "--pipe"], {
+    input: JSON.stringify(text),
+    encoding: "utf-8",
+    timeout: 10000,
+  });
   return (JSON.parse(out) as { value: string }).value;
 }
 
