@@ -47,6 +47,8 @@ export async function putSchemaFile(
   return hash;
 }
 
+const quietEnv = { ...process.env, NODE_NO_WARNINGS: "1" };
+
 /**
  * Run CLI command. Accepts either a string[] or ...string[] (rest args).
  * If first arg is an array, uses that as args. Otherwise treats all args as the command.
@@ -59,9 +61,10 @@ export function runCli(
     ? [entrypoint, "--home", storePath, ...args]
     : [entrypoint, ...args];
   try {
-    const stdout = execFileSync("node", ["--no-warnings", ...finalArgs], {
+    const stdout = execFileSync("node", finalArgs, {
       encoding: "utf-8",
       timeout: 10000,
+      env: quietEnv,
     });
     return { stdout, stderr: "", exitCode: 0 };
   } catch (e: unknown) {
@@ -81,10 +84,11 @@ export function runCliWithStdin(
 ): { stdout: string; stderr: string; exitCode: number } {
   const finalArgs = [entrypoint, "--home", storePath, ...args];
   try {
-    const stdout = execFileSync("node", ["--no-warnings", ...finalArgs], {
+    const stdout = execFileSync("node", finalArgs, {
       input: stdin,
       encoding: "utf-8",
       timeout: 10000,
+      env: quietEnv,
     });
     return { stdout, stderr: "", exitCode: 0 };
   } catch (e: unknown) {
