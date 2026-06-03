@@ -623,13 +623,13 @@ describe("Suite 4: Render Flow Integration", () => {
       );
       store.var.set(`@ocas/template/text/${nodeSchema}`, template);
 
-      await expect(async () => {
-        await renderWithTemplate(store, nodeHash, {
+      await expect(
+        renderWithTemplate(store, nodeHash, {
           resolution: 1.0,
           decay: 0.5,
           epsilon: 0.01,
-        });
-      }).rejects.toThrow();
+        }),
+      ).rejects.toThrow();
     } finally {
       await cleanup();
     }
@@ -970,13 +970,13 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       );
       store.var.set(`@ocas/template/text/${parentSchema}`, template);
 
-      await expect(async () => {
-        await renderWithTemplate(store, parentHash, {
+      await expect(
+        renderWithTemplate(store, parentHash, {
           resolution: 1.0,
           decay: 0.5,
           epsilon: 0.01,
-        });
-      }).rejects.toThrow(/decay/);
+        }),
+      ).rejects.toThrow(/decay/);
     } finally {
       await cleanup();
     }
@@ -1009,13 +1009,13 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       );
       store.var.set(`@ocas/template/text/${parentSchema}`, template);
 
-      await expect(async () => {
-        await renderWithTemplate(store, parentHash, {
+      await expect(
+        renderWithTemplate(store, parentHash, {
           resolution: 1.0,
           decay: 0.5,
           epsilon: 0.01,
-        });
-      }).rejects.toThrow();
+        }),
+      ).rejects.toThrow();
     } finally {
       await cleanup();
     }
@@ -1048,13 +1048,13 @@ describe("Suite 7: Error Handling & Edge Cases", () => {
       );
       store.var.set(`@ocas/template/text/${parentSchema}`, template);
 
-      await expect(async () => {
-        await renderWithTemplate(store, parentHash, {
+      await expect(
+        renderWithTemplate(store, parentHash, {
           resolution: 1.0,
           decay: 0.5,
           epsilon: 0.01,
-        });
-      }).rejects.toThrow(/decay/);
+        }),
+      ).rejects.toThrow(/decay/);
     } finally {
       await cleanup();
     }

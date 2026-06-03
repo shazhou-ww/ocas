@@ -1,5 +1,5 @@
 name: "@ocas/workspace"
-runtime: bun
+runtime: node
 packages:
   - name: "@ocas/core"
     path: packages/core
