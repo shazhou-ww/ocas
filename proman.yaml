@@ -3,10 +3,13 @@ runtime: bun
 packages:
   - name: "@ocas/core"
     path: packages/core
+    type: lib
   - name: "@ocas/fs"
     path: packages/fs
+    type: lib
   - name: "@ocas/cli"
     path: packages/cli
+    type: cli
 changeset:
   fixed: true
 release:
