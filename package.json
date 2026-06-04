@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "proman build",
-    "test": "vitest run",
+    "test": "proman test",
     "check": "proman check",
     "format": "proman format"
   },
