@@ -1,5 +1,11 @@
 # @ocas/cli
 
+## 0.3.1
+
+### Patch Changes
+
+- Fix prompt docs: `bun` → `pnpm` install instructions, remove stale `--var-db` flag from usage docs.
+
 ## 0.2.0
 
 ### Breaking Changes
