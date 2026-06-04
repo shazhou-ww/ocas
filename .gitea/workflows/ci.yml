@@ -12,14 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: 'pnpm'
+          node-version: 22
 
-      - run: pnpm install
+      - run: corepack enable && pnpm install
 
       - name: Build
         run: pnpm run build
