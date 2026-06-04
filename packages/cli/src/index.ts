@@ -1234,7 +1234,7 @@ switch (cmd) {
     switch (sub) {
       case "usage": {
         const content = readFileSync(
-          join(__dirname, "prompts", "usage.md"),
+          join(__dirname, "..", "prompts", "usage.md"),
           "utf-8",
         );
         process.stdout.write(content);
@@ -1242,7 +1242,7 @@ switch (cmd) {
       }
       case "setup": {
         const content = readFileSync(
-          join(__dirname, "prompts", "setup.md"),
+          join(__dirname, "..", "prompts", "setup.md"),
           "utf-8",
         );
         process.stdout.write(content);
