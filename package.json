@@ -27,11 +27,5 @@
   },
   "bugs": {
     "url": "https://github.com/shazhou-ww/ocas/issues"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ],
-    "overrides": {}
   }
 }
