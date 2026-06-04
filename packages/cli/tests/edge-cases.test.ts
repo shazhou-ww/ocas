@@ -52,6 +52,7 @@ describe("Phase 7: Edge Cases", () => {
         {
           encoding: "utf-8",
           timeout: 10000,
+          env: { ...process.env, NODE_NO_WARNINGS: "1" },
         },
       );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
@@ -177,6 +178,7 @@ describe("Phase 3: Variable System", () => {
         {
           encoding: "utf-8",
           timeout: 10000,
+          env: { ...process.env, NODE_NO_WARNINGS: "1" },
         },
       );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
@@ -379,6 +381,7 @@ describe("Phase 4: Template System", () => {
         {
           encoding: "utf-8",
           timeout: 10000,
+          env: { ...process.env, NODE_NO_WARNINGS: "1" },
         },
       );
       return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
