@@ -610,6 +610,7 @@ describe("Phase 2: Schema Validation", () => {
         {
           encoding: "utf-8",
           timeout: 10000,
+          env: { ...process.env, NODE_NO_WARNINGS: "1" },
         },
       ).trim();
     } catch (e: unknown) {
@@ -635,6 +636,7 @@ describe("Phase 2: Schema Validation", () => {
         {
           encoding: "utf-8",
           timeout: 10000,
+          env: { ...process.env, NODE_NO_WARNINGS: "1" },
         },
       );
     } catch (e: unknown) {

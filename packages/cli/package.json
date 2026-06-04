@@ -14,6 +14,10 @@
   "bin": {
     "ocas": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "prompts"
+  ],
   "dependencies": {
     "@ocas/core": "workspace:*",
     "@ocas/fs": "workspace:*"
