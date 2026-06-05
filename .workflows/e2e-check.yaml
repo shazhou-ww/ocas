@@ -398,7 +398,8 @@ roles:
 
 graph:
   $START:
-    _: { role: "preparer", prompt: "Set up Docker environment for E2E testing. Repo at {{{repoPath}}}." }
+    new: { role: "preparer", prompt: "Set up Docker environment for E2E testing. Repo at {{{repoPath}}}." }
+    resume: { role: "preparer", prompt: "Review previous E2E run and continue testing. Repo at {{{repoPath}}}." }
   preparer:
     ready: { role: "tester", prompt: "Environment ready. Container: {{{containerName}}}, store: {{{storePath}}}. Run all test scenarios." }
     setup_failed: { role: "reporter", prompt: "Setup failures found. File these as bugs: {{{failures}}}" }

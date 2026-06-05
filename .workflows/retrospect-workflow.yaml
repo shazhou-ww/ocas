@@ -212,7 +212,8 @@ roles:
           required: [$status, error]
 graph:
   $START:
-    _: { role: "analyst", prompt: "Analyze completed thread {{{threadId}}} for execution anomalies." }
+    new: { role: "analyst", prompt: "Analyze completed thread {{{threadId}}} for execution anomalies." }
+    resume: { role: "analyst", prompt: "Review previous analysis of thread {{{threadId}}} and continue." }
   analyst:
     clean: { role: "$END", prompt: "No issues found. Thread executed cleanly." }
     findings: { role: "proposer", prompt: "Findings report: {{{report}}}. Target workflow: {{{targetWorkflow}}}. Propose minimal edits." }
