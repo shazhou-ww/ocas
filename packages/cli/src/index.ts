@@ -5,6 +5,8 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { cmdPromptBootstrap } from "./prompt-bootstrap.js";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import type { Hash, ListEntry, ListOptions, Store, TagOp } from "@ocas/core";
@@ -1115,7 +1117,7 @@ Flags:
   --epsilon <n>       Cutoff threshold for render (default: 0.01)
   --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
 
-Agent: If you have not installed the ocas skill for this version (${pkg.version}), run \`ocas prompt setup\` and follow the instructions.`);
+Agent: If you have not installed the ocas skill for this version (${pkg.version}), run \`ocas prompt bootstrap\` and follow the instructions.`);
 }
 
 // ---- Dispatch ----
@@ -1232,6 +1234,11 @@ switch (cmd) {
   case "prompt": {
     const [sub] = rest;
     switch (sub) {
+      case "list": {
+        // biome-ignore lint/suspicious/noConsole: CLI user-facing output
+        console.log("usage\nbootstrap");
+        break;
+      }
       case "usage": {
         const content = readFileSync(
           join(__dirname, "..", "prompts", "usage.md"),
@@ -1240,17 +1247,14 @@ switch (cmd) {
         process.stdout.write(content);
         break;
       }
-      case "setup": {
-        const content = readFileSync(
-          join(__dirname, "..", "prompts", "setup.md"),
-          "utf-8",
-        );
-        process.stdout.write(content);
+      case "bootstrap": {
+        // biome-ignore lint/suspicious/noConsole: CLI user-facing output
+        console.log(cmdPromptBootstrap());
         break;
       }
       default:
         die(
-          `Unknown prompt subcommand: ${sub ?? "(none)"}. Available: usage, setup`,
+          `Unknown prompt subcommand: ${sub ?? "(none)"}. Available: list, usage, bootstrap`,
         );
     }
     break;

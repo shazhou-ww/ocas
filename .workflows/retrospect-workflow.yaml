@@ -120,15 +120,15 @@ roles:
       1. Use `git rev-parse --show-toplevel` to find the repo root (do NOT use repoPath from proposer — that's the analyzed repo)
       2. `git fetch origin` to get latest refs
       3. `git worktree add .worktrees/retrospect/<short-slug> -b retrospect/<short-slug> origin/main`
-      4. `cd .worktrees/retrospect/<short-slug> && bun install`
+      4. `cd .worktrees/retrospect/<short-slug> && pnpm install`
       5. ALL subsequent work must happen inside the worktree directory.
 
       Then apply changes:
       6. Read the change plan from CAS: `uwf cas get <plan hash>`
       7. Apply each edit from the plan to the workflow YAML
       8. Update or add tests as specified in the plan
-      9. Run `bun run build` and `bun test` to verify
-      10. Run `bun run check` for lint
+      9. Run `pnpm run build` and `pnpm test` to verify
+      10. Run `pnpm run check` for lint
       11. Commit with message: `improve: <workflow-name> — <brief summary>`
     output: "List all files changed and provide a summary. Set $status to done (with branch/worktree), or failed (with reason)."
     frontmatter:
@@ -157,8 +157,8 @@ roles:
       2. Edits should be minimal — don't rewrite working procedures
       3. New pitfall notes or instructions must be clear and actionable
       4. Tests must be updated if assertions changed
-      5. `bun run build` and `bun test` must pass
-      6. `bunx biome check` must pass
+      5. `pnpm run build` and `pnpm test` must pass
+      6. `pnpm run check` must pass
 
       IMPORTANT: `tea pr create` must run from the MAIN repo directory (not a worktree), because tea cannot detect the repo from worktree `.git` files.
     output: "Explain your decision. Set $status to approved (with branch/worktree) or rejected (with comments)."
