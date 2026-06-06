@@ -1234,6 +1234,11 @@ switch (cmd) {
   case "prompt": {
     const [sub] = rest;
     switch (sub) {
+      case "list": {
+        // biome-ignore lint/suspicious/noConsole: CLI user-facing output
+        console.log("usage\nbootstrap");
+        break;
+      }
       case "usage": {
         const content = readFileSync(
           join(__dirname, "..", "prompts", "usage.md"),
@@ -1249,7 +1254,7 @@ switch (cmd) {
       }
       default:
         die(
-          `Unknown prompt subcommand: ${sub ?? "(none)"}. Available: usage, bootstrap`,
+          `Unknown prompt subcommand: ${sub ?? "(none)"}. Available: list, usage, bootstrap`,
         );
     }
     break;
