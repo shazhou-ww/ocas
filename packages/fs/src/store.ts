@@ -31,10 +31,33 @@ import { createSqliteVarStore } from "./sqlite-store.js";
 
 const INDEX_DIR = "_index";
 const META_FILE = "_meta";
+const NODES_DIR = "nodes";
 
 // Initialise the xxhash WASM instance once at module load so the FS CAS
 // store can use the synchronous hashing functions.
 await initHasher();
+
+/**
+ * Migrate any pre-#84 flat-layout `.bin` files at the store root into the
+ * `nodes/` subdirectory. Idempotent — does nothing if no `.bin` files are
+ * present at the root.
+ */
+function migrateFlatLayoutToNodes(dir: string): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  const binFiles = entries.filter((name) => name.endsWith(".bin"));
+  if (binFiles.length === 0) return;
+
+  const nodesDir = join(dir, NODES_DIR);
+  mkdirSync(nodesDir, { recursive: true });
+  for (const name of binFiles) {
+    renameSync(join(dir, name), join(nodesDir, name));
+  }
+}
 
 function loadDir(dir: string, data: Map<Hash, CasNode>): void {
   let entries: string[];
@@ -203,8 +226,12 @@ export type FsCasStore = BootstrapCapableStore & {
 };
 
 export function createFsStore(dir: string): FsCasStore {
+  // Migrate any pre-#84 flat-layout .bin files at the root into nodes/.
+  migrateFlatLayoutToNodes(dir);
+
+  const nodesDir = join(dir, NODES_DIR);
   const data = new Map<Hash, CasNode>();
-  loadDir(dir, data);
+  loadDir(nodesDir, data);
   const indexDir = join(dir, INDEX_DIR);
   const typeIndex = loadOrMigrateTypeIndex(dir, data);
   const metaSet = loadOrMigrateMetaSet(dir, data);
@@ -215,9 +242,9 @@ export function createFsStore(dir: string): FsCasStore {
       const node: CasNode = { type: hash, payload, timestamp: Date.now() };
       data.set(hash, node);
 
-      mkdirSync(dir, { recursive: true });
-      const tmp = join(dir, `${hash}.tmp`);
-      const dest = join(dir, `${hash}.bin`);
+      mkdirSync(nodesDir, { recursive: true });
+      const tmp = join(nodesDir, `${hash}.tmp`);
+      const dest = join(nodesDir, `${hash}.bin`);
       writeFileSync(
         tmp,
         cborEncode({ type: hash, payload, timestamp: node.timestamp }),
@@ -242,9 +269,9 @@ export function createFsStore(dir: string): FsCasStore {
         };
         data.set(hash, node);
 
-        mkdirSync(dir, { recursive: true });
-        const tmp = join(dir, `${hash}.tmp`);
-        const dest = join(dir, `${hash}.bin`);
+        mkdirSync(nodesDir, { recursive: true });
+        const tmp = join(nodesDir, `${hash}.tmp`);
+        const dest = join(nodesDir, `${hash}.bin`);
         writeFileSync(
           tmp,
           cborEncode({ type: typeHash, payload, timestamp: node.timestamp }),
@@ -297,7 +324,7 @@ export function createFsStore(dir: string): FsCasStore {
       data.delete(hash);
       // Delete file
       try {
-        unlinkSync(join(dir, `${hash}.bin`));
+        unlinkSync(join(nodesDir, `${hash}.bin`));
       } catch {
         // ignore if file doesn't exist
       }

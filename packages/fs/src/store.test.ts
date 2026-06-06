@@ -3,7 +3,9 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -586,5 +588,267 @@ describe("openStore – Store shape", () => {
     expect(typeof store.tag.tag).toBe("function");
     expect(typeof store.tag.tags).toBe("function");
     expect(typeof store.tag.listByTag).toBe("function");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// nodes/ subdirectory layout (#84)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("createFsStore – nodes/ subdirectory layout", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = makeTmpDir();
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // A. New layout – nodes written to nodes/ subdirectory
+
+  test("A1. put() writes .bin file to dir/nodes/, not dir/", async () => {
+    const store = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "t" });
+    const hash = await store.put(typeHash, { x: 1 });
+
+    expect(existsSync(join(dir, "nodes", `${hash}.bin`))).toBe(true);
+    expect(existsSync(join(dir, `${hash}.bin`))).toBe(false);
+  });
+
+  test("A2. putSelfReferencing (BOOTSTRAP_STORE) writes to dir/nodes/", async () => {
+    const store = createFsStore(dir);
+    const hash = await store[BOOTSTRAP_STORE]({ type: "object" });
+
+    expect(existsSync(join(dir, "nodes", `${hash}.bin`))).toBe(true);
+    expect(existsSync(join(dir, `${hash}.bin`))).toBe(false);
+  });
+
+  test("A3. nodes/ directory auto-created on first put", async () => {
+    expect(existsSync(join(dir, "nodes"))).toBe(false);
+
+    const store = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "t" });
+    await store.put(typeHash, { x: 1 });
+
+    expect(existsSync(join(dir, "nodes"))).toBe(true);
+    expect(statSync(join(dir, "nodes")).isDirectory()).toBe(true);
+  });
+
+  // B. Round-trip with new layout
+
+  test("B1. second createFsStore instance reads nodes from dir/nodes/", async () => {
+    const typeHash = await computeSelfHash({ name: "B1" });
+
+    const store1 = createFsStore(dir);
+    const h1 = await store1.put(typeHash, { msg: "hello" });
+    const h2 = await store1.put(typeHash, { msg: "world" });
+
+    // Confirm files are in nodes/, not root
+    expect(existsSync(join(dir, "nodes", `${h1}.bin`))).toBe(true);
+    expect(existsSync(join(dir, "nodes", `${h2}.bin`))).toBe(true);
+
+    const store2 = createFsStore(dir);
+    expect(store2.has(h1)).toBe(true);
+    expect(store2.has(h2)).toBe(true);
+    expect(store2.listByType(typeHash)).toHaveLength(2);
+  });
+
+  test("B2. openStore round-trip: bootstrap + put + reload all intact", async () => {
+    const store1 = await openStore(dir);
+    const schemas1 = bootstrap(store1);
+    const schemaHash = schemas1["@ocas/schema"] ?? "";
+    const typeHash = await computeSelfHash({ name: "B2" });
+    const userHash = store1.cas.put(typeHash, { x: 42 });
+
+    // All node files should be in nodes/
+    const nodeEntries = readdirSync(join(dir, "nodes"));
+    expect(nodeEntries.some((e) => e === `${schemaHash}.bin`)).toBe(true);
+    expect(nodeEntries.some((e) => e === `${userHash}.bin`)).toBe(true);
+
+    const store2 = await openStore(dir);
+    expect(store2.cas.has(schemaHash)).toBe(true);
+    expect(store2.cas.has(userHash)).toBe(true);
+  });
+
+  // C. Migration from old flat layout
+
+  test("C1. old-layout .bin files in dir/ root are moved to dir/nodes/ on createFsStore", async () => {
+    // Manually build an "old" layout by writing nodes via a fresh store first
+    // then renaming files from nodes/ back to root, simulating pre-#84 stores.
+    const typeHash = await computeSelfHash({ name: "C1" });
+    const tmp = createFsStore(dir);
+    const h1 = await tmp.put(typeHash, { i: 1 });
+    const h2 = await tmp.put(typeHash, { i: 2 });
+
+    // Simulate old flat layout: move .bin files from nodes/ to root
+    const nodesDir = join(dir, "nodes");
+    for (const f of readdirSync(nodesDir)) {
+      renameSync(join(nodesDir, f), join(dir, f));
+    }
+    rmSync(nodesDir, { recursive: true, force: true });
+
+    expect(existsSync(join(dir, `${h1}.bin`))).toBe(true);
+    expect(existsSync(join(dir, `${h2}.bin`))).toBe(true);
+    expect(existsSync(nodesDir)).toBe(false);
+
+    // Now open the store; migration should run
+    const _store = createFsStore(dir);
+
+    expect(existsSync(join(dir, "nodes", `${h1}.bin`))).toBe(true);
+    expect(existsSync(join(dir, "nodes", `${h2}.bin`))).toBe(true);
+  });
+
+  test("C2. after migration, no .bin files remain in dir/ root", async () => {
+    const typeHash = await computeSelfHash({ name: "C2" });
+    const tmp = createFsStore(dir);
+    await tmp.put(typeHash, { i: 1 });
+    await tmp.put(typeHash, { i: 2 });
+
+    // Simulate old flat layout
+    const nodesDir = join(dir, "nodes");
+    for (const f of readdirSync(nodesDir)) {
+      renameSync(join(nodesDir, f), join(dir, f));
+    }
+    rmSync(nodesDir, { recursive: true, force: true });
+
+    const _store = createFsStore(dir);
+
+    const rootEntries = readdirSync(dir);
+    const binFilesInRoot = rootEntries.filter((e) => e.endsWith(".bin"));
+    expect(binFilesInRoot).toEqual([]);
+  });
+
+  test("C3. after migration, all nodes accessible via get() and listByType()", async () => {
+    const typeHash = await computeSelfHash({ name: "C3" });
+    const tmp = createFsStore(dir);
+    const h1 = await tmp.put(typeHash, { i: 1 });
+    const h2 = await tmp.put(typeHash, { i: 2 });
+    const h3 = await tmp.put(typeHash, { i: 3 });
+
+    // Simulate old flat layout: move .bin to root, drop _index so we re-build
+    const nodesDir = join(dir, "nodes");
+    for (const f of readdirSync(nodesDir)) {
+      renameSync(join(nodesDir, f), join(dir, f));
+    }
+    rmSync(nodesDir, { recursive: true, force: true });
+    rmSync(join(dir, "_index"), { recursive: true, force: true });
+
+    const store = createFsStore(dir);
+    expect(store.has(h1)).toBe(true);
+    expect(store.has(h2)).toBe(true);
+    expect(store.has(h3)).toBe(true);
+    const listed = store.listByType(typeHash).map((e) => e.hash);
+    expect(listed).toHaveLength(3);
+    expect(listed).toContain(h1);
+    expect(listed).toContain(h2);
+    expect(listed).toContain(h3);
+  });
+
+  test("C4. migration is idempotent: re-opening already-migrated store is no-op", async () => {
+    const typeHash = await computeSelfHash({ name: "C4" });
+    const store1 = createFsStore(dir);
+    const h1 = await store1.put(typeHash, { i: 1 });
+    await store1.put(typeHash, { i: 2 });
+
+    const nodesDirBefore = readdirSync(join(dir, "nodes")).sort();
+    const rootEntriesBefore = readdirSync(dir).sort();
+
+    // Re-open — should be a no-op (no migration occurs)
+    const _store2 = createFsStore(dir);
+
+    const nodesDirAfter = readdirSync(join(dir, "nodes")).sort();
+    const rootEntriesAfter = readdirSync(dir).sort();
+
+    expect(nodesDirAfter).toEqual(nodesDirBefore);
+    expect(rootEntriesAfter).toEqual(rootEntriesBefore);
+    // Sanity: file from before migration is still in nodes/
+    expect(existsSync(join(dir, "nodes", `${h1}.bin`))).toBe(true);
+  });
+
+  test("C5. openStore on old layout: migrates, bootstraps, put/get all work", async () => {
+    // Build an "old" store: bootstrap then move .bin to root
+    const store1 = await openStore(dir);
+    const schemas1 = bootstrap(store1);
+    const schemaHash = schemas1["@ocas/schema"] ?? "";
+
+    const nodesDir = join(dir, "nodes");
+    for (const f of readdirSync(nodesDir)) {
+      renameSync(join(nodesDir, f), join(dir, f));
+    }
+    rmSync(nodesDir, { recursive: true, force: true });
+
+    expect(existsSync(join(dir, `${schemaHash}.bin`))).toBe(true);
+
+    // Re-open with openStore — should migrate + bootstrap idempotently
+    const store2 = await openStore(dir);
+    expect(store2.cas.has(schemaHash)).toBe(true);
+    expect(existsSync(join(dir, "nodes", `${schemaHash}.bin`))).toBe(true);
+    expect(existsSync(join(dir, `${schemaHash}.bin`))).toBe(false);
+
+    // put/get works after migration
+    const typeHash = await computeSelfHash({ name: "C5" });
+    const newHash = store2.cas.put(typeHash, { hello: "world" });
+    expect(store2.cas.has(newHash)).toBe(true);
+    expect(existsSync(join(dir, "nodes", `${newHash}.bin`))).toBe(true);
+  });
+
+  // D. Delete
+
+  test("D1. delete() removes dir/nodes/<hash>.bin (not dir/<hash>.bin)", async () => {
+    const store = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "D1" });
+    const hash = await store.put(typeHash, { x: 1 });
+
+    expect(existsSync(join(dir, "nodes", `${hash}.bin`))).toBe(true);
+
+    const removed = store.delete(hash);
+    expect(removed).toBe(true);
+
+    expect(existsSync(join(dir, "nodes", `${hash}.bin`))).toBe(false);
+    expect(existsSync(join(dir, `${hash}.bin`))).toBe(false);
+    expect(store.has(hash)).toBe(false);
+  });
+
+  // E. Metadata location unchanged
+
+  test("E1. _index/ stays in dir/ (not inside nodes/)", async () => {
+    const store = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "E1" });
+    await store.put(typeHash, { x: 1 });
+
+    expect(existsSync(join(dir, "_index"))).toBe(true);
+    expect(statSync(join(dir, "_index")).isDirectory()).toBe(true);
+    expect(existsSync(join(dir, "nodes", "_index"))).toBe(false);
+  });
+
+  test("E2. _store.db stays in dir/ (not inside nodes/)", async () => {
+    const store = await openStore(dir);
+    const typeHash = await computeSelfHash({ name: "E2" });
+    store.cas.put(typeHash, { x: 1 });
+
+    expect(existsSync(join(dir, "_store.db"))).toBe(true);
+    expect(existsSync(join(dir, "nodes", "_store.db"))).toBe(false);
+  });
+
+  // F. Index rebuild with new layout
+
+  test("F1. removing _index/ then re-opening rebuilds index from dir/nodes/ .bin files", async () => {
+    const typeHash = await computeSelfHash({ name: "F1" });
+    const store1 = createFsStore(dir);
+    const h1 = await store1.put(typeHash, { a: 1 });
+    const h2 = await store1.put(typeHash, { a: 2 });
+
+    rmSync(join(dir, "_index"), { recursive: true, force: true });
+    expect(existsSync(join(dir, "_index"))).toBe(false);
+
+    const store2 = createFsStore(dir);
+    const list = store2.listByType(typeHash).map((e) => e.hash);
+    expect(list).toHaveLength(2);
+    expect(list).toContain(h1);
+    expect(list).toContain(h2);
+    expect(existsSync(join(dir, "_index", typeHash))).toBe(true);
+
+    // sanity: .bin files still in nodes/
+    expect(existsSync(join(dir, "nodes", `${h1}.bin`))).toBe(true);
+    expect(existsSync(join(dir, "nodes", `${h2}.bin`))).toBe(true);
   });
 });
