@@ -1,5 +1,10 @@
 # @ocas/fs
 
+## 0.4.0 — 2026-06-07
+
+- `FsStore` now uses lazy loading: at startup it scans only filenames in the `nodes/` subdirectory (no CBOR decoding) and reads each node from disk on first `get()`. This makes startup O(filenames) instead of O(decoded-bytes), keeps memory usage bounded by what's actually accessed, and avoids paying the full-load cost for stores with many nodes. Behaviour is unchanged: `has()`, `listAll()`, `listByType()`, `listMeta()`, and `listSchemas()` return the same results as before. Index/meta migration paths still work — they perform a one-time scan + decode when `_index/` is missing.
+- Move CAS node files from the store root into a `nodes/` subdirectory. Pre-existing flat-layout stores are auto-migrated on first open: any `<HASH>.bin` files in the store root are renamed into `nodes/`. Metadata (`_index/`, `_store.db`, `_meta`) remain at the store root unchanged.
+
 ## 0.3.0 — 2026-06-03
 
 - Migrate from better-sqlite3 to built-in node:sqlite — zero native addon dependencies, no more NODE_MODULE_VERSION mismatch across Node upgrades.
