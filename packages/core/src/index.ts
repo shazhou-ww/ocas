@@ -1,7 +1,16 @@
 export { bootstrap } from "./bootstrap.js";
 export type { BootstrapCapableStore } from "./bootstrap-capable.js";
 export { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
+export {
+  type ExportStats,
+  exportBundle,
+  type ImportOptions,
+  type ImportStats,
+  importBundle,
+  loadBundleStore,
+} from "./bundle.js";
 export { cborEncode } from "./cbor.js";
+export { type ClosureResult, computeClosure } from "./closure.js";
 export {
   CasNodeNotFoundError,
   InvalidTagFormatError,
