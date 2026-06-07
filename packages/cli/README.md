@@ -40,6 +40,7 @@ Usage: ocas [--home <path>] [--json] <command> [args]
 |------|-------------|
 | `--home <path>` | Store directory (default: `$OCAS_HOME` or `~/.ocas`) |
 | `--var-db <path>` | Variable database path (default: `<home>/variables.db`) |
+| `--store <bundle.tar>` | Open a bundle file as a read-only store (write commands rejected) |
 | `--json` | Compact (single-line) JSON output |
 
 ### Envelope format
@@ -82,6 +83,8 @@ raw, non-envelope text.
 | `template list` | `{ schemaHash, contentHash }[]` | `@output/template-list` |
 | `template delete <schema-hash>` | `{ deleted: boolean }` | `@output/template-delete` |
 | `gc` | `{ total, reachable, collected, scanned }` | `@output/gc` |
+| `export <root...> -o <bundle.tar>` | `{ nodes, vars, tags }` | `@output/export` |
+| `import <bundle.tar> [--scope @new]` | nested `{ nodes, vars, tags }` stats | `@output/import` |
 
 ### Examples
 
@@ -142,6 +145,35 @@ ocas template set 0123456789ABC --inline "Item: {{ payload.name }}"
 ocas render <content-hash>
 # → Item: Widget
 ```
+
+### Bundles (export / import)
+
+`ocas export` walks the transitive CAS closure (refs **and** schema chains) of one or more
+roots and writes a self-contained POSIX-tar archive containing every reachable CAS node
+(`cas/<hash>.bin`, CBOR-encoded), every variable whose value is in-closure
+(`vars.jsonl`), and every tag attached to an in-closure target (`tags.jsonl`).
+
+```bash
+ocas export @myapp/config -o myapp.tar             # single root by name
+ocas export @myapp/config @myapp/users -o m.tar    # multiple roots
+ocas export 1ABC2DEF34567 -o snapshot.tar          # raw hash root
+
+# Import into the current store (idempotent — content-addressed dedup)
+ocas import myapp.tar
+ocas import myapp.tar --scope @prod                # remap @myapp/* → @prod/*
+
+# Inspect a bundle without unpacking it
+ocas get @myapp/config --store myapp.tar
+ocas walk @myapp/config --store myapp.tar
+ocas var list --store myapp.tar
+```
+
+`-o <path>` (required for `export`) names the output tar. `--scope @new` rewrites the
+leading `@scope` of every imported variable name except builtins (`@ocas/*`).
+`--store <bundle.tar>` swaps the store backend for any read-only command (`get`, `has`,
+`refs`, `walk`, `list`, `var list`, `var get`, `verify`, `render`, …); write commands
+(`put`, `tag`, `gc`, `import`, `var set`, `template set`, …) refuse with
+`--store is read-only` when the flag is set.
 
 ## Internal Structure
 

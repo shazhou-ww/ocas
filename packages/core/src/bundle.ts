@@ -1,5 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { decode } from "cborg";
 import { bootstrap } from "./bootstrap.js";
+import { BOOTSTRAP_STORE } from "./bootstrap-capable.js";
 import { cborEncode } from "./cbor.js";
 import { computeClosure } from "./closure.js";
 import { createMemoryStore } from "./store.js";
@@ -33,7 +35,6 @@ export type ImportStats = {
 };
 
 /** Import via CBOR using cborg, mirroring how FsStore decodes nodes. */
-import { decode } from "cborg";
 
 const BUILTIN_PREFIX = "@ocas/";
 
@@ -231,17 +232,12 @@ export async function importBundle(
         const cas = target.cas as unknown as {
           [k: symbol]: ((p: unknown) => Hash) | undefined;
         };
-        const bootstrapSym = Symbol.for("ocas.bootstrap-store");
-        // Look up the proper symbol from the module to avoid forging it.
-        // (Imported lazily to avoid circular dependency at module init.)
-        const sym = (await import("./bootstrap-capable.js")).BOOTSTRAP_STORE;
-        const fn = cas[sym];
+        const fn = cas[BOOTSTRAP_STORE];
         if (fn) {
           fn(node.payload);
         } else {
           target.cas.put(node.type, node.payload);
         }
-        void bootstrapSym;
         imported++;
       } else {
         target.cas.put(node.type, node.payload);
