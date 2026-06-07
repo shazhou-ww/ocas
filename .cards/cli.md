@@ -68,12 +68,36 @@ ocas render <hash> [--resolution n] [--decay n] [--epsilon n]
 ocas render --pipe/-p [options]
 ```
 
+### Bundle Export / Import
+
+```bash
+ocas export <root>... -o <bundle.tar>     # write CAS closure of roots to tar
+ocas import <bundle.tar> [--scope @new]   # merge bundle into current store
+```
+
+`ocas export` walks `cas_ref` edges **and** schema chains from each root, then
+writes a self-contained POSIX-tar archive containing every reachable CAS node
+(`cas/<hash>.bin`, CBOR-encoded), every variable whose `value` is in-closure
+(`vars.jsonl`), and every tag attached to an in-closure target (`tags.jsonl`).
+
+`ocas import` is content-addressed and idempotent — re-importing the same
+bundle is a no-op. `--scope @new` rewrites the leading `@scope/` of every
+imported variable name except `@ocas/*` builtins.
+
+`--store <bundle.tar>` is a global flag that swaps the store backend for
+read-only commands. Internally this calls `loadBundleStore()` (from
+`@ocas/core`) which returns an in-memory `Store` populated from the bundle,
+without touching `~/.ocas`. Write commands (`put`, `tag`, `gc`, `import`,
+`var set`, `template set`, …) refuse with an explicit error when `--store`
+is set.
+
 ## Flags
 
 | Flag | Description |
 |------|-------------|
 | `--home <path>` | Store directory |
 | `--var-db <path>` | Variable database path |
+| `--store <bundle.tar>` | Open a bundle as a read-only store (write commands rejected) |
 | `--json` | Compact JSON output (no pretty-printing) |
 | `--pipe`, `-p` | Read from stdin (`put`/`hash`: raw JSON; `render`: envelope) |
 | `--schema <hash>` | Schema filter for var commands |
@@ -85,6 +109,8 @@ ocas render --pipe/-p [options]
 | `--limit <n>` | Max results to return (default: 100) |
 | `--offset <n>` | Skip first N results (default: 0) |
 | `--desc` | Sort descending (default: ascending) |
+| `-o <path>` | Output file path (used by `export`) |
+| `--scope @new` | Variable scope remap on import (used by `import`) |
 
 ## Variable Names
 

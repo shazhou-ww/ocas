@@ -88,6 +88,13 @@ exports[`Phase 3: Variable System > 3.3 var list shows all variables 1`] = `
     },
     {
       "labels": [],
+      "name": "@ocas/output/export",
+      "schema": "CTS5P6RD8HMCS",
+      "tags": {},
+      "value": "3P2SFAVZXZ474",
+    },
+    {
+      "labels": [],
       "name": "@ocas/output/gc",
       "schema": "CTS5P6RD8HMCS",
       "tags": {},
@@ -113,6 +120,13 @@ exports[`Phase 3: Variable System > 3.3 var list shows all variables 1`] = `
       "schema": "CTS5P6RD8HMCS",
       "tags": {},
       "value": "1B24CBF95Q5G6",
+    },
+    {
+      "labels": [],
+      "name": "@ocas/output/import",
+      "schema": "CTS5P6RD8HMCS",
+      "tags": {},
+      "value": "198WWJWDA6KDX",
     },
     {
       "labels": [],
@@ -453,9 +467,12 @@ Commands:
   template list                     List all templates                                 (@ocas/output/template-list)
   template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
   gc                                Run garbage collection                             (@ocas/output/gc)
+  export <root>... -o <file>        Export CAS closure of roots to a tar bundle
+  import <bundle> [--scope @s]      Import nodes/vars/tags from a bundle into the store
 
 Flags:
   --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
+  --store <bundle>    Use a tar bundle as a read-only store (instead of --home)
   --json              Compact JSON output
   --render, -r        Render output inline (equivalent to | ocas render -p)
   --schema <hash>     Schema hash filter for var get/delete/tag/list
@@ -465,6 +482,8 @@ Flags:
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)
   --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
+  --scope <name>      Variable name remap target for import (e.g. --scope @imported)
+  -o <file>           Output path for export
 
 Agent: If you have not installed the ocas skill for this version (0.3.1), run \`ocas prompt bootstrap\` and follow the instructions."
 `;

@@ -269,7 +269,7 @@ describe("bootstrap", () => {
     );
   });
 
-  test("returns a map with 30 built-in schema aliases", async () => {
+  test("returns a map with built-in schema aliases", async () => {
     const store = createMemoryStore();
     const builtinSchemas = bootstrap(store);
 
@@ -289,7 +289,7 @@ describe("bootstrap", () => {
       expect(hash).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
     }
 
-    expect(Object.keys(builtinSchemas)).toHaveLength(31);
+    expect(Object.keys(builtinSchemas)).toHaveLength(33);
   });
 
   test("meta-schema node is stored and retrievable", async () => {
@@ -326,7 +326,7 @@ describe("bootstrap", () => {
     const h2 = bootstrap(store);
 
     expect(h1).toEqual(h2);
-    // All built-in schemas typed by the meta-schema (1 self + 7 unique primitives + 22 outputs)
-    expect(store.cas.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(30);
+    // All built-in schemas typed by the meta-schema (1 self + 7 unique primitives + 24 outputs)
+    expect(store.cas.listByType(h1["@ocas/schema"] ?? "")).toHaveLength(32);
   });
 });

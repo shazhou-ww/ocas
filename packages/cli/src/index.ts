@@ -14,9 +14,12 @@ import {
   applyListOptions,
   CasNodeNotFoundError,
   computeHash,
+  exportBundle,
   gc,
   getSchema,
   InvalidVariableNameError,
+  importBundle,
+  loadBundleStore,
   putSchema,
   refs,
   renderAsync,
@@ -48,6 +51,9 @@ const VALUE_FLAGS = new Set([
   "sort",
   "limit",
   "offset",
+  "store",
+  "scope",
+  "o",
 ]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
@@ -85,6 +91,14 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
       flags.p = true;
     } else if (arg === "-r") {
       flags.r = true;
+    } else if (arg === "-o") {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("--")) {
+        flags.o = next;
+        i++;
+      } else {
+        flags.o = true;
+      }
     } else {
       positional.push(arg);
     }
@@ -162,12 +176,45 @@ async function readStdinJson(): Promise<unknown> {
 }
 
 /**
+ * Set of write-mutating commands that cannot run against a bundle (read-only).
+ * Subcommands are also recorded as `cmd:sub`.
+ */
+const WRITE_COMMANDS = new Set([
+  "put",
+  "tag",
+  "untag",
+  "gc",
+  "import",
+  "var:set",
+  "var:delete",
+  "template:set",
+  "template:delete",
+]);
+
+/**
  * Open the filesystem-backed Store. Automatically creates directory and
- * bootstraps if needed.
+ * bootstraps if needed. If `--store <bundle>` is passed, returns a read-only
+ * bundle-backed Store instead.
  */
 async function openStore(): Promise<Store> {
+  if (typeof flags.store === "string") {
+    return await loadBundleStore(flags.store);
+  }
   const fullPath = resolve(storePath);
   return await openFsStore(fullPath);
+}
+
+/**
+ * Reject write commands when --store points at a bundle. Should be called
+ * from the dispatch layer before any write command runs.
+ */
+function ensureWritable(commandKey: string): void {
+  if (typeof flags.store !== "string") return;
+  if (WRITE_COMMANDS.has(commandKey)) {
+    die(
+      `Error: --store is read-only — '${commandKey}' is not allowed against a bundle. Use --home for a writable store.`,
+    );
+  }
 }
 
 /**
@@ -991,6 +1038,51 @@ async function cmdGc(_args: string[]): Promise<void> {
   await out(await wrapEnvelope(store, "@ocas/output/gc", stats), store);
 }
 
+async function cmdExport(args: string[]): Promise<void> {
+  if (args.length === 0) {
+    die(
+      "Usage: ocas export <root>... -o <bundle.tar>\n       ocas export <hash>... -o <bundle.tar>",
+    );
+  }
+  const output = flags.o;
+  if (typeof output !== "string") {
+    die(
+      "Error: -o <output-path> is required.\nUsage: ocas export <root>... -o <bundle.tar>",
+    );
+  }
+
+  const store = await openStore();
+  try {
+    const stats = await exportBundle(store, args, output);
+    await out(await wrapEnvelope(store, "@ocas/output/export", stats), store);
+  } catch (e) {
+    if (e instanceof Error) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  }
+}
+
+async function cmdImport(args: string[]): Promise<void> {
+  const bundlePath = args[0];
+  if (!bundlePath) {
+    die("Usage: ocas import <bundle.tar> [--scope @newscope]");
+  }
+  const scope = typeof flags.scope === "string" ? flags.scope : undefined;
+
+  const store = await openStore();
+  try {
+    const opts = scope !== undefined ? { scope } : undefined;
+    const stats = await importBundle(bundlePath, store, opts);
+    await out(await wrapEnvelope(store, "@ocas/output/import", stats), store);
+  } catch (e) {
+    if (e instanceof Error) {
+      die(`Error: ${e.message}`);
+    }
+    throw e;
+  }
+}
+
 async function cmdList(_args: string[]): Promise<void> {
   const typeFlag = flags.type;
   if (typeof typeFlag !== "string")
@@ -1104,9 +1196,12 @@ Commands:
   template list                     List all templates                                 (@ocas/output/template-list)
   template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
   gc                                Run garbage collection                             (@ocas/output/gc)
+  export <root>... -o <file>        Export CAS closure of roots to a tar bundle
+  import <bundle> [--scope @s]      Import nodes/vars/tags from a bundle into the store
 
 Flags:
   --home <path>       Store directory (default: $OCAS_HOME or ~/.ocas)
+  --store <bundle>    Use a tar bundle as a read-only store (instead of --home)
   --json              Compact JSON output
   --render, -r        Render output inline (equivalent to | ocas render -p)
   --schema <hash>     Schema hash filter for var get/delete/tag/list
@@ -1116,6 +1211,8 @@ Flags:
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)
   --pipe, -p          Read from stdin (put/hash: raw JSON payload; render: { type, value } envelope)
+  --scope <name>      Variable name remap target for import (e.g. --scope @imported)
+  -o <file>           Output path for export
 
 Agent: If you have not installed the ocas skill for this version (${pkg.version}), run \`ocas prompt bootstrap\` and follow the instructions.`);
 }
@@ -1128,6 +1225,14 @@ if (!cmd) {
   printUsage();
   process.exit(0);
 }
+
+// Build the command key (cmd or cmd:sub) used by the read-only guard.
+const subCmd = rest[0];
+const writeKey =
+  cmd === "var" || cmd === "template"
+    ? `${cmd}:${subCmd ?? ""}`
+    : (cmd as string);
+ensureWritable(writeKey);
 
 switch (cmd) {
   case "put":
@@ -1229,6 +1334,14 @@ switch (cmd) {
 
   case "gc":
     await cmdGc(rest);
+    break;
+
+  case "export":
+    await cmdExport(rest);
+    break;
+
+  case "import":
+    await cmdImport(rest);
     break;
 
   case "prompt": {

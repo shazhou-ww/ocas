@@ -367,6 +367,42 @@ const OUTPUT_SCHEMAS: ReadonlyArray<
       title: "ocas gc result",
     },
   ],
+  [
+    "@ocas/output/export",
+    {
+      type: "object",
+      properties: {
+        nodes: { type: "number" },
+        vars: { type: "number" },
+        tags: { type: "number" },
+      },
+      title: "ocas export result",
+    },
+  ],
+  [
+    "@ocas/output/import",
+    {
+      type: "object",
+      properties: {
+        nodes: {
+          type: "object",
+          properties: {
+            imported: { type: "number" },
+            skipped: { type: "number" },
+          },
+        },
+        vars: {
+          type: "object",
+          properties: {
+            created: { type: "number" },
+            updated: { type: "number" },
+          },
+        },
+        tags: { type: "number" },
+      },
+      title: "ocas import result",
+    },
+  ],
 ];
 
 /**

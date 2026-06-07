@@ -99,6 +99,48 @@ async function verify(hash: Hash, node: CasNode): Promise<boolean>;
 
 Recomputes hash from `node` and compares to `hash` (self-referencing vs normal rules).
 
+### Closure & Bundles
+
+```typescript
+type ClosureResult = {
+  nodes: Set<Hash>;
+  vars: Variable[];
+  tags: Map<Hash, Tag[]>;
+};
+function computeClosure(store: Store, roots: Hash[]): ClosureResult;
+
+type ExportStats = { nodes: number; vars: number; tags: number };
+type ImportOptions = { scope?: string };
+type ImportStats = {
+  nodes: { imported: number; skipped: number };
+  vars: { created: number; updated: number };
+  tags: number;
+};
+async function exportBundle(
+  store: Store,
+  roots: Hash[],
+  outputPath: string,
+): Promise<ExportStats>;
+async function importBundle(
+  bundlePath: string,
+  target: Store,
+  options?: ImportOptions,
+): Promise<ImportStats>;
+async function loadBundleStore(bundlePath: string): Promise<Store>;
+```
+
+- `computeClosure` — walks `cas_ref` edges and schema chains from each root,
+  also gathering every `Variable` whose `value` lands in the closure and every
+  `Tag` attached to an in-closure target.
+- `exportBundle` — writes a self-contained POSIX-tar archive containing
+  `cas/<hash>.bin` (CBOR-encoded payloads), `vars.jsonl`, and `tags.jsonl`.
+- `importBundle` — content-addressed merge into `target`. Idempotent:
+  re-importing the same bundle yields zero `imported` and zero `created`.
+  `options.scope` rewrites the leading `@scope/` of every imported variable
+  name except `@ocas/*` builtins.
+- `loadBundleStore` — convenience that returns an in-memory `Store` populated
+  from a bundle (for read-only inspection without touching the persistent store).
+
 ### Example
 
 ```typescript
@@ -149,6 +191,8 @@ walk(store, bobHash, (h) => console.log(h)); // bobHash, aliceHash
 | `mem-store.ts` | Alternate in-memory store (tests only; not exported) |
 | `schema.ts` | Schema put/get/validate, `refs`, `walk` |
 | `verify.ts` | Node integrity verification |
+| `closure.ts` | `computeClosure` — refs + schema chain traversal |
+| `bundle.ts` | `exportBundle`, `importBundle`, `loadBundleStore` (POSIX tar) |
 | `index.ts` | Public exports |
 
 Tests live in `src/*.test.ts` and `tests/`.

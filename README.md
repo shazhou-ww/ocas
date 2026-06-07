@@ -159,12 +159,38 @@ ocas gc | ocas render -p   # human-readable stats
 
 Nodes reachable from any variable binding are kept; everything else is swept.
 
+### Bundles (Export / Import)
+
+Pack the transitive CAS closure of one or more roots into a self-contained tar
+archive that can be moved between stores:
+
+```bash
+# Export a closure (nodes + schemas + variables + tags reachable from roots)
+ocas export @myapp/config -o myapp.tar
+ocas export @myapp/config @myapp/users -o myapp.tar     # multiple roots
+ocas export 1ABC2DEF34567 -o snapshot.tar               # roots can be hashes
+
+# Import a bundle into the current store (idempotent — content-addressed dedup)
+ocas import myapp.tar
+ocas import myapp.tar --scope @prod      # remap @myapp/* → @prod/* on import
+
+# Open a bundle as a read-only store without unpacking it
+ocas get @myapp/config --store myapp.tar
+ocas walk @myapp/config --store myapp.tar
+ocas var list --store myapp.tar
+```
+
+`--store <bundle.tar>` works with all read-only commands (`get`, `has`, `walk`,
+`refs`, `list`, `var list`, `var get`, …). Write commands (`put`, `tag`, `gc`,
+`import`, `var set`, …) are rejected with a clear error.
+
 ## Global Flags
 
 | Flag | Description |
 |------|-------------|
 | `--home <path>` | Store directory (default: `$OCAS_HOME` or `~/.ocas`) |
 | `--var-db <path>` | Variable database path |
+| `--store <bundle.tar>` | Open a bundle file as a read-only store (write commands rejected) |
 | `--json` | Compact single-line JSON output |
 | `--pipe`, `-p` | Read from stdin |
 | `--render`, `-r` | Render output inline |

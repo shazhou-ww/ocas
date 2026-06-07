@@ -133,11 +133,31 @@ ocas gc                    # collect unreachable nodes
 ocas gc | ocas render -p   # human-readable stats
 ```
 
+### Bundles (Export / Import)
+
+```bash
+ocas export <root>... -o <bundle.tar>           # write closure of roots to tar
+ocas export @myapp/config -o myapp.tar
+ocas export @myapp/config @myapp/users -o m.tar # multiple roots
+ocas import <bundle.tar>                        # import bundle (idempotent)
+ocas import <bundle.tar> --scope @prod          # remap @<scope>/* → @prod/*
+ocas get <hash> --store <bundle.tar>            # read-only access into bundle
+```
+
+`export` walks refs **and** schema chains; the resulting tar contains every reachable
+CAS node (`cas/<hash>.bin`, CBOR), every variable whose value is in-closure, and every
+tag attached to an in-closure target. `import` is content-addressed (deduplicates
+existing nodes). `--scope @new` rewrites the leading `@scope` of imported variable
+names except `@ocas/*` builtins. `--store <bundle.tar>` opens a bundle as a read-only
+store for any inspection command; write commands (`put`, `tag`, `gc`, `import`,
+`var set`, …) refuse with `--store is read-only`.
+
 ### Global Flags
 
 | Flag | Description |
 |------|-------------|
 | `--home <path>` | Store directory (default: `$OCAS_HOME` or `~/.ocas`) |
+| `--store <bundle.tar>` | Open a bundle as a read-only store (write commands rejected) |
 | `--json` | Compact JSON output |
 | `-p`, `--pipe` | Read from stdin |
 | `-r`, `--render` | Render output inline |
@@ -145,6 +165,8 @@ ocas gc | ocas render -p   # human-readable stats
 | `--limit <n>` | Max results (default: 100) |
 | `--offset <n>` | Skip first N (default: 0) |
 | `--desc` | Sort descending |
+| `-o <path>` | Output path (used by `export`) |
+| `--scope @new` | Variable scope remap (used by `import`) |
 
 ## Pipe Composition Patterns
 
