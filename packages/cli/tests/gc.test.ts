@@ -123,3 +123,100 @@ describe("Phase 6: GC", () => {
     expect(envValue(afterGc)).toBe(false);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Issue #93: gc must not collect uwf-style step chains joined by oneOf prev
+// ──────────────────────────────────────────────────────────────────────────────
+describe("GC #93 - oneOf step chain CLI integration", () => {
+  test("6.5 gc preserves step chain joined by oneOf prev", async () => {
+    const subStore = mkdtempSync(join(tmpdir(), "ocas-e2e-93-"));
+    try {
+      const { openStore: openFsStore } = await import("@ocas/fs");
+      const { putSchema } = await import("@ocas/core");
+      const store = await openFsStore(subStore);
+
+      const stepSchemaHash = putSchema(store, {
+        type: "object",
+        properties: {
+          payload: { type: "string" },
+          prev: {
+            oneOf: [{ type: "null" }, { type: "string", format: "ocas_ref" }],
+          },
+        },
+      });
+
+      const step1File = join(subStore, "step1.json");
+      writeFileSync(step1File, JSON.stringify({ payload: "a", prev: null }));
+      const runCliSub = (
+        args: string[],
+      ): { stdout: string; stderr: string; exitCode: number } => {
+        try {
+          const stdout = execFileSync(
+            "node",
+            [entrypoint, "--home", subStore, ...args],
+            { encoding: "utf-8", timeout: 10000 },
+          );
+          return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
+        } catch (e: unknown) {
+          const err = e as {
+            stdout?: string;
+            stderr?: string;
+            status?: number;
+          };
+          return {
+            stdout: (err.stdout ?? "").trim(),
+            stderr: (err.stderr ?? "").trim(),
+            exitCode: err.status ?? 1,
+          };
+        }
+      };
+
+      const { stdout: s1Out } = runCliSub(["put", stepSchemaHash, step1File]);
+      const step1Hash = envValue(s1Out) as string;
+
+      const step2File = join(subStore, "step2.json");
+      writeFileSync(
+        step2File,
+        JSON.stringify({ payload: "b", prev: step1Hash }),
+      );
+      const { stdout: s2Out } = runCliSub(["put", stepSchemaHash, step2File]);
+      const step2Hash = envValue(s2Out) as string;
+
+      const step3File = join(subStore, "step3.json");
+      writeFileSync(
+        step3File,
+        JSON.stringify({ payload: "c", prev: step2Hash }),
+      );
+      const { stdout: s3Out } = runCliSub(["put", stepSchemaHash, step3File]);
+      const step3Hash = envValue(s3Out) as string;
+
+      const orphanFile = join(subStore, "orphan-step.json");
+      writeFileSync(
+        orphanFile,
+        JSON.stringify({ payload: "orphan", prev: null }),
+      );
+      const { stdout: orphanOut } = runCliSub([
+        "put",
+        stepSchemaHash,
+        orphanFile,
+      ]);
+      const orphanHash = envValue(orphanOut) as string;
+
+      runCliSub(["var", "set", "@test/thread/head", step3Hash]);
+
+      const { exitCode } = runCliSub(["gc"]);
+      expect(exitCode).toBe(0);
+
+      const { stdout: has1 } = runCliSub(["has", step1Hash]);
+      expect(envValue(has1)).toBe(true);
+      const { stdout: has2 } = runCliSub(["has", step2Hash]);
+      expect(envValue(has2)).toBe(true);
+      const { stdout: has3 } = runCliSub(["has", step3Hash]);
+      expect(envValue(has3)).toBe(true);
+      const { stdout: hasOrphan } = runCliSub(["has", orphanHash]);
+      expect(envValue(hasOrphan)).toBe(false);
+    } finally {
+      rmSync(subStore, { recursive: true, force: true });
+    }
+  });
+});

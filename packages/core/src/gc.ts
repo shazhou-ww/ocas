@@ -8,10 +8,17 @@ export interface GcStats {
   scanned: number; // Variables scanned as roots
 }
 
+const TEMPLATE_VAR_PREFIX = "@ocas/template/text/";
+
 /**
  * Garbage collection: mark-and-sweep algorithm
- * - Roots: all variable values (global, not scoped)
+ * - Roots: all variable values (global, not scoped), excluding
+ *   `@ocas/template/text/*` variables — those are added in a follow-up
+ *   phase only when their referenced schema is itself reachable.
  * - Mark: recursively walk refs from roots
+ * - Template phase: for every reachable schema, walk the contents of its
+ *   `@ocas/template/text/<schema>` template variable (mirrors
+ *   `computeClosure` Phase 3).
  * - Sweep: delete unmarked nodes
  * - Schema preservation: schemas of reachable nodes are also marked
  */
@@ -21,9 +28,13 @@ export function gc(store: Store): GcStats {
   const variables = store.var.list();
   const scanned = variables.length;
 
-  // Collect unique root hashes from all variables
+  // Collect unique root hashes from all variables, except template
+  // variables (`@ocas/template/text/*`). Template variables are processed
+  // in a follow-up phase so their content is preserved only when the
+  // referenced schema is itself reachable from non-template roots.
   const roots = new Set<Hash>();
   for (const variable of variables) {
+    if (variable.name.startsWith(TEMPLATE_VAR_PREFIX)) continue;
     roots.add(variable.value);
   }
 
@@ -60,6 +71,33 @@ export function gc(store: Store): GcStats {
         break;
       }
       current = node.type;
+    }
+  }
+
+  // Template phase: include `@ocas/template/text/<schema>` content nodes
+  // when their schema is in the reachable set (mirrors closure.ts Phase 3).
+  // Snapshot the current reachable set before walking template content so
+  // that template-only nodes do not transitively pull in further templates.
+  const reachableSnapshot = [...reachable];
+  for (const hash of reachableSnapshot) {
+    const templateName = `${TEMPLATE_VAR_PREFIX}${hash}`;
+    const variants = store.var.list({ exactName: templateName });
+    for (const variant of variants) {
+      walk(store, variant.value, (h, n) => {
+        reachable.add(h);
+        reachable.add(n.type);
+      });
+      // Walk the template content's schema chain too
+      const tNode = store.cas.get(variant.value);
+      if (tNode) {
+        let current: Hash | null = tNode.type;
+        while (current !== null && !reachable.has(current)) {
+          reachable.add(current);
+          const node = store.cas.get(current);
+          if (!node || node.type === current) break;
+          current = node.type;
+        }
+      }
     }
   }
 

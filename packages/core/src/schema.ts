@@ -311,6 +311,17 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
     return result;
   }
 
+  // oneOf — JSON Schema requires exactly one branch to validate, but for
+  // ref collection we conservatively traverse every branch (the meta-schema
+  // accepts oneOf alongside anyOf, and we cannot statically know which
+  // branch the value will match). Mirrors anyOf handling.
+  if (Array.isArray(schema.oneOf)) {
+    for (const sub of schema.oneOf as JSONSchema[]) {
+      result.push(...collectRefs(sub, value));
+    }
+    return result;
+  }
+
   // P2: allOf — each sub-schema applies to the same value
   if (Array.isArray(schema.allOf)) {
     for (const sub of schema.allOf as JSONSchema[]) {

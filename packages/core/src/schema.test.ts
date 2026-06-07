@@ -743,3 +743,82 @@ describe("bootstrap meta-schema self-reference", () => {
     expect(refList).toContain(targetHash);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Suite A: collectRefs() oneOf traversal (issue #93)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("collectRefs oneOf traversal", () => {
+  test("A.1 returns the ref hash from the chosen oneOf branch (string variant)", async () => {
+    const store = createMemoryStore();
+    const innerSchema = putSchema(store, { type: "string" });
+    const schema = putSchema(store, {
+      type: "object",
+      properties: {
+        prev: {
+          oneOf: [{ type: "null" }, { type: "string", format: "ocas_ref" }],
+        },
+      },
+    });
+
+    const targetHash = store.cas.put(innerSchema, "target");
+    const nodeHash = store.cas.put(schema, { prev: targetHash });
+    const node = store.cas.get(nodeHash) as CasNode;
+
+    expect(refs(store, node)).toContain(targetHash);
+  });
+
+  test("A.2 returns no ref when oneOf matches the null variant", async () => {
+    const store = createMemoryStore();
+    const schema = putSchema(store, {
+      type: "object",
+      properties: {
+        prev: {
+          oneOf: [{ type: "null" }, { type: "string", format: "ocas_ref" }],
+        },
+      },
+    });
+
+    const nodeHash = store.cas.put(schema, { prev: null });
+    const node = store.cas.get(nodeHash) as CasNode;
+
+    expect(refs(store, node)).toEqual([]);
+  });
+
+  test("A.3 traverses nested combinators inside oneOf", async () => {
+    const store = createMemoryStore();
+    const innerSchema = putSchema(store, { type: "string" });
+    const schema = putSchema(store, {
+      oneOf: [
+        { type: "null" },
+        {
+          type: "object",
+          properties: { ref: { type: "string", format: "ocas_ref" } },
+        },
+      ],
+    });
+
+    const targetHash = store.cas.put(innerSchema, "target");
+    const nodeHash = store.cas.put(schema, { ref: targetHash });
+    const node = store.cas.get(nodeHash) as CasNode;
+
+    expect(refs(store, node)).toContain(targetHash);
+  });
+
+  test("A.4 multiple ref branches in oneOf all surface", async () => {
+    const store = createMemoryStore();
+    const innerSchema = putSchema(store, { type: "string" });
+    const schema = putSchema(store, {
+      oneOf: [
+        { type: "string", format: "ocas_ref" },
+        { type: "string", format: "ocas_ref" },
+      ],
+    });
+
+    const targetHash = store.cas.put(innerSchema, "target");
+    const nodeHash = store.cas.put(schema, targetHash);
+    const node = store.cas.get(nodeHash) as CasNode;
+
+    const result = refs(store, node);
+    expect(result).toContain(targetHash);
+  });
+});
