@@ -852,3 +852,276 @@ describe("createFsStore – nodes/ subdirectory layout", () => {
     expect(existsSync(join(dir, "nodes", `${h2}.bin`))).toBe(true);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Lazy loading (#85)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("createFsStore – lazy loading (#85)", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = makeTmpDir();
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("L1. createFsStore does NOT CBOR-decode nodes at startup", async () => {
+    const typeHash = await computeSelfHash({ name: "L1" });
+
+    const store1 = createFsStore(dir);
+    const h1 = await store1.put(typeHash, { i: 1 });
+    const h2 = await store1.put(typeHash, { i: 2 });
+    const h3 = await store1.put(typeHash, { i: 3 });
+
+    // Corrupt h2 by overwriting its .bin file with garbage CBOR
+    const corruptedPath = join(dir, "nodes", `${h2}.bin`);
+    writeFileSync(corruptedPath, Buffer.from([0xff, 0xfe, 0xfd, 0xfc]));
+
+    // Opening the store should NOT throw, even though h2 is corrupted —
+    // because nothing is decoded at startup.
+    const store2 = createFsStore(dir);
+
+    // has() should return true for all three (filename-based)
+    expect(store2.has(h1)).toBe(true);
+    expect(store2.has(h2)).toBe(true);
+    expect(store2.has(h3)).toBe(true);
+
+    // listAll() reads filenames, so all three appear
+    const all = store2.listAll();
+    expect(all).toContain(h1);
+    expect(all).toContain(h2);
+    expect(all).toContain(h3);
+
+    // Non-corrupted nodes load fine
+    expect(store2.get(h1)).not.toBeNull();
+    expect(store2.get(h3)).not.toBeNull();
+
+    // Corrupted node fails to load (returns null)
+    expect(store2.get(h2)).toBeNull();
+  });
+
+  test("L2. get() loads node from disk on demand (cache miss)", async () => {
+    const typeHash = await computeSelfHash({ name: "L2" });
+
+    const store1 = createFsStore(dir);
+    const hash = await store1.put(typeHash, { value: 42, label: "answer" });
+    const original = store1.get(hash) as CasNode;
+
+    // Lazy-load instance
+    const store2 = createFsStore(dir);
+    const loaded1 = store2.get(hash) as CasNode;
+    expect(loaded1.type).toBe(typeHash);
+    expect(loaded1.payload).toEqual({ value: 42, label: "answer" });
+    expect(loaded1.timestamp).toBe(original.timestamp);
+
+    // Second get should return the same data (from cache)
+    const loaded2 = store2.get(hash) as CasNode;
+    expect(loaded2).toEqual(loaded1);
+  });
+
+  test("L3. has() works without loading node data", async () => {
+    const typeHash = await computeSelfHash({ name: "L3" });
+
+    const store1 = createFsStore(dir);
+    const hashes: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      hashes.push(await store1.put(typeHash, { i }));
+    }
+
+    const store2 = createFsStore(dir);
+    for (const hash of hashes) {
+      expect(store2.has(hash)).toBe(true);
+    }
+
+    // Non-existent hash returns false
+    expect(store2.has("0000000000000")).toBe(false);
+  });
+
+  test("L4. listAll() returns hashes from filenames without decoding", async () => {
+    const typeHash = await computeSelfHash({ name: "L4" });
+
+    const store1 = createFsStore(dir);
+    const realHashes: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      realHashes.push(await store1.put(typeHash, { i }));
+    }
+
+    // Add a corrupted .bin file with valid filename but garbage content
+    const corruptedHash = "ABCDEFGHJKMNP";
+    writeFileSync(
+      join(dir, "nodes", `${corruptedHash}.bin`),
+      Buffer.from([0xff, 0xee, 0xdd]),
+    );
+
+    const store2 = createFsStore(dir);
+    const all = store2.listAll();
+    expect(all).toHaveLength(realHashes.length + 1);
+    for (const h of realHashes) {
+      expect(all).toContain(h);
+    }
+    expect(all).toContain(corruptedHash);
+
+    // Real nodes still readable
+    for (const h of realHashes) {
+      expect(store2.get(h)).not.toBeNull();
+    }
+    // Corrupted one returns null
+    expect(store2.get(corruptedHash)).toBeNull();
+  });
+
+  test("L5. put() makes node immediately available without re-reading disk", async () => {
+    const store = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "L5" });
+
+    const hash = await store.put(typeHash, { written: true });
+
+    // Immediately available via get(), has(), and listAll()
+    const node = store.get(hash) as CasNode;
+    expect(node.type).toBe(typeHash);
+    expect(node.payload).toEqual({ written: true });
+    expect(store.has(hash)).toBe(true);
+    expect(store.listAll()).toContain(hash);
+  });
+
+  test("L6. delete() removes node from cache and disk", async () => {
+    const store = createFsStore(dir);
+    const typeHash = await computeSelfHash({ name: "L6" });
+
+    const hash = await store.put(typeHash, { temporary: true });
+    // populate cache by getting once
+    expect(store.get(hash)).not.toBeNull();
+
+    expect(store.delete(hash)).toBe(true);
+
+    expect(store.get(hash)).toBeNull();
+    expect(store.has(hash)).toBe(false);
+    expect(store.listAll()).not.toContain(hash);
+    expect(existsSync(join(dir, "nodes", `${hash}.bin`))).toBe(false);
+  });
+
+  test("L7. listByType works with lazy loading (loads timestamps on demand)", async () => {
+    const typeA = await computeSelfHash({ name: "typeA-L7" });
+    const typeB = await computeSelfHash({ name: "typeB-L7" });
+
+    const store1 = createFsStore(dir);
+    const aHashes: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      aHashes.push(await store1.put(typeA, { i }));
+    }
+    const bHashes: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      bHashes.push(await store1.put(typeB, { i }));
+    }
+
+    const store2 = createFsStore(dir);
+    const aList = store2.listByType(typeA);
+    expect(aList).toHaveLength(3);
+    for (const e of aList) {
+      expect(aHashes).toContain(e.hash);
+      expect(typeof e.created).toBe("number");
+      expect(e.created).toBeGreaterThan(0);
+    }
+
+    const bList = store2.listByType(typeB);
+    expect(bList).toHaveLength(2);
+
+    expect(store2.listByType("0000000000000")).toEqual([]);
+  });
+
+  test("L8. listMeta works with lazy loading", async () => {
+    const store1 = createFsStore(dir);
+    const m1 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "L8a" });
+    const m2 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "L8b" });
+
+    const store2 = createFsStore(dir);
+    const meta = store2.listMeta();
+    const metaHashes = meta.map((e) => e.hash);
+    expect(metaHashes).toHaveLength(2);
+    expect(metaHashes).toContain(m1);
+    expect(metaHashes).toContain(m2);
+    for (const e of meta) {
+      expect(typeof e.created).toBe("number");
+      expect(e.created).toBeGreaterThan(0);
+    }
+  });
+
+  test("L9. listSchemas works with lazy loading", async () => {
+    const store1 = createFsStore(dir);
+    const m = await store1[BOOTSTRAP_STORE]({ type: "object" });
+    const s1 = await store1.put(m, { type: "string" });
+    const s2 = await store1.put(m, { type: "number" });
+
+    const store2 = createFsStore(dir);
+    const schemas = store2.listSchemas().map((e) => e.hash);
+    expect(schemas).toHaveLength(3);
+    expect(schemas).toContain(m);
+    expect(schemas).toContain(s1);
+    expect(schemas).toContain(s2);
+  });
+
+  test("L10. index migration still works with lazy loading", async () => {
+    const typeHash = await computeSelfHash({ name: "L10" });
+
+    const store1 = createFsStore(dir);
+    const h1 = await store1.put(typeHash, { i: 1 });
+    const h2 = await store1.put(typeHash, { i: 2 });
+
+    rmSync(join(dir, "_index"), { recursive: true, force: true });
+
+    // Re-open: should rebuild type index by scanning + decoding nodes on disk
+    const store2 = createFsStore(dir);
+    const list = store2.listByType(typeHash).map((e) => e.hash);
+    expect(list).toHaveLength(2);
+    expect(list).toContain(h1);
+    expect(list).toContain(h2);
+    expect(existsSync(join(dir, "_index", typeHash))).toBe(true);
+
+    // Re-open again: index already on disk, no re-scan needed
+    const store3 = createFsStore(dir);
+    const list3 = store3.listByType(typeHash).map((e) => e.hash);
+    expect(list3).toHaveLength(2);
+  });
+
+  test("L11. meta migration still works with lazy loading", async () => {
+    const store1 = createFsStore(dir);
+    const h1 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "L11a" });
+    const h2 = await store1[BOOTSTRAP_STORE]({ type: "object", v: "L11b" });
+
+    const metaPath = join(dir, "_index", "_meta");
+    rmSync(metaPath, { force: true });
+    expect(existsSync(metaPath)).toBe(false);
+
+    const store2 = createFsStore(dir);
+    const meta = store2.listMeta().map((e) => e.hash);
+    expect(meta).toHaveLength(2);
+    expect(meta).toContain(h1);
+    expect(meta).toContain(h2);
+    expect(existsSync(metaPath)).toBe(true);
+  });
+
+  test("L12. bootstrap round-trip works with lazy store", async () => {
+    const store1 = await openStore(dir);
+    const schemas1 = bootstrap(store1);
+    const typeHash = await computeSelfHash({ name: "L12-user" });
+    const userHash = store1.cas.put(typeHash, { user: "data" });
+
+    const store2 = await openStore(dir);
+    // All bootstrap schemas accessible
+    for (const name of [
+      "@ocas/schema",
+      "@ocas/string",
+      "@ocas/number",
+      "@ocas/object",
+      "@ocas/array",
+      "@ocas/bool",
+    ]) {
+      const h = schemas1[name] as string;
+      expect(store2.cas.has(h)).toBe(true);
+      expect(store2.cas.get(h)).not.toBeNull();
+    }
+    // User data still accessible
+    expect(store2.cas.has(userHash)).toBe(true);
+    const userNode = store2.cas.get(userHash) as CasNode;
+    expect(userNode.payload).toEqual({ user: "data" });
+  });
+});
