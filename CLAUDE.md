@@ -86,10 +86,6 @@ This is resolved to real version numbers only during publishing (see below).
 - Reference issues: `Fixes #N` / `Closes #N`
 - Author: `小橘 <xiaoju@shazhou.work>`
 
-## Project Rules
-
-- [docs/sync-readme.md](docs/sync-readme.md) — README sync conventions
-
 ## Before Submitting
 
 1. `pnpm run test` — all tests pass
