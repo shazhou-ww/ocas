@@ -59,23 +59,36 @@ function migrateFlatLayoutToNodes(dir: string): void {
   }
 }
 
-function loadDir(dir: string, data: Map<Hash, CasNode>): void {
+/**
+ * Scan `nodes/` directory for `.bin` filenames and return the set of hashes
+ * present on disk. Does NOT read or decode any node content — this is the
+ * cheap O(n) startup operation that replaces the legacy full-load.
+ */
+function loadHashSet(dir: string): Set<Hash> {
+  const hashes = new Set<Hash>();
   let entries: string[];
   try {
     entries = readdirSync(dir);
   } catch {
-    return;
+    return hashes;
   }
   for (const name of entries) {
     if (!name.endsWith(".bin")) continue;
-    const hash = name.slice(0, -4) as Hash;
-    try {
-      const buf = readFileSync(join(dir, name));
-      const node = decode(new Uint8Array(buf)) as CasNode;
-      data.set(hash, node);
-    } catch {
-      // skip corrupted files
-    }
+    hashes.add(name.slice(0, -4) as Hash);
+  }
+  return hashes;
+}
+
+/**
+ * Read and CBOR-decode a single node from disk. Returns `null` if the file
+ * is missing or its content is corrupted.
+ */
+function readNodeFromDisk(nodesDir: string, hash: Hash): CasNode | null {
+  try {
+    const buf = readFileSync(join(nodesDir, `${hash}.bin`));
+    return decode(new Uint8Array(buf)) as CasNode;
+  } catch {
+    return null;
   }
 }
 
@@ -103,9 +116,19 @@ function loadTypeIndex(indexDir: string): Map<Hash, Hash[]> {
   return typeIndex;
 }
 
-function buildTypeIndexFromNodes(data: Map<Hash, CasNode>): Map<Hash, Hash[]> {
+/**
+ * Migration helper: scan all `.bin` files on disk, decoding each one to read
+ * its `type` field, and rebuild the type index. Used only when `_index/` is
+ * missing — a one-time cost.
+ */
+function buildTypeIndexFromDisk(
+  nodesDir: string,
+  hashSet: Set<Hash>,
+): Map<Hash, Hash[]> {
   const typeIndex = new Map<Hash, Hash[]>();
-  for (const [hash, node] of data) {
+  for (const hash of hashSet) {
+    const node = readNodeFromDisk(nodesDir, hash);
+    if (!node) continue;
     const list = typeIndex.get(node.type) ?? [];
     list.push(hash);
     typeIndex.set(node.type, list);
@@ -123,11 +146,12 @@ function writeTypeIndex(indexDir: string, typeIndex: Map<Hash, Hash[]>): void {
 
 function loadOrMigrateTypeIndex(
   dir: string,
-  data: Map<Hash, CasNode>,
+  nodesDir: string,
+  hashSet: Set<Hash>,
 ): Map<Hash, Hash[]> {
   const indexDir = join(dir, INDEX_DIR);
   if (!existsSync(indexDir)) {
-    const typeIndex = buildTypeIndexFromNodes(data);
+    const typeIndex = buildTypeIndexFromDisk(nodesDir, hashSet);
     if (typeIndex.size > 0) {
       writeTypeIndex(indexDir, typeIndex);
     }
@@ -138,7 +162,8 @@ function loadOrMigrateTypeIndex(
 
 function loadOrMigrateMetaSet(
   dir: string,
-  data: Map<Hash, CasNode>,
+  nodesDir: string,
+  hashSet: Set<Hash>,
 ): Set<Hash> {
   const indexDir = join(dir, INDEX_DIR);
   const metaPath = join(indexDir, META_FILE);
@@ -150,10 +175,11 @@ function loadOrMigrateMetaSet(
       return new Set();
     }
   }
-  // Migration: scan loaded nodes for self-referencing nodes (type === hash)
+  // Migration: scan nodes on disk for self-referencing nodes (type === hash)
   const metaSet = new Set<Hash>();
-  for (const [hash, node] of data) {
-    if (node.type === hash) {
+  for (const hash of hashSet) {
+    const node = readNodeFromDisk(nodesDir, hash);
+    if (node && node.type === hash) {
       metaSet.add(hash);
     }
   }
@@ -204,18 +230,6 @@ function appendToTypeIndex(
   typeIndex.set(type, list);
 }
 
-function hashesToEntries(
-  data: Map<Hash, CasNode>,
-  hashes: Iterable<Hash>,
-): ListEntry[] {
-  const result: ListEntry[] = [];
-  for (const h of hashes) {
-    const node = data.get(h);
-    if (node) result.push(casListEntry(h, node.timestamp));
-  }
-  return result;
-}
-
 /**
  * The CAS sub-store of an FS-backed `Store` — also satisfies the legacy
  * `BootstrapCapableStore` interface so `bootstrap()` can run against it.
@@ -230,17 +244,42 @@ export function createFsStore(dir: string): FsCasStore {
   migrateFlatLayoutToNodes(dir);
 
   const nodesDir = join(dir, NODES_DIR);
-  const data = new Map<Hash, CasNode>();
-  loadDir(nodesDir, data);
+  // Lazy loading (#85): only scan filenames at startup — do NOT decode.
+  const hashSet = loadHashSet(nodesDir);
+  // In-memory cache of decoded nodes. Populated on first get() of each hash.
+  const cache = new Map<Hash, CasNode>();
   const indexDir = join(dir, INDEX_DIR);
-  const typeIndex = loadOrMigrateTypeIndex(dir, data);
-  const metaSet = loadOrMigrateMetaSet(dir, data);
+  const typeIndex = loadOrMigrateTypeIndex(dir, nodesDir, hashSet);
+  const metaSet = loadOrMigrateMetaSet(dir, nodesDir, hashSet);
+
+  /**
+   * Look up a node by hash, loading from disk on cache miss. Returns `null`
+   * if the hash is unknown or the file is corrupted.
+   */
+  function loadNode(hash: Hash): CasNode | null {
+    const cached = cache.get(hash);
+    if (cached) return cached;
+    if (!hashSet.has(hash)) return null;
+    const node = readNodeFromDisk(nodesDir, hash);
+    if (node) cache.set(hash, node);
+    return node;
+  }
+
+  function hashesToEntries(hashes: Iterable<Hash>): ListEntry[] {
+    const result: ListEntry[] = [];
+    for (const h of hashes) {
+      const node = loadNode(h);
+      if (node) result.push(casListEntry(h, node.timestamp));
+    }
+    return result;
+  }
 
   function putSelfReferencing(payload: unknown): Hash {
     const hash = computeSelfHashSync(payload);
-    if (!data.has(hash)) {
+    if (!hashSet.has(hash)) {
       const node: CasNode = { type: hash, payload, timestamp: Date.now() };
-      data.set(hash, node);
+      hashSet.add(hash);
+      cache.set(hash, node);
 
       mkdirSync(nodesDir, { recursive: true });
       const tmp = join(nodesDir, `${hash}.tmp`);
@@ -261,13 +300,14 @@ export function createFsStore(dir: string): FsCasStore {
     put(typeHash: Hash, payload: unknown): Hash {
       const hash = computeHashSync(typeHash, payload);
 
-      if (!data.has(hash)) {
+      if (!hashSet.has(hash)) {
         const node: CasNode = {
           type: typeHash,
           payload,
           timestamp: Date.now(),
         };
-        data.set(hash, node);
+        hashSet.add(hash);
+        cache.set(hash, node);
 
         mkdirSync(nodesDir, { recursive: true });
         const tmp = join(nodesDir, `${hash}.tmp`);
@@ -285,25 +325,25 @@ export function createFsStore(dir: string): FsCasStore {
     },
 
     get(hash: Hash): CasNode | null {
-      return data.get(hash) ?? null;
+      return loadNode(hash);
     },
 
     has(hash: Hash): boolean {
-      return data.has(hash);
+      return hashSet.has(hash);
     },
 
     listByType(typeHash: Hash, options?: ListOptions): ListEntry[] {
       const list = typeIndex.get(typeHash);
       if (!list) return [];
-      return applyListOptions(hashesToEntries(data, list), options);
+      return applyListOptions(hashesToEntries(list), options);
     },
 
     listAll(): Hash[] {
-      return Array.from(data.keys());
+      return Array.from(hashSet);
     },
 
     listMeta(options?: ListOptions): ListEntry[] {
-      return applyListOptions(hashesToEntries(data, metaSet), options);
+      return applyListOptions(hashesToEntries(metaSet), options);
     },
 
     listSchemas(options?: ListOptions): ListEntry[] {
@@ -315,38 +355,42 @@ export function createFsStore(dir: string): FsCasStore {
           for (const h of list) result.add(h);
         }
       }
-      return applyListOptions(hashesToEntries(data, result), options);
+      return applyListOptions(hashesToEntries(result), options);
     },
 
     delete(hash: Hash): boolean {
-      const node = data.get(hash);
-      if (!node) return false;
-      data.delete(hash);
+      if (!hashSet.has(hash)) return false;
+      // Need the node's type to clean up the type index. Lazy-load if needed.
+      const node = loadNode(hash);
+      hashSet.delete(hash);
+      cache.delete(hash);
       // Delete file
       try {
         unlinkSync(join(nodesDir, `${hash}.bin`));
       } catch {
         // ignore if file doesn't exist
       }
-      // Remove from type index
-      const list = typeIndex.get(node.type);
-      if (list) {
-        const idx = list.indexOf(hash);
-        if (idx !== -1) {
-          list.splice(idx, 1);
-        }
-        if (list.length === 0) {
-          typeIndex.delete(node.type);
-          // Delete empty index file
-          try {
-            unlinkSync(join(indexDir, node.type));
-          } catch {
-            // ignore
+      // Remove from type index (only if we could decode the node)
+      if (node) {
+        const list = typeIndex.get(node.type);
+        if (list) {
+          const idx = list.indexOf(hash);
+          if (idx !== -1) {
+            list.splice(idx, 1);
           }
-        } else {
-          // Rewrite index file
-          const body = `${list.join("\n")}\n`;
-          writeFileSync(join(indexDir, node.type), body, "utf8");
+          if (list.length === 0) {
+            typeIndex.delete(node.type);
+            // Delete empty index file
+            try {
+              unlinkSync(join(indexDir, node.type));
+            } catch {
+              // ignore
+            }
+          } else {
+            // Rewrite index file
+            const body = `${list.join("\n")}\n`;
+            writeFileSync(join(indexDir, node.type), body, "utf8");
+          }
         }
       }
       // Remove from meta set if applicable
