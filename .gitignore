@@ -2,5 +2,7 @@ node_modules/
 dist/
 *.d.ts.map
 *.tsbuildinfo
+.proman/
 .worktrees/
 bun.lock
+
