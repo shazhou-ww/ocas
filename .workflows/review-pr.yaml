@@ -80,6 +80,7 @@ roles:
 
     output: "Output the PR metadata, diff summary, changed files list, existing reviews, and worktree path. If self-review detected, output $status: self_review immediately."
     frontmatter:
+      type: object
       oneOf:
         - properties:
             $status: { const: "ready" }
@@ -164,6 +165,7 @@ roles:
 
     output: "List all findings with file:line references. Set $status to approve or request_changes."
     frontmatter:
+      type: object
       oneOf:
         - properties:
             $status: { const: "approve" }
@@ -234,6 +236,7 @@ roles:
 
     output: "Report the review submission result and any issues created. Set $status to rejected or approved."
     frontmatter:
+      type: object
       oneOf:
         - properties:
             $status: { const: "rejected" }
@@ -299,6 +302,7 @@ roles:
 
     output: "Report the merge result. Set $status to merged, ci_failed, conflict, or merge_failed."
     frontmatter:
+      type: object
       oneOf:
         - properties:
             $status: { const: "merged" }
