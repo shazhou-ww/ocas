@@ -12,8 +12,8 @@ importers:
         specifier: ^2.4.16
         version: 2.4.16
       '@shazhou/proman':
-        specifier: ^0.6.4
-        version: 0.6.4(@biomejs/biome@2.4.16)(typescript@6.0.3)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0)))(wrangler@3.114.17)
+        specifier: ^0.7.0
+        version: 0.7.0(@biomejs/biome@2.4.16)(typescript@6.0.3)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0)))(wrangler@3.114.17)
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
@@ -729,8 +729,8 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@shazhou/proman@0.6.4':
-    resolution: {integrity: sha512-zdRZ0sN7+kvTANVMFrmxuNzpiZNnHHs5fW369+YUaGftDGoPFWF/I0UwYRQR5JAmesbPWgwWWzF3+sB3/3ujxw==}
+  '@shazhou/proman@0.7.0':
+    resolution: {integrity: sha512-iPOvCqlxeSz1MGtXneXfdwAyMlL6ntottDgGsNPuzEkDEXoPylPcDRqMpuD5AiG3mU+Kg/WsTctBsRZwmm8rXA==}
     hasBin: true
     peerDependencies:
       '@biomejs/biome': ^2.0.0
@@ -1679,7 +1679,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@shazhou/proman@0.6.4(@biomejs/biome@2.4.16)(typescript@6.0.3)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0)))(wrangler@3.114.17)':
+  '@shazhou/proman@0.7.0(@biomejs/biome@2.4.16)(typescript@6.0.3)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0)))(wrangler@3.114.17)':
     dependencies:
       '@biomejs/biome': 2.4.16
       typescript: 6.0.3
