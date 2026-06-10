@@ -9,6 +9,20 @@ const DEFAULT_EPSILON = 0.01;
 const FLOAT_TOLERANCE = 1e-10;
 
 /**
+ * Reserved context keys that are always populated by the engine and
+ * must never be shadowed by payload properties of the same name.
+ */
+const RESERVED_CONTEXT_KEYS = new Set<string>([
+  "hash",
+  "type",
+  "resolution",
+  "epsilon",
+  "payload",
+  "timestamp",
+  "__visited",
+]);
+
+/**
  * Render a CAS node using LiquidJS templates with resolution-based decay.
  * Templates are discovered via variables: @ocas/template/text/<type-hash>
  */
@@ -176,15 +190,33 @@ async function renderNode(
     }
 
     // Render using the template
-    const context = {
-      resolution: currentResolution,
-      epsilon,
-      hash,
-      payload: node.payload,
-      type: node.type,
-      timestamp: node.timestamp,
-      __visited: visited, // Pass visited set through context
-    };
+    const context: Record<string, unknown> = {};
+
+    // Merge top-level payload properties (object payloads only) as Liquid
+    // context variables, so templates can write `{{name}}` instead of
+    // `{{payload.name}}`. Reserved engine keys take precedence — see
+    // RESERVED_CONTEXT_KEYS.
+    if (
+      node.payload !== null &&
+      typeof node.payload === "object" &&
+      !Array.isArray(node.payload)
+    ) {
+      const payloadObj = node.payload as Record<string, unknown>;
+      for (const key of Object.keys(payloadObj)) {
+        if (!RESERVED_CONTEXT_KEYS.has(key)) {
+          context[key] = payloadObj[key];
+        }
+      }
+    }
+
+    // Reserved engine-supplied keys are set last so they always win.
+    context.resolution = currentResolution;
+    context.epsilon = epsilon;
+    context.hash = hash;
+    context.payload = node.payload;
+    context.type = node.type;
+    context.timestamp = node.timestamp;
+    context.__visited = visited; // Pass visited set through context
 
     const output = await engine.parseAndRender(template, context);
 

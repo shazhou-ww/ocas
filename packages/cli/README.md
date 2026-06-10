@@ -137,11 +137,14 @@ There is no separate alias system — names are just variables.
 
 `template` commands manage the LiquidJS template bound to a schema (stored as a
 `@ocas/template/text/<schema-hash>` variable). `render <hash>` uses the template registered
-for the node's type, falling back to YAML when none exists.
+for the node's type, falling back to YAML when none exists. For object payloads, top-level
+properties are exposed as Liquid variables in addition to the `payload` namespace, so
+`{{ name }}` and `{{ payload.name }}` resolve to the same value. Reserved engine keys
+(`hash`, `type`, `resolution`, `epsilon`, `payload`, `timestamp`) are never shadowed.
 
 ```bash
 # Bind a template to a schema, then render a node of that type
-ocas template set 0123456789ABC --inline "Item: {{ payload.name }}"
+ocas template set 0123456789ABC --inline "Item: {{ name }}"
 ocas render <content-hash>
 # → Item: Widget
 ```

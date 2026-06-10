@@ -129,8 +129,9 @@ ocas put @ocas/schema s.json   # @ocas/schema is a builtin variable
 Bind a [LiquidJS](https://liquidjs.com/) template to a schema, then render nodes of that type:
 
 ```bash
-# Set a template
-ocas template set <schema-hash> --inline "Todo: {{ payload.title }} [{{ payload.done }}]"
+# Set a template — object payload properties are exposed as top-level
+# variables, so {{ title }} is equivalent to {{ payload.title }}.
+ocas template set <schema-hash> --inline "Todo: {{ title }} [{{ done }}]"
 
 # Render a node (uses the template for its type, falls back to YAML)
 ocas render <hash>
