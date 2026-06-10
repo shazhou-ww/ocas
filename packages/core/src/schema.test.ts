@@ -1,9 +1,16 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { bootstrap } from "./bootstrap.js";
-import { getSchema, putSchema, refs, validate, walk } from "./schema.js";
+import {
+  getSchema,
+  type OnDangling,
+  putSchema,
+  refs,
+  validate,
+  walk,
+} from "./schema.js";
 import { createMemoryStore } from "./store.js";
-import type { CasNode } from "./types.js";
+import type { CasNode, Hash } from "./types.js";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Step 1: putSchema() — store a JSON Schema as a CAS node
@@ -820,5 +827,348 @@ describe("collectRefs oneOf traversal", () => {
 
     const result = refs(store, node);
     expect(result).toContain(targetHash);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Suite B: dangling refs (issue #112) — graceful handling via onDangling
+// ──────────────────────────────────────────────────────────────────────────────
+describe("dangling refs (issue #112)", () => {
+  // ── refs() — dangling type schema and dangling ref targets ───────────────
+
+  test("refs() does not throw when node.type is missing and no callback is given", () => {
+    const store = createMemoryStore();
+    const node: CasNode = {
+      type: "0000000000000",
+      payload: { x: 1 },
+      timestamp: Date.now(),
+    };
+
+    expect(() => refs(store, node)).not.toThrow();
+    expect(refs(store, node)).toEqual([]);
+  });
+
+  test("refs() with onDangling is NOT called for missing schema (only for missing payload refs)", () => {
+    const store = createMemoryStore();
+    const node: CasNode = {
+      type: "0000000000000",
+      payload: { x: 1 },
+      timestamp: Date.now(),
+    };
+    const spy = vi.fn();
+
+    const result = refs(store, node, { onDangling: spy });
+    expect(result).toEqual([]);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test("refs() returns ref hashes regardless of whether targets exist", () => {
+    const store = createMemoryStore();
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: { ref: { type: "string", format: "ocas_ref" } },
+    });
+    const missingHash: Hash = "AAAAAAAAAAAAA";
+    const nodeHash = store.cas.put(schemaHash, { ref: missingHash });
+    const node = store.cas.get(nodeHash) as CasNode;
+
+    // Without options: returns the ref, no throw.
+    expect(() => refs(store, node)).not.toThrow();
+    expect(refs(store, node)).toEqual([missingHash]);
+
+    // With onDangling: ref is still returned, callback called once.
+    const spy = vi.fn();
+    const result = refs(store, node, { onDangling: spy });
+    expect(result).toEqual([missingHash]);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(missingHash);
+  });
+
+  test("refs() de-duplicates onDangling per unique hash", () => {
+    const store = createMemoryStore();
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: {
+        leftHash: { type: "string", format: "ocas_ref" },
+        rightHash: { type: "string", format: "ocas_ref" },
+      },
+    });
+    const missingHash: Hash = "AAAAAAAAAAAAA";
+    const nodeHash = store.cas.put(schemaHash, {
+      leftHash: missingHash,
+      rightHash: missingHash,
+    });
+    const node = store.cas.get(nodeHash) as CasNode;
+
+    const spy = vi.fn();
+    const result = refs(store, node, { onDangling: spy });
+    // Returned array preserves duplicates (current refs() semantics)
+    expect(result).toHaveLength(2);
+    expect(result.every((h) => h === missingHash)).toBe(true);
+    // Callback fired only once for the unique hash
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(missingHash);
+  });
+
+  // ── walk() — dangling root and dangling descendants ─────────────────────
+
+  test("walk() default behavior is unchanged when there are no dangling refs (regression: optional options)", () => {
+    const store = createMemoryStore();
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: {
+        nextHash: { type: "string", format: "ocas_ref" },
+        val: { type: "number" },
+      },
+    });
+
+    const hashC = store.cas.put(schemaHash, { val: 3 });
+    const hashB = store.cas.put(schemaHash, { nextHash: hashC, val: 2 });
+    const hashA = store.cas.put(schemaHash, { nextHash: hashB, val: 1 });
+
+    const visited: string[] = [];
+    walk(store, hashA, (hash) => visited.push(hash));
+
+    expect(visited).toHaveLength(3);
+    expect(visited).toContain(hashA);
+    expect(visited).toContain(hashB);
+    expect(visited).toContain(hashC);
+  });
+
+  test("walk() silently skips a dangling root (no callback, no throw)", () => {
+    const store = createMemoryStore();
+    const visitor = vi.fn();
+
+    expect(() => walk(store, "0000000000000" as Hash, visitor)).not.toThrow();
+    expect(visitor).not.toHaveBeenCalled();
+  });
+
+  test("walk() with onDangling reports a dangling root", () => {
+    const store = createMemoryStore();
+    const visitor = vi.fn();
+    const spy = vi.fn();
+
+    walk(store, "0000000000000" as Hash, visitor, { onDangling: spy });
+
+    expect(visitor).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("0000000000000");
+  });
+
+  test("walk() continues past a dangling middle node and visits remaining reachable subtree", () => {
+    const store = createMemoryStore();
+    const leafSchema = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const linkSchema = putSchema(store, {
+      type: "object",
+      properties: { next: { type: "string", format: "ocas_ref" } },
+    });
+    const diamondSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        leftHash: { type: "string", format: "ocas_ref" },
+        rightHash: { type: "string", format: "ocas_ref" },
+      },
+    });
+
+    // R has its own ref child Z
+    const hashZ = store.cas.put(leafSchema, { val: 99 });
+    const hashR = store.cas.put(linkSchema, { next: hashZ });
+
+    // Left child will be inserted then deleted
+    const leftHash = store.cas.put(leafSchema, { val: 7 });
+
+    const rootHash = store.cas.put(diamondSchema, {
+      leftHash,
+      rightHash: hashR,
+    });
+
+    // Delete the left child to simulate dangling ref
+    expect(store.cas.delete(leftHash)).toBe(true);
+    expect(store.cas.has(leftHash)).toBe(false);
+
+    // Without onDangling — silent skip
+    const visited: string[] = [];
+    expect(() => walk(store, rootHash, (h) => visited.push(h))).not.toThrow();
+    expect(visited).toContain(rootHash);
+    expect(visited).toContain(hashR);
+    expect(visited).toContain(hashZ);
+    expect(visited).not.toContain(leftHash);
+
+    // With onDangling — callback fires for the deleted left, full subtree still visited
+    const visited2: string[] = [];
+    const spy = vi.fn();
+    walk(store, rootHash, (h) => visited2.push(h), { onDangling: spy });
+
+    expect(visited2).toContain(rootHash);
+    expect(visited2).toContain(hashR);
+    expect(visited2).toContain(hashZ);
+    expect(visited2).not.toContain(leftHash);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(leftHash);
+  });
+
+  test("walk() reports each unique dangling hash exactly once even when reachable from multiple paths", () => {
+    const store = createMemoryStore();
+    const leafSchema = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const linkSchema = putSchema(store, {
+      type: "object",
+      properties: { next: { type: "string", format: "ocas_ref" } },
+    });
+    const diamondSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        leftHash: { type: "string", format: "ocas_ref" },
+        rightHash: { type: "string", format: "ocas_ref" },
+      },
+    });
+
+    // Shared child that we will delete
+    const sharedChild = store.cas.put(leafSchema, { val: 1 });
+    // Two parents that both reference the shared child
+    const parentA = store.cas.put(linkSchema, { next: sharedChild });
+    const parentB = store.cas.put(linkSchema, { next: sharedChild });
+
+    const rootHash = store.cas.put(diamondSchema, {
+      leftHash: parentA,
+      rightHash: parentB,
+    });
+
+    // Delete the shared child: now both parents reference a missing hash
+    expect(store.cas.delete(sharedChild)).toBe(true);
+
+    const spy = vi.fn();
+    walk(store, rootHash, () => {}, { onDangling: spy });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(sharedChild);
+  });
+
+  test("walk() handles a cycle that contains a dangling ref without infinite loop", () => {
+    const store = createMemoryStore();
+    const linkSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        next: { type: "string", format: "ocas_ref" },
+        val: { type: "number" },
+      },
+    });
+
+    // Build root → A, A → B, A → root (cycle), then delete B
+    // Since CAS is content-addressed, build B first, then A pointing to B,
+    // but for the cycle we use a dual-ref schema for A.
+    const dualSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        a: { type: "string", format: "ocas_ref" },
+        b: { type: "string", format: "ocas_ref" },
+        val: { type: "number" },
+      },
+    });
+
+    const hashB = store.cas.put(linkSchema, { val: 2 });
+    // We don't actually have rootHash before A - so just build A → B and root → A.
+    // For cycle: have A reference B AND a placeholder root. We can't make a true
+    // cycle in CAS since hashes are content-derived. Instead, use a schema where
+    // visited dedup naturally guards.
+    const hashA = store.cas.put(dualSchema, {
+      a: hashB,
+      b: hashB,
+      val: 1,
+    });
+    // root references A and B both (so A is reachable from two places)
+    const rootHash = store.cas.put(dualSchema, {
+      a: hashA,
+      b: hashB,
+      val: 0,
+    });
+
+    // Delete B to make it dangling
+    expect(store.cas.delete(hashB)).toBe(true);
+
+    const visited = new Set<Hash>();
+    const spy = vi.fn();
+    expect(() =>
+      walk(store, rootHash, (h) => visited.add(h), { onDangling: spy }),
+    ).not.toThrow();
+
+    // Termination: visited contains root + A
+    expect(visited.has(rootHash)).toBe(true);
+    expect(visited.has(hashA)).toBe(true);
+    expect(visited.has(hashB)).toBe(false);
+
+    // B reported exactly once even though reachable from two paths
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(hashB);
+  });
+
+  test("walk() onDangling fires during traversal of the missing node", () => {
+    const store = createMemoryStore();
+    const leafSchema = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const linkSchema = putSchema(store, {
+      type: "object",
+      properties: { next: { type: "string", format: "ocas_ref" } },
+    });
+
+    const childHash = store.cas.put(leafSchema, { val: 1 });
+    const rootHash = store.cas.put(linkSchema, { next: childHash });
+    expect(store.cas.delete(childHash)).toBe(true);
+
+    const log: string[] = [];
+    walk(store, rootHash, (h) => log.push(`v:${h}`), {
+      onDangling: (h) => log.push(`d:${h}`),
+    });
+
+    // visitor called for root, then dangling fires for child
+    expect(log).toContain(`v:${rootHash}`);
+    expect(log).toContain(`d:${childHash}`);
+    // visitor was NOT called for the deleted child
+    expect(log).not.toContain(`v:${childHash}`);
+  });
+
+  // ── Backward-compat / signature ──────────────────────────────────────────
+
+  test("walk() three-argument call still type-checks and behaves identically", () => {
+    const store = createMemoryStore();
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const nodeHash = store.cas.put(schemaHash, { val: 42 });
+
+    const visited: string[] = [];
+    // No options object — original signature.
+    walk(store, nodeHash, (hash) => visited.push(hash));
+
+    expect(visited).toEqual([nodeHash]);
+  });
+
+  test("refs() two-argument call still type-checks and returns the same array as before", () => {
+    const store = createMemoryStore();
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: { ref: { type: "string", format: "ocas_ref" } },
+    });
+    const targetHash = "AAAAAAAAAAAAA" as Hash;
+    const nodeHash = store.cas.put(schemaHash, { ref: targetHash });
+    const node = store.cas.get(nodeHash) as CasNode;
+
+    expect(refs(store, node)).toEqual([targetHash]);
+  });
+
+  // ── Exports ──────────────────────────────────────────────────────────────
+
+  test("OnDangling type is exported and assignable", () => {
+    // Compile-time check: no runtime behavior asserted here.
+    const _cb: OnDangling = (_h) => {};
+    expect(typeof _cb).toBe("function");
   });
 });
