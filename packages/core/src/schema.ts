@@ -445,6 +445,12 @@ export interface WalkOptions {
    * Exceptions thrown inside the callback propagate to the caller.
    */
   onDangling?: OnDangling;
+  /**
+   * When `true` (the default), the traversal enqueues each node's `type`
+   * hash so that the full schema chain is part of the walk. Set to `false`
+   * to traverse only payload `ocas_ref` edges and skip the schema chain.
+   */
+  followType?: boolean;
 }
 
 /**
@@ -511,6 +517,7 @@ export function walk(
   const dangling = new Set<Hash>();
   const queue: Hash[] = [rootHash];
   const onDangling = options?.onDangling;
+  const followType = options?.followType !== false;
 
   while (queue.length > 0) {
     const hash = queue.shift() as Hash;
@@ -535,7 +542,7 @@ export function walk(
     // Enqueue the node's own type so the schema chain is part of normal
     // traversal. The visited-set dedup terminates self-referencing meta-
     // schemas (where node.type === hash).
-    if (!visited.has(node.type) && !dangling.has(node.type)) {
+    if (followType && !visited.has(node.type) && !dangling.has(node.type)) {
       queue.push(node.type);
     }
   }

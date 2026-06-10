@@ -448,7 +448,7 @@ Commands:
   has <hash>                        Print envelope (value=boolean)                     (@ocas/output/has)
   verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@ocas/output/verify)
   refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
-  walk <hash> [--format tree]       Recursive traversal                                (@ocas/output/walk)
+  walk <hash> [--format tree]       Recursive traversal (--follow-type to include schemas) (@ocas/output/walk)
   hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
