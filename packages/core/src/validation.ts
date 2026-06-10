@@ -1,6 +1,23 @@
 import { InvalidVariableNameError } from "./errors.js";
 
 /**
+ * Non-throwing predicate counterpart of {@link validateName}. Returns `true`
+ * when the input is a syntactically valid `@scope/name`, `false` otherwise.
+ *
+ * Useful for callers that need to classify untrusted user input as
+ * "potential variable name" vs. "malformed garbage" without paying the cost
+ * of an exception, e.g. the CLI's `tryResolveHash` short-circuit.
+ */
+export function isValidName(name: string): boolean {
+  try {
+    validateName(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validate that a variable name follows the `@scope/name` format.
  *
  * Rules:

@@ -72,7 +72,7 @@ export type {
   VarSetOptions,
   VarStore,
 } from "./types.js";
-export { validateName } from "./validation.js";
+export { isValidName, validateName } from "./validation.js";
 export {
   addNameIndex,
   checkTagLabelConflict,

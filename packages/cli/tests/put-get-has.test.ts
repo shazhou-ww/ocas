@@ -139,9 +139,96 @@ describe("ocas has predicate contract (#117)", () => {
     expect(envValue(b.stdout)).toBe(true);
   });
 
-  test("get on unresolvable name dies with 'Name not found'", async () => {
+  test("get on unresolvable name dies with 'Unknown hash or variable'", async () => {
     const { stderr, exitCode } = await runCli(["get", "@nonexistent/name"]);
     expect(exitCode).not.toBe(0);
-    expect(stderr).toContain("Error: Name not found:");
+    expect(stderr).toContain("Error: Unknown hash or variable:");
+    expect(stderr).not.toContain("Name not found");
+    expect(stderr).not.toContain("Schema not found");
+  });
+});
+
+// --- Issue #136: tightened resolveHash + has-no-die expansion ---
+
+describe("resolveHash unified error wording (#136)", () => {
+  test.each([
+    "not-a-hash",
+    "foo bar",
+    "@/x",
+    "@1bad/x",
+    "@app/",
+    "@app//x",
+    "@app/foo!bar",
+    "aaaaaaaaaaaaa",
+    "AAAAAAAAAAAAAA",
+    "@nonexistent/var",
+  ])(
+    "ocas get %s dies with 'Unknown hash or variable: <input>'",
+    (input) => {
+      const { stdout, stderr, exitCode } = runCli(["get", input]);
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain(`Error: Unknown hash or variable: ${input}`);
+      expect(stderr).not.toContain("Name not found");
+      expect(stderr).not.toContain("Schema not found");
+      expect(stdout).toBe("");
+    },
+  );
+
+  test.each(["verify", "refs", "walk", "render"])(
+    "ocas %s not-a-hash emits the same unified error",
+    (cmd) => {
+      const { stderr, exitCode } = runCli([cmd, "not-a-hash"]);
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("Error: Unknown hash or variable: not-a-hash");
+    },
+  );
+
+  test("ocas put not-a-hash <file> fails on the type-hash arg with the unified error", () => {
+    const payloadFile = join(tmpStore, "payload-136.json");
+    writeFileSync(payloadFile, JSON.stringify({ name: "x" }));
+    const { stderr, exitCode } = runCli(["put", "not-a-hash", payloadFile]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Error: Unknown hash or variable: not-a-hash");
+  });
+
+  test("ocas hash not-a-hash <file> fails on the type-hash arg with the unified error", () => {
+    const payloadFile = join(tmpStore, "payload-136.json");
+    writeFileSync(payloadFile, JSON.stringify({ name: "x" }));
+    const { stderr, exitCode } = runCli(["hash", "not-a-hash", payloadFile]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Error: Unknown hash or variable: not-a-hash");
+  });
+
+  test("Schema not found wording is preserved when a valid hash resolves but no schema lives at it", () => {
+    const payloadFile = join(tmpStore, "payload-136.json");
+    writeFileSync(payloadFile, JSON.stringify({ name: "x" }));
+    const { stderr, exitCode } = runCli([
+      "put",
+      "AAAAAAAAAAAAA",
+      payloadFile,
+    ]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Schema not found: AAAAAAAAAAAAA");
+  });
+});
+
+describe("ocas has never dies (#136 full enumeration)", () => {
+  test.each([
+    ["not-a-hash", "malformed: not a hash, fails @scope/name format"],
+    ["foo bar", "malformed: contains a space"],
+    ["@/x", "malformed: empty scope"],
+    ["@1bad/x", "malformed: scope starts with a digit"],
+    ["@app/", "malformed: trailing slash"],
+    ["@app//x", "malformed: empty segment"],
+    ["@app/foo!bar", "malformed: illegal character"],
+    ["aaaaaaaaaaaaa", "malformed: lowercase fails uppercase Crockford regex"],
+    ["AAAAAAAAAAAAAA", "malformed: 14 chars, wrong length"],
+    ["@nonexistent/var", "valid format but unregistered"],
+    ["AAAAAAAAAAAAA", "valid hash format but absent from CAS"],
+  ])("has %s returns {value:false}, exit 0 (%s)", (input) => {
+    const { stdout, stderr, exitCode } = runCli(["has", input]);
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(envValue(stdout)).toBe(false);
   });
 });

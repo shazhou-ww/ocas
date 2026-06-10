@@ -180,7 +180,7 @@ describe("ocas tag", () => {
   test("Test 9: tag with unknown variable name errors", async () => {
     const { stderr, exitCode } = await runCli("tag", "@user/missing", "label");
     expect(exitCode).not.toBe(0);
-    expect(stderr).toContain("Name not found: @user/missing");
+    expect(stderr).toContain("Unknown hash or variable: @user/missing");
   });
 
   test("Test 10: var tag is removed", async () => {
