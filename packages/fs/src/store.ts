@@ -94,7 +94,19 @@ function readNodeFromDisk(nodesDir: string, hash: Hash): CasNode | null {
 
 function parseIndexFile(content: string): Hash[] {
   if (content.length === 0) return [];
-  return content.split("\n").filter((line) => line.length > 0) as Hash[];
+  // Defensive dedup: preserve first occurrence to maintain insertion order
+  // even when a stale on-disk index file contains duplicates from a previous
+  // session that pre-dates the dedup fix (issue #116).
+  const seen = new Set<Hash>();
+  const out: Hash[] = [];
+  for (const line of content.split("\n")) {
+    if (line.length === 0) continue;
+    const h = line as Hash;
+    if (seen.has(h)) continue;
+    seen.add(h);
+    out.push(h);
+  }
+  return out;
 }
 
 function loadTypeIndex(indexDir: string): Map<Hash, Hash[]> {
@@ -223,9 +235,13 @@ function appendToTypeIndex(
   type: Hash,
   hash: Hash,
 ): void {
+  // Skip if already indexed (issue #116): prevents stale on-disk lines from
+  // accumulating across put → delete → reopen cycles. The in-memory list is
+  // the source of truth here because parseIndexFile dedupes on read.
+  const list = typeIndex.get(type) ?? [];
+  if (list.includes(hash)) return;
   mkdirSync(indexDir, { recursive: true });
   appendFileSync(join(indexDir, type), `${hash}\n`, "utf8");
-  const list = typeIndex.get(type) ?? [];
   list.push(hash);
   typeIndex.set(type, list);
 }
@@ -359,9 +375,24 @@ export function createFsStore(dir: string): FsCasStore {
     },
 
     delete(hash: Hash): boolean {
-      if (!hashSet.has(hash)) return false;
+      // Detect stale index entries (issue #116): a hash may be present only
+      // in the on-disk type index (e.g. its .bin was already removed by a
+      // previous failed delete). We still want delete() to succeed so the
+      // caller can reach a consistent state.
+      const inHashSet = hashSet.has(hash);
+      let inTypeIndex = false;
+      if (!inHashSet) {
+        for (const list of typeIndex.values()) {
+          if (list.includes(hash)) {
+            inTypeIndex = true;
+            break;
+          }
+        }
+      }
+      if (!inHashSet && !inTypeIndex && !metaSet.has(hash)) return false;
+
       // Need the node's type to clean up the type index. Lazy-load if needed.
-      const node = loadNode(hash);
+      const node = inHashSet ? loadNode(hash) : null;
       hashSet.delete(hash);
       cache.delete(hash);
       // Delete file
@@ -370,27 +401,34 @@ export function createFsStore(dir: string): FsCasStore {
       } catch {
         // ignore if file doesn't exist
       }
-      // Remove from type index (only if we could decode the node)
+      // Remove from type index. If the node could be decoded, we know its
+      // type directly; otherwise (issue #116: missing or corrupted .bin file)
+      // we scan every type list for the hash and clean it up there. This
+      // prevents stale on-disk index entries from accumulating across
+      // delete → reopen cycles.
+      const typesToCleanup: Hash[] = [];
       if (node) {
-        const list = typeIndex.get(node.type);
-        if (list) {
-          const idx = list.indexOf(hash);
-          if (idx !== -1) {
-            list.splice(idx, 1);
+        if (typeIndex.has(node.type)) typesToCleanup.push(node.type);
+      } else {
+        for (const [type, list] of typeIndex) {
+          if (list.includes(hash)) typesToCleanup.push(type);
+        }
+      }
+      for (const type of typesToCleanup) {
+        const list = typeIndex.get(type);
+        if (!list) continue;
+        const idx = list.indexOf(hash);
+        if (idx !== -1) list.splice(idx, 1);
+        if (list.length === 0) {
+          typeIndex.delete(type);
+          try {
+            unlinkSync(join(indexDir, type));
+          } catch {
+            // ignore
           }
-          if (list.length === 0) {
-            typeIndex.delete(node.type);
-            // Delete empty index file
-            try {
-              unlinkSync(join(indexDir, node.type));
-            } catch {
-              // ignore
-            }
-          } else {
-            // Rewrite index file
-            const body = `${list.join("\n")}\n`;
-            writeFileSync(join(indexDir, node.type), body, "utf8");
-          }
+        } else {
+          const body = `${list.join("\n")}\n`;
+          writeFileSync(join(indexDir, type), body, "utf8");
         }
       }
       // Remove from meta set if applicable
