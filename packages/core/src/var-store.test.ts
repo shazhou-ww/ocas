@@ -9,7 +9,7 @@ import {
 } from "./errors.js";
 import { createMemoryStore } from "./store.js";
 import type { Hash } from "./types.js";
-import { validateName } from "./validation.js";
+import { isValidName, validateName } from "./validation.js";
 
 function makeStoreWithSchema(): {
   store: ReturnType<typeof createMemoryStore>;
@@ -253,5 +253,28 @@ describe("validateName (shared)", () => {
 
   test("C-VN4. scope must start with a letter", () => {
     expect(() => validateName("@1bad/x")).toThrow(InvalidVariableNameError);
+  });
+});
+
+describe("isValidName (predicate)", () => {
+  test("returns true for well-formed names", () => {
+    expect(isValidName("@app/x")).toBe(true);
+    expect(isValidName("@app/a.b_c-1")).toBe(true);
+    expect(isValidName("@app/nested/path")).toBe(true);
+    expect(isValidName("@ocas/schema")).toBe(true);
+  });
+
+  test("returns false for every malformed input (no throw)", () => {
+    expect(isValidName("")).toBe(false);
+    expect(isValidName("x")).toBe(false);
+    expect(isValidName("not-a-hash")).toBe(false);
+    expect(isValidName("foo bar")).toBe(false);
+    expect(isValidName("@/x")).toBe(false);
+    expect(isValidName("@1bad/x")).toBe(false);
+    expect(isValidName("@app/")).toBe(false);
+    expect(isValidName("@app//x")).toBe(false);
+    expect(isValidName("@app/foo!bar")).toBe(false);
+    expect(isValidName("aaaaaaaaaaaaa")).toBe(false);
+    expect(isValidName("AAAAAAAAAAAAAA")).toBe(false);
   });
 });

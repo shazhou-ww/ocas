@@ -19,6 +19,7 @@ import {
   getSchema,
   InvalidVariableNameError,
   importBundle,
+  isValidName,
   loadBundleStore,
   putSchema,
   refs,
@@ -226,25 +227,34 @@ function isHash(input: string): boolean {
 
 /**
  * Resolve a hash-or-name. If `input` already looks like a hash, return it as-is.
- * Otherwise, query the store's var sub-store for a variable with that exact
- * name and return the first match's value.
+ * If it is a syntactically valid `@scope/name`, query the store's var sub-store
+ * for an exact-name match. Otherwise — and on any lookup miss — die with the
+ * unified `Unknown hash or variable` error.
  */
 function resolveHash(input: string, store: Store): Hash {
   const resolved = tryResolveHash(input, store);
   if (resolved === null) {
-    die(`Error: Name not found: ${input}`);
+    die(`Error: Unknown hash or variable: ${input}`);
   }
   return resolved;
 }
 
 /**
  * Non-dying variant of `resolveHash`. Returns `null` when the input is neither
- * a valid hash nor a registered variable name. Used by predicate commands like
+ * a valid hash nor a registered variable name. Malformed inputs (that are
+ * neither a 13-char hash nor a syntactically valid `@scope/name`) short-circuit
+ * to `null` WITHOUT querying `store.var`. Used by predicate commands like
  * `ocas has` that must report "not present" instead of crashing.
  */
 function tryResolveHash(input: string, store: Store): Hash | null {
   if (isHash(input)) {
     return input as Hash;
+  }
+  // Reject malformed input before touching store.var — anything that fails
+  // validateName() cannot possibly be a registered variable name, so the
+  // lookup would be pure waste (and produce a misleading error path).
+  if (!isValidName(input)) {
+    return null;
   }
   const variants = store.var.list({ exactName: input });
   const first = variants[0];
