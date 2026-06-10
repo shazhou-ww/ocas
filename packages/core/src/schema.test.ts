@@ -252,7 +252,7 @@ describe("walk", () => {
     const visited: string[] = [];
     walk(store, nodeHash, (hash) => visited.push(hash));
 
-    expect(visited).toEqual([nodeHash]);
+    expect(visited).toContain(nodeHash);
   });
 
   test("visits all reachable nodes in a chain A → B → C", async () => {
@@ -272,7 +272,6 @@ describe("walk", () => {
     const visited: string[] = [];
     walk(store, hashA, (hash) => visited.push(hash));
 
-    expect(visited).toHaveLength(3);
     expect(visited).toContain(hashA);
     expect(visited).toContain(hashB);
     expect(visited).toContain(hashC);
@@ -319,7 +318,6 @@ describe("walk", () => {
     expect(visited.has(hashD)).toBe(true);
     expect(visited.has(hashE)).toBe(true);
     expect(visited.has(hashC)).toBe(true);
-    expect(visited.size).toBe(4);
   });
 
   test("skips missing hashes gracefully", async () => {
@@ -345,15 +343,133 @@ describe("walk", () => {
     });
     const nodeHash = store.cas.put(schemaHash, { x: 7 });
 
-    let receivedHash: string | null = null;
-    let receivedNode: CasNode | null = null;
+    const received: { hash: string; node: CasNode }[] = [];
     walk(store, nodeHash, (hash, node) => {
-      receivedHash = hash;
-      receivedNode = node;
+      received.push({ hash, node });
     });
 
-    expect(receivedHash).toBe(nodeHash);
-    expect(receivedNode?.payload).toEqual({ x: 7 });
+    const rootCall = received.find((r) => r.hash === nodeHash);
+    expect(rootCall).toBeDefined();
+    expect(rootCall?.node.payload).toEqual({ x: 7 });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Suite W: walk() follows node.type (#130)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("walk() follows node.type (#130)", () => {
+  test("W.1 walk() visits node.type alongside the node itself", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as Hash;
+
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const dataHash = store.cas.put(schemaHash, { val: 42 });
+
+    const visited = new Set<Hash>();
+    walk(store, dataHash, (h) => {
+      visited.add(h);
+    });
+
+    expect(visited.has(dataHash)).toBe(true);
+    expect(visited.has(schemaHash)).toBe(true);
+    expect(visited.has(metaHash)).toBe(true); // transitively via schemaHash.type
+  });
+
+  test("W.2 walk() terminates on self-referencing meta-schema", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as Hash;
+
+    const visited = new Set<Hash>();
+    walk(store, metaHash, (h) => {
+      visited.add(h);
+    });
+
+    expect(visited.has(metaHash)).toBe(true);
+    expect(visited.size).toBeGreaterThanOrEqual(1);
+  });
+
+  test("W.3 walk() reaches refs embedded inside a schema node's payload", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as Hash;
+    const stringHash = aliases["@ocas/string"] as Hash;
+
+    // Custom meta: a schema that adds an extraRef field (format: ocas_ref).
+    const customMeta = store.cas.put(metaHash, {
+      type: "object",
+      properties: {
+        extraRef: { type: "string", format: "ocas_ref" },
+        type: { type: "string" },
+      },
+    });
+
+    const targetHash = store.cas.put(stringHash, "secret");
+
+    // S is typed by customMeta AND has extraRef pointing to targetHash.
+    const S = store.cas.put(customMeta, {
+      extraRef: targetHash,
+      type: "string",
+    });
+
+    // D is typed by S (since S.payload says type:"string", D.payload must be a string).
+    const D = store.cas.put(S, "hello");
+
+    const visited = new Set<Hash>();
+    walk(store, D, (h) => {
+      visited.add(h);
+    });
+
+    expect(visited.has(D)).toBe(true);
+    expect(visited.has(S)).toBe(true);
+    expect(visited.has(customMeta)).toBe(true);
+    expect(visited.has(targetHash)).toBe(true); // ← the new behavior
+  });
+
+  test("W.4 walk() reports dangling type via onDangling", () => {
+    const store = createMemoryStore();
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const dataHash = store.cas.put(schemaHash, { val: 1 });
+
+    expect(store.cas.delete(schemaHash)).toBe(true);
+
+    const visited: Hash[] = [];
+    const spy = vi.fn();
+    walk(store, dataHash, (h) => visited.push(h), { onDangling: spy });
+
+    expect(visited).toContain(dataHash);
+    expect(spy).toHaveBeenCalledWith(schemaHash);
+  });
+
+  test("W.5 walk() visits shared type exactly once across siblings", () => {
+    const store = createMemoryStore();
+    const leaf = putSchema(store, {
+      type: "object",
+      properties: { v: { type: "number" } },
+    });
+    const pair = putSchema(store, {
+      type: "object",
+      properties: {
+        a: { type: "string", format: "ocas_ref" },
+        b: { type: "string", format: "ocas_ref" },
+      },
+    });
+    const d1 = store.cas.put(leaf, { v: 1 });
+    const d2 = store.cas.put(leaf, { v: 2 });
+    const root = store.cas.put(pair, { a: d1, b: d2 });
+
+    const calls: Hash[] = [];
+    walk(store, root, (h) => calls.push(h));
+
+    const leafCount = calls.filter((h) => h === leaf).length;
+    expect(leafCount).toBe(1);
   });
 });
 
@@ -929,7 +1045,6 @@ describe("dangling refs (issue #112)", () => {
     const visited: string[] = [];
     walk(store, hashA, (hash) => visited.push(hash));
 
-    expect(visited).toHaveLength(3);
     expect(visited).toContain(hashA);
     expect(visited).toContain(hashB);
     expect(visited).toContain(hashC);
@@ -1148,7 +1263,7 @@ describe("dangling refs (issue #112)", () => {
     // No options object — original signature.
     walk(store, nodeHash, (hash) => visited.push(hash));
 
-    expect(visited).toEqual([nodeHash]);
+    expect(visited).toContain(nodeHash);
   });
 
   test("refs() two-argument call still type-checks and returns the same array as before", () => {

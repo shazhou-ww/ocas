@@ -335,3 +335,38 @@ describe("GC - template content preservation (#93)", () => {
     expect(store.cas.has(tplA)).toBe(false);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Suite G: GC — schema payload ref preservation (#130)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("GC - schema payload ref preservation (#130)", () => {
+  test("G.1 GC preserves CAS hashes embedded inside schema payloads", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as string;
+    const stringHash = aliases["@ocas/string"] as string;
+
+    const customMeta = store.cas.put(metaHash, {
+      type: "object",
+      properties: {
+        extraRef: { type: "string", format: "ocas_ref" },
+        type: { type: "string" },
+      },
+    });
+    const targetHash = store.cas.put(stringHash, "secret");
+    const S = store.cas.put(customMeta, {
+      extraRef: targetHash,
+      type: "string",
+    });
+    const D = store.cas.put(S, "hello");
+
+    store.var.set("@test/data", D);
+
+    gc(store);
+
+    expect(store.cas.has(D)).toBe(true);
+    expect(store.cas.has(S)).toBe(true);
+    expect(store.cas.has(customMeta)).toBe(true);
+    expect(store.cas.has(targetHash)).toBe(true); // ← key assertion
+  });
+});

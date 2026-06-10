@@ -487,9 +487,19 @@ export function refs(
  * Calls visitor(hash, node) for each reachable node exactly once.
  * Handles cycles via a visited set.
  *
+ * Traversal enqueues both:
+ *   1. payload refs returned by {@link refs} (ocas_ref fields), and
+ *   2. the node's own type hash (so the schema chain is reachable).
+ *
+ * The visited-set dedup naturally handles self-referencing meta-schemas
+ * (where `node.type === hash`). Because schema nodes are traversed like any
+ * other node, refs embedded inside a schema's payload (e.g. via a custom
+ * meta-schema declaring an `ocas_ref` field) are now reached transitively.
+ *
  * Dangling refs (hashes that resolve to no stored node, including the root
- * itself) are silently skipped by default. Pass `options.onDangling` to be
- * notified once per unique missing hash discovered during the traversal.
+ * itself, the node's type, and any payload ref target) are silently skipped
+ * by default. Pass `options.onDangling` to be notified once per unique
+ * missing hash discovered during the traversal.
  */
 export function walk(
   store: Store,
@@ -520,6 +530,13 @@ export function walk(
       if (!visited.has(refHash) && !dangling.has(refHash)) {
         queue.push(refHash);
       }
+    }
+
+    // Enqueue the node's own type so the schema chain is part of normal
+    // traversal. The visited-set dedup terminates self-referencing meta-
+    // schemas (where node.type === hash).
+    if (!visited.has(node.type) && !dangling.has(node.type)) {
+      queue.push(node.type);
     }
   }
 }
