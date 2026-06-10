@@ -1,9 +1,9 @@
 name: "solve-issue"
-description: "TDD-driven issue resolution. Planner writes specs/ files, developer implements, tester verifies against specs. Uses pnpm."
+description: "TDD-driven issue resolution. Planner creates worktree + writes specs/ files, developer implements, tester verifies against specs. Uses pnpm."
 roles:
   planner:
-    description: "Analyzes issue and writes a spec file in specs/"
-    goal: "You are a planning agent. You analyze Gitea issues and produce a behavior spec file in the repo's specs/ directory."
+    description: "Analyzes issue, creates worktree, and writes spec files in specs/"
+    goal: "You are a planning agent. You analyze Gitea issues, create a worktree, and produce behavior spec files in the worktree's specs/ directory."
     capabilities:
       - issue-analysis
       - planning
@@ -22,7 +22,15 @@ roles:
       3. Read `specs/README.md` to understand the spec format and conventions
       4. Assess whether the issue has enough information to produce a spec
       5. If insufficient info: comment on the issue via `echo "..." | tea comment <number> -r <owner/repo>` (skip if you already commented), then yield by outputting $status=$SUSPEND with a reason describing what's missing. The engine suspends the thread; a human can `uwf thread resume` once the info is provided.
-      6. If sufficient: write a spec file to `specs/<feature>-<behavior>.md` following the Given/When/Then format:
+      6. Create a worktree for this issue:
+         ```bash
+         cd <repoPath>
+         git fetch origin
+         git worktree add .worktrees/fix/<issue-number>-<short-slug> -b fix/<issue-number>-<short-slug> origin/main
+         cd .worktrees/fix/<issue-number>-<short-slug>
+         pnpm install
+         ```
+      7. Write spec files inside the worktree's `specs/<feature>-<behavior>.md` following the Given/When/Then format:
          ```markdown
          ---
          scenario: "One-line description"
@@ -43,7 +51,8 @@ roles:
          ```
          If the issue covers multiple behaviors, write multiple spec files.
          If a spec file already exists for the same behavior, update it rather than creating a duplicate.
-      7. Output **$status=ready** with specFiles (list of written spec file paths) and repoPath
+      8. specFiles MUST be non-empty — at least one spec file must be written. If no spec can be produced, use $SUSPEND instead.
+      9. Output **$status=ready** with specFiles (list of written spec file paths relative to repo root, e.g. `specs/render-template-substitution.md`), repoPath, worktree, and branch
 
       **Mode B — Continue on existing PR (prompt mentions PR, branch, or review feedback):**
       YOU MUST output $status=continue (NOT ready) when in this mode.
@@ -51,31 +60,28 @@ roles:
       2. Read the PR and its review comments from Gitea: `tea pr <number> --comments -r <owner/repo>`
       3. Read the existing issue for full context: `tea issues <number> -r <owner/repo>`
       4. Look for project conventions files (CLAUDE.md, CONTRIBUTING.md, .cursor/rules/) in the repo
-      5. Write or update spec files in `specs/` covering ONLY the changes requested in the review — do NOT re-spec already-implemented features
-      6. Find the existing worktree: `git worktree list` and locate the branch
+      5. Find the existing worktree: `git worktree list` and locate the branch. cd into it.
+      6. Write or update spec files in the worktree's `specs/` covering ONLY the changes requested in the review — do NOT re-spec already-implemented features
       7. Output **$status=continue** with specFiles, repoPath, branch name, and worktree path
 
       **Mode C — Bounced back by tester (fix_spec):**
       1. Read the tester's output from the previous step to understand what's wrong with the spec
-      2. Revise the spec files accordingly
-      3. Output **$status=ready** with specFiles and repoPath
-
-      IMPORTANT: Extract the repo remote (owner/repo) from git:
-      ```bash
-      git remote get-url origin | sed 's|.*[:/]\([^/]*/[^.]*\).*|\1|'
-      ```
-      Store the result as repoRemote in your frontmatter output so downstream roles can use it.
+      2. cd into the existing worktree (from the thread history)
+      3. Revise the spec files in the worktree accordingly
+      4. Output **$status=ready** with specFiles, repoPath, worktree, and branch
     output: "Output a brief summary of the spec. Set $status to ready (fresh) or continue (existing PR). If the issue lacks enough info to plan, yield with $status=$SUSPEND and a reason."
     frontmatter:
       oneOf:
         - properties:
             $status: { const: "ready" }
-            specFiles: { type: array, items: { type: string } }
+            specFiles: { type: array, items: { type: string }, minItems: 1 }
             repoPath: { type: string }
-          required: [$status, specFiles, repoPath]
+            worktree: { type: string }
+            branch: { type: string }
+          required: [$status, specFiles, repoPath, worktree, branch]
         - properties:
             $status: { const: "continue" }
-            specFiles: { type: array, items: { type: string } }
+            specFiles: { type: array, items: { type: string }, minItems: 1 }
             repoPath: { type: string }
             branch: { type: string }
             worktree: { type: string }
@@ -87,40 +93,32 @@ roles:
       - coding
     procedure: |
       IMPORTANT: You MUST execute every step via shell commands. Do NOT skip steps or fabricate output.
-      Always work in a git worktree, NEVER modify the main working directory directly.
-      The repo path and other details are provided in your task prompt.
+      Always work in the worktree provided by the planner — NEVER modify the main working directory directly.
+      The worktree path and other details are provided in your task prompt.
 
-      Before starting any work, set up an isolated worktree:
-      1. cd into the repo path provided in your task prompt
-      2. `git fetch origin` to get latest refs
-      3. First time (no existing branch):
-         - `git worktree add .worktrees/fix/<issue-number>-<short-slug> -b fix/<issue-number>-<short-slug> origin/main`
-         - `cd .worktrees/fix/<issue-number>-<short-slug> && pnpm install`
-      4. If continuing on existing branch (prompt says "Continue work on existing branch" or provides a worktree path):
-         - cd directly into the worktree path provided in the prompt
-         - `git fetch origin && git rebase origin/main`
-         - Do NOT create a new branch or worktree
-      5. If bounced back from reviewer or tester (branch already exists but no explicit worktree path):
-         - cd into the existing worktree under `.worktrees/fix/<issue-number>-<short-slug>`
-         - `git fetch origin && git rebase origin/main`
+      Set up your working environment:
+      1. cd into the worktree path provided in your task prompt
+      2. `git fetch origin`
+      3. If continuing on existing branch or bounced back from reviewer/tester:
+         - `git rebase origin/main`
          - You MUST actually edit the files to address the feedback. Do NOT claim fixes without running commands.
-      6. ALL subsequent work must happen inside the worktree directory.
+      4. ALL subsequent work must happen inside the worktree directory.
 
       Then implement TDD:
-      7. Read all spec files listed in your task prompt: `cat specs/<file>.md` for each one
-      8. If bounced back from reviewer or tester: read the feedback carefully, then execute the actual fix commands — edit files, run build, run tests. Never output "done" without tool calls.
-      9. Write tests first based on the Given/When/Then scenarios in the spec files
-      10. Implement the code to make tests pass
-      11. Ensure `pnpm run build` passes with no errors
-      12. Run `pnpm test` to verify all tests pass
+      5. Read all spec files listed in your task prompt: `cat specs/<file>.md` for each one
+      6. If bounced back from reviewer or tester: read the feedback carefully, then execute the actual fix commands — edit files, run build, run tests. Never output "done" without tool calls.
+      7. Write tests first based on the Given/When/Then scenarios in the spec files
+      8. Implement the code to make tests pass
+      9. Ensure `pnpm run build` passes with no errors
+      10. Run `pnpm test` to verify all tests pass
 
       After implementation, before reporting done:
-      13. Add a changeset file (`.changeset/<short-slug>.md`) with correct bump type:
+      11. Add a changeset file (`.changeset/<short-slug>.md`) with correct bump type:
           - `patch` for bug fixes, internal refactors, test-only changes
           - `minor` for new features, new CLI commands, new API surfaces
           - `major` for breaking changes
           List every affected package in the changeset frontmatter.
-      14. Update documentation if the change affects user-facing behavior:
+      12. Update documentation if the change affects user-facing behavior:
           - `README.md` — usage examples, feature descriptions
           - `.cards/` — architecture decision records (if applicable)
           - CLI prompt subcommand output (if CLI help text changes)
@@ -200,7 +198,8 @@ roles:
       The worktree path is provided in your task prompt. cd into it first.
 
       1. Run `pnpm test` for automated test verification — all tests must pass
-      2. Read every spec file listed in the thread history (from the planner step). For each spec file:
+      2. Find the spec files for THIS issue: look at the planner step output in the thread history for the specFiles list. Only verify those files — do NOT scan all files in specs/.
+      3. For each spec file from the planner:
          a. Read the file: `cat specs/<file>.md`
          b. Parse the Given/When/Then sections
          c. Verify each **Then** condition is satisfied:
@@ -208,8 +207,8 @@ roles:
             - If the spec describes an API behavior, check that a test covers it and passes
             - If the spec describes an error condition, verify the error is handled as specified
          d. Record pass/fail per Then condition with evidence (actual output)
-      3. Determine outcome:
-         - passed: ALL Then conditions in ALL spec files verified + pnpm test passes
+      4. Determine outcome:
+         - passed: ALL Then conditions in the planner's spec files verified + pnpm test passes
          - fix_code: tests fail or implementation doesn't match spec → send back to developer
          - fix_spec: the spec itself is wrong or incomplete → send back to planner
     output: "Report test results per spec file and per Then condition. Set $status to passed (with branch/worktree), fix_code (with report), or fix_spec (with report)."
@@ -269,13 +268,13 @@ graph:
     new: { role: "planner", prompt: "Analyze the issue and write behavior specs in specs/." }
     resume: { role: "planner", prompt: "Review the previous run output and continue the work." }
   planner:
-    ready: { role: "developer", prompt: "Implement the behavior defined in spec files: {{{specFiles}}}. Repo: {{{repoPath}}}." }
-    continue: { role: "developer", prompt: "Continue work on existing branch {{{branch}}} at worktree {{{worktree}}}. Implement the revised specs: {{{specFiles}}}. Repo: {{{repoPath}}}. Do NOT create a new branch or worktree — cd into the existing worktree and work there." }
+    ready: { role: "developer", prompt: "Implement the behavior defined in spec files ({{#specFiles}}{{.}} {{/specFiles}}) at worktree {{{worktree}}} on branch {{{branch}}}. Repo: {{{repoPath}}}. Do NOT create a new worktree — the planner already created it." }
+    continue: { role: "developer", prompt: "Continue work on existing branch {{{branch}}} at worktree {{{worktree}}}. Implement the revised specs ({{#specFiles}}{{.}} {{/specFiles}}). Repo: {{{repoPath}}}. Do NOT create a new branch or worktree — cd into the existing worktree and work there." }
   developer:
     done: { role: "reviewer", prompt: "Review branch {{{branch}}} at {{{worktree}}} for code standards compliance." }
     failed: { role: "$END", prompt: "Developer failed: {{{reason}}}. Ending workflow." }
   reviewer:
-    rejected: { role: "developer", prompt: "Reviewer rejected: {{{comments}}}. Fix the issues in repo {{{worktree}}}." }
+    rejected: { role: "developer", prompt: "Reviewer rejected: {{{comments}}}. Fix the issues at {{{worktree}}}." }
     approved: { role: "tester", prompt: "Review passed. Verify implementation against spec files on branch {{{branch}}} at {{{worktree}}}." }
   tester:
     fix_code: { role: "developer", prompt: "Tests found code issues: {{{report}}}. Fix and re-submit." }
