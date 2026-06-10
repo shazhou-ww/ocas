@@ -222,11 +222,15 @@ roles:
         - properties:
             $status: { const: "fix_code" }
             report: { type: string }
-          required: [$status, report]
+            branch: { type: string }
+            worktree: { type: string }
+          required: [$status, report, branch, worktree]
         - properties:
             $status: { const: "fix_spec" }
             report: { type: string }
-          required: [$status, report]
+            branch: { type: string }
+            worktree: { type: string }
+          required: [$status, report, branch, worktree]
   committer:
     description: "Commits and creates PR"
     goal: "You are a committer agent. You create a clean commit and push a PR linking the original issue."
@@ -262,7 +266,9 @@ roles:
         - properties:
             $status: { const: "hook_failed" }
             error: { type: string }
-          required: [$status, error]
+            branch: { type: string }
+            worktree: { type: string }
+          required: [$status, error, branch, worktree]
 graph:
   $START:
     new: { role: "planner", prompt: "Analyze the issue and write behavior specs in specs/." }
@@ -277,9 +283,9 @@ graph:
     rejected: { role: "developer", prompt: "Reviewer rejected: {{{comments}}}. Fix the issues at {{{worktree}}}." }
     approved: { role: "tester", prompt: "Review passed. Verify implementation against spec files on branch {{{branch}}} at {{{worktree}}}." }
   tester:
-    fix_code: { role: "developer", prompt: "Tests found code issues: {{{report}}}. Fix and re-submit." }
-    fix_spec: { role: "planner", prompt: "Tests found spec issues: {{{report}}}. Revise the spec files." }
+    fix_code: { role: "developer", prompt: "Tests found code issues: {{{report}}}. Fix and re-submit at {{{worktree}}} on branch {{{branch}}}." }
+    fix_spec: { role: "planner", prompt: "Tests found spec issues: {{{report}}}. Revise the spec files at {{{worktree}}} on branch {{{branch}}}." }
     passed: { role: "committer", prompt: "All specs verified. Commit and push branch {{{branch}}} from {{{worktree}}}." }
   committer:
-    hook_failed: { role: "developer", prompt: "Push hook failed: {{{error}}}. Fix and re-submit." }
+    hook_failed: { role: "developer", prompt: "Push hook failed: {{{error}}}. Fix and re-submit at {{{worktree}}} on branch {{{branch}}}." }
     committed: { role: "$END", prompt: "PR created: {{{prUrl}}}. Workflow complete." }
