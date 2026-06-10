@@ -7,7 +7,13 @@ roles:
     goal: "You are a triage agent. You classify open issues by type and assign them to appropriate version milestones."
     capabilities: [gitea]
     procedure: |
-      You triage issues in batches. Each run, you process the issues given to you.
+      You triage issues in batches — process up to 10 issues per run to prevent token exhaustion.
+      Each run, you process the issues given to you.
+
+      **Note on bash commands:** The bash command examples throughout this procedure are
+      illustrative — they show the logical operations to perform. You interpret them contextually
+      and adapt as needed (using available tools, handling errors, etc.), rather than executing
+      them as literal shell scripts.
 
       ## Testing this workflow
 
@@ -56,6 +62,8 @@ roles:
          `tea issues edit <number> --repo <owner/repo> --labels <label> --milestone <milestone>`
          If tea edit fails, use the Gitea API directly:
          `curl -s -X PATCH "https://git.shazhou.work/api/v1/repos/<owner>/<repo>/issues/<number>" -H "Authorization: token <token>" -H "Content-Type: application/json" -d '{"labels": [<label_id>], "milestone": <milestone_id>}'`
+         **Important:** If both tea CLI and API calls fail, log the failure in your output so operators
+         can diagnose authentication or network issues.
 
       ## After processing
 
