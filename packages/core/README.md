@@ -68,7 +68,7 @@ Writes the meta-schema seed node (idempotent). Requires a `BootstrapCapableStore
 ```typescript
 class SchemaValidationError extends Error;
 
-async function putSchema(store: Store, jsonSchema: JSONSchema): Promise<Hash>;
+function putSchema(store: Store, jsonSchema: JSONSchema): Hash;
 function getSchema(store: Store, typeHash: Hash): JSONSchema | null;
 function validate(store: Store, node: CasNode): boolean;
 
@@ -86,8 +86,8 @@ function walk(
 ```
 
 - `putSchema` — stores a schema typed by the meta-schema; returned hash is the `typeHash` for conforming payloads.
-- `refs` — collects all `format: "cas_ref"` values in the payload per schema shape. Pass `onDangling` to be notified once per unique referenced hash that is missing from the store; the returned array is unaffected.
-- `walk` — BFS from `rootHash`, following `cas_ref` edges; cycles are visited once. Dangling refs (including a missing root) are silently skipped by default; pass `onDangling` to be notified once per unique missing hash discovered during the traversal.
+- `refs` — collects all `format: "ocas_ref"` values in the payload per schema shape. Pass `onDangling` to be notified once per unique referenced hash that is missing from the store; the returned array is unaffected.
+- `walk` — BFS from `rootHash`, following `ocas_ref` edges; cycles are visited once. Dangling refs (including a missing root) are silently skipped by default; pass `onDangling` to be notified once per unique missing hash discovered during the traversal.
 
 ### Store
 
@@ -135,7 +135,7 @@ async function importBundle(
 async function loadBundleStore(bundlePath: string): Promise<Store>;
 ```
 
-- `computeClosure` — walks `cas_ref` edges and schema chains from each root,
+- `computeClosure` — walks `ocas_ref` edges and schema chains from each root,
   also gathering every `Variable` whose `value` lands in the closure and every
   `Tag` attached to an in-closure target.
 - `exportBundle` — writes a self-contained POSIX-tar archive containing
@@ -160,20 +160,20 @@ import {
 } from "@ocas/core";
 
 const store = createMemoryStore();
-const metaHash = await bootstrap(store);
+const metaHash = bootstrap(store);
 
-const personType = await putSchema(store, {
+const personType = putSchema(store, {
   type: "object",
   properties: {
     name: { type: "string" },
-    friend: { type: "string", format: "cas_ref" },
+    friend: { type: "string", format: "ocas_ref" },
   },
   required: ["name"],
   additionalProperties: false,
 });
 
-const aliceHash = await store.put(personType, { name: "Alice" });
-const bobHash = await store.put(personType, {
+const aliceHash = store.put(personType, { name: "Alice" });
+const bobHash = store.put(personType, {
   name: "Bob",
   friend: aliceHash,
 });

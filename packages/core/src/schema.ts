@@ -440,7 +440,10 @@ export interface RefsOptions {
  * Options accepted by {@link walk}.
  */
 export interface WalkOptions {
-  /** See {@link OnDangling}. */
+  /**
+   * See {@link OnDangling}.
+   * Exceptions thrown inside the callback propagate to the caller.
+   */
   onDangling?: OnDangling;
 }
 
@@ -466,6 +469,7 @@ export function refs(
   const collected = collectRefs(schema, node.payload);
   const onDangling = options?.onDangling;
   if (onDangling !== undefined) {
+    // Track all visited hashes for dedup: notify onDangling at most once per unique hash
     const seen = new Set<Hash>();
     for (const hash of collected) {
       if (seen.has(hash)) continue;
