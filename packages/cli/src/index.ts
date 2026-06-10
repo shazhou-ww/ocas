@@ -230,13 +230,26 @@ function isHash(input: string): boolean {
  * name and return the first match's value.
  */
 function resolveHash(input: string, store: Store): Hash {
+  const resolved = tryResolveHash(input, store);
+  if (resolved === null) {
+    die(`Error: Name not found: ${input}`);
+  }
+  return resolved;
+}
+
+/**
+ * Non-dying variant of `resolveHash`. Returns `null` when the input is neither
+ * a valid hash nor a registered variable name. Used by predicate commands like
+ * `ocas has` that must report "not present" instead of crashing.
+ */
+function tryResolveHash(input: string, store: Store): Hash | null {
   if (isHash(input)) {
     return input as Hash;
   }
   const variants = store.var.list({ exactName: input });
   const first = variants[0];
   if (!first) {
-    die(`Error: Schema not found: ${input}`);
+    return null;
   }
   return first.value as Hash;
 }
@@ -397,11 +410,9 @@ async function cmdHas(args: string[]): Promise<void> {
   const input = args[0];
   if (!input) die("Usage: ocas has <hash-or-name>");
   const store = await openStore();
-  const hash = resolveHash(input, store);
-  await out(
-    await wrapEnvelope(store, "@ocas/output/has", store.cas.has(hash)),
-    store,
-  );
+  const hash = tryResolveHash(input, store);
+  const present = hash !== null && store.cas.has(hash);
+  await out(await wrapEnvelope(store, "@ocas/output/has", present), store);
 }
 
 async function cmdVerify(args: string[]): Promise<void> {

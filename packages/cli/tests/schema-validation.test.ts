@@ -380,7 +380,7 @@ describe("Issue #50: Schema Validation in put", () => {
         );
 
         expect(exitCode).not.toBe(0);
-        expect(stderr).toContain("Schema not found");
+        expect(stderr).toContain("Name not found");
       } finally {
         rmSync(tmpStore, { recursive: true, force: true });
       }
