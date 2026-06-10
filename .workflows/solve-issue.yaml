@@ -207,18 +207,27 @@ roles:
             - If the spec describes an API behavior, check that a test covers it and passes
             - If the spec describes an error condition, verify the error is handled as specified
          d. Record pass/fail per Then condition with evidence (actual output)
-      4. Determine outcome:
+      4. Build a verification report as a markdown string. Format:
+         ```
+         ## <spec-file-name>
+         - [PASS] <Then condition 1> — <evidence>
+         - [PASS] <Then condition 2> — <evidence>
+         - [FAIL] <Then condition 3> — expected: X, actual: Y
+         ```
+         This report MUST be included in your frontmatter `report` field for ALL outcomes (passed, fix_code, fix_spec).
+      5. Determine outcome:
          - passed: ALL Then conditions in the planner's spec files verified + pnpm test passes
          - fix_code: tests fail or implementation doesn't match spec → send back to developer
          - fix_spec: the spec itself is wrong or incomplete → send back to planner
-    output: "Report test results per spec file and per Then condition. Set $status to passed (with branch/worktree), fix_code (with report), or fix_spec (with report)."
+    output: "Report test results per spec file and per Then condition in the report field. Set $status to passed (with branch/worktree/report), fix_code (with report), or fix_spec (with report)."
     frontmatter:
       oneOf:
         - properties:
             $status: { const: "passed" }
+            report: { type: string }
             branch: { type: string }
             worktree: { type: string }
-          required: [$status, branch, worktree]
+          required: [$status, report, branch, worktree]
         - properties:
             $status: { const: "fix_code" }
             report: { type: string }
@@ -274,8 +283,8 @@ graph:
     new: { role: "planner", prompt: "Analyze the issue and write behavior specs in specs/." }
     resume: { role: "planner", prompt: "Review the previous run output and continue the work." }
   planner:
-    ready: { role: "developer", prompt: "Implement the behavior defined in spec files ({{#specFiles}}{{.}} {{/specFiles}}) at worktree {{{worktree}}} on branch {{{branch}}}. Repo: {{{repoPath}}}. Do NOT create a new worktree — the planner already created it." }
-    continue: { role: "developer", prompt: "Continue work on existing branch {{{branch}}} at worktree {{{worktree}}}. Implement the revised specs ({{#specFiles}}{{.}} {{/specFiles}}). Repo: {{{repoPath}}}. Do NOT create a new branch or worktree — cd into the existing worktree and work there." }
+    ready: { role: "developer", prompt: "Implement the behavior defined in spec files (comma-separated): {{{specFiles}}}. Worktree: {{{worktree}}}, branch: {{{branch}}}. Repo: {{{repoPath}}}. Do NOT create a new worktree — the planner already created it." }
+    continue: { role: "developer", prompt: "Continue work on existing branch {{{branch}}} at worktree {{{worktree}}}. Implement the revised specs (comma-separated): {{{specFiles}}}. Repo: {{{repoPath}}}. Do NOT create a new branch or worktree — cd into the existing worktree and work there." }
   developer:
     done: { role: "reviewer", prompt: "Review branch {{{branch}}} at {{{worktree}}} for code standards compliance." }
     failed: { role: "$END", prompt: "Developer failed: {{{reason}}}. Ending workflow." }
