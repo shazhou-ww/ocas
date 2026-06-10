@@ -445,16 +445,27 @@ async function cmdRefs(args: string[]): Promise<void> {
 
 async function cmdWalk(args: string[]): Promise<void> {
   const input = args[0];
-  if (!input) die("Usage: ocas walk <hash-or-name> [--format tree]");
+  if (!input)
+    die("Usage: ocas walk <hash-or-name> [--format tree] [--follow-type]");
   const store = await openStore();
   const hash = resolveHash(input, store);
   const format = flags.format;
+  const followType = flags["follow-type"] === true;
 
   if (format === "tree") {
     const childMap = new Map<Hash, Hash[]>();
-    walk(store, hash, (h, node) => {
-      childMap.set(h, refs(store, node));
-    });
+    walk(
+      store,
+      hash,
+      (h, node) => {
+        const children = refs(store, node);
+        if (followType) {
+          children.push(node.type);
+        }
+        childMap.set(h, children);
+      },
+      { followType },
+    );
 
     const printed = new Set<Hash>();
     const lines: string[] = [];
@@ -483,9 +494,14 @@ async function cmdWalk(args: string[]): Promise<void> {
     );
   } else {
     const hashes: Hash[] = [];
-    walk(store, hash, (h) => {
-      hashes.push(h);
-    });
+    walk(
+      store,
+      hash,
+      (h) => {
+        hashes.push(h);
+      },
+      { followType },
+    );
     await out(await wrapEnvelope(store, "@ocas/output/walk", hashes), store);
   }
 }
@@ -1188,7 +1204,7 @@ Commands:
   has <hash>                        Print envelope (value=boolean)                     (@ocas/output/has)
   verify <hash>                     Verify integrity + schema (value=ok/corrupted/invalid) (@ocas/output/verify)
   refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
-  walk <hash> [--format tree]       Recursive traversal                                (@ocas/output/walk)
+  walk <hash> [--format tree]       Recursive traversal (--follow-type to include schemas) (@ocas/output/walk)
   hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
   render <hash> [options]           Render node as text with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)

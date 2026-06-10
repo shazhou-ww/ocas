@@ -1287,3 +1287,129 @@ describe("dangling refs (issue #112)", () => {
     expect(typeof _cb).toBe("function");
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Suite: walk() followType option (#135)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("walk() followType option (#135)", () => {
+  test("followType: false — only payload refs are traversed, schemas excluded", () => {
+    const store = createMemoryStore();
+    bootstrap(store);
+
+    const simpleSchema = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const refSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        ref: { type: "string", format: "ocas_ref" },
+        val: { type: "number" },
+      },
+    });
+
+    const leaf = store.cas.put(simpleSchema, { val: 7 });
+    const root = store.cas.put(refSchema, { ref: leaf, val: 1 });
+
+    const visited = new Set<Hash>();
+    walk(store, root, (h) => visited.add(h), { followType: false });
+
+    expect(visited.has(root)).toBe(true);
+    expect(visited.has(leaf)).toBe(true);
+    expect(visited.has(refSchema)).toBe(false);
+    expect(visited.has(simpleSchema)).toBe(false);
+  });
+
+  test("followType: true — schema chain is traversed (explicit)", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as Hash;
+
+    const simpleSchema = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const refSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        ref: { type: "string", format: "ocas_ref" },
+        val: { type: "number" },
+      },
+    });
+
+    const leaf = store.cas.put(simpleSchema, { val: 7 });
+    const root = store.cas.put(refSchema, { ref: leaf, val: 1 });
+
+    const visited = new Set<Hash>();
+    walk(store, root, (h) => visited.add(h), { followType: true });
+
+    expect(visited.has(root)).toBe(true);
+    expect(visited.has(leaf)).toBe(true);
+    expect(visited.has(refSchema)).toBe(true);
+    expect(visited.has(simpleSchema)).toBe(true);
+    expect(visited.has(metaHash)).toBe(true);
+  });
+
+  test("followType omitted (default = true) — backward compatible", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as Hash;
+
+    const schema = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const node = store.cas.put(schema, { val: 42 });
+
+    const visited = new Set<Hash>();
+    walk(store, node, (h) => visited.add(h));
+
+    expect(visited.has(node)).toBe(true);
+    expect(visited.has(schema)).toBe(true);
+    expect(visited.has(metaHash)).toBe(true);
+  });
+
+  test("followType omitted with empty options — same as default true", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as Hash;
+
+    const schema = putSchema(store, {
+      type: "object",
+      properties: { val: { type: "number" } },
+    });
+    const node = store.cas.put(schema, { val: 42 });
+
+    const visited = new Set<Hash>();
+    walk(store, node, (h) => visited.add(h), {});
+
+    expect(visited.has(node)).toBe(true);
+    expect(visited.has(schema)).toBe(true);
+    expect(visited.has(metaHash)).toBe(true);
+  });
+
+  test("followType: false still fully traverses payload ocas_ref edges", () => {
+    const store = createMemoryStore();
+    bootstrap(store);
+
+    const chainSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        next: { type: "string", format: "ocas_ref" },
+        val: { type: "number" },
+      },
+    });
+
+    const c = store.cas.put(chainSchema, { val: 3 });
+    const b = store.cas.put(chainSchema, { next: c, val: 2 });
+    const a = store.cas.put(chainSchema, { next: b, val: 1 });
+
+    const visited: Hash[] = [];
+    walk(store, a, (h) => visited.push(h), { followType: false });
+
+    expect(visited).toContain(a);
+    expect(visited).toContain(b);
+    expect(visited).toContain(c);
+    expect(visited).not.toContain(chainSchema);
+  });
+});

@@ -18,9 +18,7 @@ exports[`Phase 1: CAS Core > 1.11 walk shows traversal tree (snapshot) 1`] = `
 "{
   "type": "4HG6MD3XG5H5C",
   "value": [
-    "9W3MGR3184QYE",
-    "FRBAB1BF0ZBCS",
-    "CTS5P6RD8HMCS"
+    "9W3MGR3184QYE"
   ]
 }"
 `;
