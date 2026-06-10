@@ -9,6 +9,14 @@ roles:
     procedure: |
       You triage issues in batches. Each run, you process the issues given to you.
 
+      ## Testing this workflow
+
+      Before first production use or after making changes, test with:
+      `uwf thread start triage-issues -p "Test run"`
+
+      This helps validate the workflow configuration and ensures future maintainers
+      can verify changes before production use.
+
       ## Setup (first run only)
 
       If this is the first run (no issue list in your prompt), discover untriaged issues:
