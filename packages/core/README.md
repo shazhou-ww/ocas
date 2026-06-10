@@ -71,17 +71,23 @@ class SchemaValidationError extends Error;
 async function putSchema(store: Store, jsonSchema: JSONSchema): Promise<Hash>;
 function getSchema(store: Store, typeHash: Hash): JSONSchema | null;
 function validate(store: Store, node: CasNode): boolean;
-function refs(store: Store, node: CasNode): Hash[];
+
+type OnDangling = (hash: Hash) => void;
+interface RefsOptions { onDangling?: OnDangling }
+interface WalkOptions { onDangling?: OnDangling }
+
+function refs(store: Store, node: CasNode, options?: RefsOptions): Hash[];
 function walk(
   store: Store,
   rootHash: Hash,
   visitor: (hash: Hash, node: CasNode) => void,
+  options?: WalkOptions,
 ): void;
 ```
 
 - `putSchema` — stores a schema typed by the meta-schema; returned hash is the `typeHash` for conforming payloads.
-- `refs` — collects all `format: "cas_ref"` values in the payload per schema shape.
-- `walk` — BFS from `rootHash`, following `cas_ref` edges; cycles are visited once.
+- `refs` — collects all `format: "cas_ref"` values in the payload per schema shape. Pass `onDangling` to be notified once per unique referenced hash that is missing from the store; the returned array is unaffected.
+- `walk` — BFS from `rootHash`, following `cas_ref` edges; cycles are visited once. Dangling refs (including a missing root) are silently skipped by default; pass `onDangling` to be notified once per unique missing hash discovered during the traversal.
 
 ### Store
 

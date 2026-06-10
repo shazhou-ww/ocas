@@ -421,40 +421,99 @@ export function collectRefs(schema: JSONSchema, value: unknown): Hash[] {
 }
 
 /**
+ * Callback invoked when traversal discovers a CAS hash that does not exist
+ * in the store. Called at most once per unique missing hash per top-level
+ * call. Purely informational — it cannot abort traversal. Exceptions thrown
+ * inside the callback propagate to the caller.
+ */
+export type OnDangling = (hash: Hash) => void;
+
+/**
+ * Options accepted by {@link refs}.
+ */
+export interface RefsOptions {
+  /** See {@link OnDangling}. */
+  onDangling?: OnDangling;
+}
+
+/**
+ * Options accepted by {@link walk}.
+ */
+export interface WalkOptions {
+  /** See {@link OnDangling}. */
+  onDangling?: OnDangling;
+}
+
+/**
  * Return all hashes referenced by this node via ocas_ref fields in its schema.
  * Null/undefined values are skipped.
+ *
+ * If `options.onDangling` is provided, the callback is invoked once per unique
+ * referenced hash that is not present in `store.cas`. The returned array is
+ * unchanged regardless of whether the targets exist (it is a static collection
+ * derived from the payload).
+ *
+ * Note: a missing schema (the node's own `type` is not in the store) yields
+ * `[]` silently — `onDangling` is for ref *targets*, not the node's own type.
  */
-export function refs(store: Store, node: CasNode): Hash[] {
+export function refs(
+  store: Store,
+  node: CasNode,
+  options?: RefsOptions,
+): Hash[] {
   const schema = getSchema(store, node.type);
   if (schema === null) return [];
-  return collectRefs(schema, node.payload);
+  const collected = collectRefs(schema, node.payload);
+  const onDangling = options?.onDangling;
+  if (onDangling !== undefined) {
+    const seen = new Set<Hash>();
+    for (const hash of collected) {
+      if (seen.has(hash)) continue;
+      seen.add(hash);
+      if (!store.cas.has(hash)) {
+        onDangling(hash);
+      }
+    }
+  }
+  return collected;
 }
 
 /**
  * BFS traversal starting from rootHash.
  * Calls visitor(hash, node) for each reachable node exactly once.
  * Handles cycles via a visited set.
+ *
+ * Dangling refs (hashes that resolve to no stored node, including the root
+ * itself) are silently skipped by default. Pass `options.onDangling` to be
+ * notified once per unique missing hash discovered during the traversal.
  */
 export function walk(
   store: Store,
   rootHash: Hash,
   visitor: (hash: Hash, node: CasNode) => void,
+  options?: WalkOptions,
 ): void {
   const visited = new Set<Hash>();
+  const dangling = new Set<Hash>();
   const queue: Hash[] = [rootHash];
+  const onDangling = options?.onDangling;
 
   while (queue.length > 0) {
     const hash = queue.shift() as Hash;
-    if (visited.has(hash)) continue;
-    visited.add(hash);
+    if (visited.has(hash) || dangling.has(hash)) continue;
 
     const node = store.cas.get(hash);
-    if (node === null) continue;
+    if (node === null) {
+      dangling.add(hash);
+      if (onDangling !== undefined) onDangling(hash);
+      continue;
+    }
 
+    visited.add(hash);
     visitor(hash, node);
 
     for (const refHash of refs(store, node)) {
-      if (!visited.has(refHash)) {
+      if (!visited.has(refHash) && !dangling.has(refHash)) {
         queue.push(refHash);
       }
     }

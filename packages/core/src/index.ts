@@ -37,7 +37,12 @@ export {
   renderAsync,
   renderDirect,
 } from "./render.js";
-export type { JSONSchema } from "./schema.js";
+export type {
+  JSONSchema,
+  OnDangling,
+  RefsOptions,
+  WalkOptions,
+} from "./schema.js";
 export {
   getSchema,
   putSchema,
