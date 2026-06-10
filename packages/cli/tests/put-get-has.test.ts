@@ -162,26 +162,25 @@ describe("resolveHash unified error wording (#136)", () => {
     "aaaaaaaaaaaaa",
     "AAAAAAAAAAAAAA",
     "@nonexistent/var",
-  ])(
-    "ocas get %s dies with 'Unknown hash or variable: <input>'",
-    (input) => {
-      const { stdout, stderr, exitCode } = runCli(["get", input]);
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toContain(`Error: Unknown hash or variable: ${input}`);
-      expect(stderr).not.toContain("Name not found");
-      expect(stderr).not.toContain("Schema not found");
-      expect(stdout).toBe("");
-    },
-  );
+  ])("ocas get %s dies with 'Unknown hash or variable: <input>'", (input) => {
+    const { stdout, stderr, exitCode } = runCli(["get", input]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain(`Error: Unknown hash or variable: ${input}`);
+    expect(stderr).not.toContain("Name not found");
+    expect(stderr).not.toContain("Schema not found");
+    expect(stdout).toBe("");
+  });
 
-  test.each(["verify", "refs", "walk", "render"])(
-    "ocas %s not-a-hash emits the same unified error",
-    (cmd) => {
-      const { stderr, exitCode } = runCli([cmd, "not-a-hash"]);
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toContain("Error: Unknown hash or variable: not-a-hash");
-    },
-  );
+  test.each([
+    "verify",
+    "refs",
+    "walk",
+    "render",
+  ])("ocas %s not-a-hash emits the same unified error", (cmd) => {
+    const { stderr, exitCode } = runCli([cmd, "not-a-hash"]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Error: Unknown hash or variable: not-a-hash");
+  });
 
   test("ocas put not-a-hash <file> fails on the type-hash arg with the unified error", () => {
     const payloadFile = join(tmpStore, "payload-136.json");
@@ -202,11 +201,7 @@ describe("resolveHash unified error wording (#136)", () => {
   test("Schema not found wording is preserved when a valid hash resolves but no schema lives at it", () => {
     const payloadFile = join(tmpStore, "payload-136.json");
     writeFileSync(payloadFile, JSON.stringify({ name: "x" }));
-    const { stderr, exitCode } = runCli([
-      "put",
-      "AAAAAAAAAAAAA",
-      payloadFile,
-    ]);
+    const { stderr, exitCode } = runCli(["put", "AAAAAAAAAAAAA", payloadFile]);
     expect(exitCode).not.toBe(0);
     expect(stderr).toContain("Schema not found: AAAAAAAAAAAAA");
   });
