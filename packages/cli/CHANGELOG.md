@@ -1,5 +1,18 @@
 # @ocas/cli
 
+## 0.5.0 — 2026-06-10
+
+- Fix `ocas has` to return `{ value: false }` for unresolvable inputs instead of dying. Variable names that don't exist in the store no longer crash the predicate; they are simply reported as not present. Also rename the shared resolver error from `Schema not found:` to `Name not found:` since the lookup is by variable name, not schema (affects `get`, `verify`, `refs`, `walk`, etc. when given an unknown name).
+- Add `followType` option to `walk()` to control schema chain traversal.
+  
+  Core API: `WalkOptions.followType` (default `true` for backward compatibility) controls whether `node.type` edges are enqueued during BFS traversal. GC and closure callers are unaffected.
+  
+  CLI: `ocas walk` now defaults to `followType: false` (cleaner output for users). Pass `--follow-type` to include the full schema chain.
+- Tighten `resolveHash`/`tryResolveHash` to classify inputs as `hash → @scope/name → malformed` and short-circuit malformed inputs without querying `store.var`. Unify the unresolved-input error wording across all CLI commands that take a `<hash-or-name>` argument (`get`, `verify`, `refs`, `walk`, `put`, `hash`, `render`, `tag`, `untag`, etc.) to `Error: Unknown hash or variable: <input>` (replacing the misleading `Name not found:` text). `ocas has` now correctly returns `{value: false}` for malformed inputs too — its no-die contract is preserved. `cmdPut`'s `Schema not found: <hash>` message is unchanged (it fires after a valid hash resolves but has no schema node). Exposes a new `isValidName(name)` predicate from `@ocas/core` alongside the existing `validateName(name)`.
+  
+  Fixes #136.
+- Add workflow testing documentation to triage-issues.yaml. The workflow now includes a comment explaining how to test it with `uwf thread start triage-issues -p "Test run"` before production use or after making changes.
+
 ## 0.4.0 — 2026-06-07
 
 - New `ocas export <root> [<root>...] -o <bundle.tar>` — export CAS closures as self-contained tar bundles.

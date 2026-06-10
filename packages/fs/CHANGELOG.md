@@ -1,5 +1,9 @@
 # @ocas/fs
 
+## 0.4.1 — 2026-06-10
+
+- fix: dedupe type index files and rewrite on delete to prevent unbounded growth across store reopens. `parseIndexFile` now dedupes on read, `appendToTypeIndex` skips entries already present in memory, and `delete()` rewrites the on-disk type-index file even when the underlying node cannot be decoded (missing or corrupted .bin). Fixes #116.
+
 ## 0.4.0 — 2026-06-07
 
 - Lazy loading: `FsStore` scans only filenames in `nodes/` at startup (no CBOR decoding), reads each node from disk on first `get()`. Startup is O(filenames) instead of O(decoded-bytes).
