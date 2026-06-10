@@ -1194,7 +1194,7 @@ describe("Suite 8: Performance & Scalability", () => {
 });
 
 describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
-  test("9.1 Direct Property Access - Should Render Empty", async () => {
+  test("9.1 Direct Property Access - Renders From Top-Level Payload Keys", async () => {
     const { store, cleanup } = await createTempVarStore();
 
     try {
@@ -1213,7 +1213,7 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
         age: 30,
       });
 
-      // Register template using direct property access (incorrect syntax)
+      // Register template using direct property access (issue #137)
       const templateSchema = putSchema(store, { type: "string" });
       const templateHash = store.cas.put(
         templateSchema,
@@ -1221,14 +1221,14 @@ describe("Suite 9: E2E Template Variable Rendering (Issue #52)", () => {
       );
       store.var.set(`@ocas/template/text/${personSchema}`, templateHash);
 
-      // Render - should produce empty values
+      // Render - top-level payload properties should resolve directly
       const output = await renderWithTemplate(store, personHash, {
         resolution: 1.0,
         decay: 0.5,
         epsilon: 0.01,
       });
 
-      expect(output).toBe("Name: , Age: ");
+      expect(output).toBe("Name: Alice, Age: 30");
     } finally {
       await cleanup();
     }
@@ -1779,6 +1779,216 @@ describe("Suite 10: Context Variable Completeness", () => {
       expect(output).toContain("Parent custom: parent_value");
       expect(output).toContain("Child custom: child_value");
       expect(output).not.toContain("Child custom: parent_value");
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+describe("Suite 11: Direct Property Access (Issue #137)", () => {
+  test("11.1 payload namespace continues to work alongside direct access", async () => {
+    const { store, cleanup } = await createTempVarStore();
+
+    try {
+      const personSchema = putSchema(store, {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          age: { type: "number" },
+        },
+      });
+
+      const personHash = store.cas.put(personSchema, {
+        name: "alice",
+        age: 30,
+      });
+
+      const templateSchema = putSchema(store, { type: "string" });
+      const templateHash = store.cas.put(
+        templateSchema,
+        "{{name}}/{{age}} == {{payload.name}}/{{payload.age}}",
+      );
+      store.var.set(`@ocas/template/text/${personSchema}`, templateHash);
+
+      const output = await renderWithTemplate(store, personHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("alice/30 == alice/30");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test("11.2 Reserved engine keys are not shadowed by payload properties", async () => {
+    const { store, cleanup } = await createTempVarStore();
+
+    try {
+      const personSchema = putSchema(store, {
+        type: "object",
+        properties: {
+          hash: { type: "string" },
+          name: { type: "string" },
+        },
+      });
+
+      const personHash = store.cas.put(personSchema, {
+        hash: "shadow",
+        name: "bob",
+      });
+
+      const templateSchema = putSchema(store, { type: "string" });
+      const templateHash = store.cas.put(
+        templateSchema,
+        "Hash: {{hash}}, Name: {{name}}",
+      );
+      store.var.set(`@ocas/template/text/${personSchema}`, templateHash);
+
+      const output = await renderWithTemplate(store, personHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      // engine-supplied hash wins
+      expect(output).toBe(`Hash: ${personHash}, Name: bob`);
+      expect(output).not.toContain("shadow");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test("11.3 All reserved engine keys cannot be shadowed", async () => {
+    const { store, cleanup } = await createTempVarStore();
+
+    try {
+      const schema = putSchema(store, {
+        type: "object",
+        properties: {
+          hash: { type: "string" },
+          type: { type: "string" },
+          resolution: { type: "string" },
+          epsilon: { type: "string" },
+          payload: { type: "string" },
+          timestamp: { type: "string" },
+          other: { type: "string" },
+        },
+      });
+
+      const nodeHash = store.cas.put(schema, {
+        hash: "x",
+        type: "x",
+        resolution: "x",
+        epsilon: "x",
+        payload: "x",
+        timestamp: "x",
+        other: "kept",
+      });
+
+      const templateSchema = putSchema(store, { type: "string" });
+      const templateHash = store.cas.put(
+        templateSchema,
+        "h={{hash}}|t={{type}}|r={{resolution}}|e={{epsilon}}|o={{other}}|ts={{timestamp}}",
+      );
+      store.var.set(`@ocas/template/text/${schema}`, templateHash);
+
+      const output = await renderWithTemplate(store, nodeHash, {
+        resolution: 0.8,
+        decay: 0.5,
+        epsilon: 0.02,
+      });
+
+      // None of the reserved keys should render as "x"
+      expect(output).toContain(`h=${nodeHash}`);
+      expect(output).toContain(`t=${schema}`);
+      expect(output).toContain("r=0.8");
+      expect(output).toContain("e=0.02");
+      expect(output).toContain("o=kept");
+      expect(output).toMatch(/ts=\d+/);
+      expect(output).not.toContain("=x");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test("11.4 Non-object payload (string) remains accessible only via {{ payload }}", async () => {
+    const { store, cleanup } = await createTempVarStore();
+
+    try {
+      const stringSchema = putSchema(store, { type: "string" });
+      const stringHash = store.cas.put(stringSchema, "Hello");
+
+      const templateSchema = putSchema(store, { type: "string" });
+      const templateHash = store.cas.put(
+        templateSchema,
+        "Value is: {{ payload }}",
+      );
+      store.var.set(`@ocas/template/text/${stringSchema}`, templateHash);
+
+      const output = await renderWithTemplate(store, stringHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Value is: Hello");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test("11.5 Array payload — no top-level merging attempted", async () => {
+    const { store, cleanup } = await createTempVarStore();
+
+    try {
+      const arraySchema = putSchema(store, {
+        type: "array",
+        items: { type: "string" },
+      });
+      const arrayHash = store.cas.put(arraySchema, ["a", "b", "c"]);
+
+      const templateSchema = putSchema(store, { type: "string" });
+      const templateHash = store.cas.put(
+        templateSchema,
+        "Items:{% for x in payload %} {{ x }}{% endfor %}",
+      );
+      store.var.set(`@ocas/template/text/${arraySchema}`, templateHash);
+
+      const output = await renderWithTemplate(store, arrayHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("Items: a b c");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test("11.6 Null payload — no merging, payload variable is null", async () => {
+    const { store, cleanup } = await createTempVarStore();
+
+    try {
+      const nullableSchema = putSchema(store, { type: ["string", "null"] });
+      const nullHash = store.cas.put(nullableSchema, null);
+
+      const templateSchema = putSchema(store, { type: "string" });
+      const templateHash = store.cas.put(
+        templateSchema,
+        "before|{{ payload }}|after",
+      );
+      store.var.set(`@ocas/template/text/${nullableSchema}`, templateHash);
+
+      const output = await renderWithTemplate(store, nullHash, {
+        resolution: 1.0,
+        decay: 0.5,
+        epsilon: 0.01,
+      });
+
+      expect(output).toBe("before||after");
     } finally {
       await cleanup();
     }
