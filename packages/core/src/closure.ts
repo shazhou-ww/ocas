@@ -35,32 +35,16 @@ export function computeClosure(store: Store, roots: Hash[]): ClosureResult {
   const nodes = new Set<Hash>();
 
   // Phase 1: walk refs from each root.
+  // walk() traverses both ocas_ref payload edges AND node.type,
+  // so the entire schema chain is reached automatically.
   for (const root of roots) {
     if (!store.cas.has(root)) continue;
-    walk(store, root, (hash, node) => {
+    walk(store, root, (hash) => {
       nodes.add(hash);
-      nodes.add(node.type);
     });
   }
 
-  // Phase 2: walk the schema chain to include meta-schemas (e.g. @ocas/schema)
-  // and any other type ancestors.
-  const schemasToWalk = new Set<Hash>();
-  for (const hash of nodes) {
-    const node = store.cas.get(hash);
-    if (node) schemasToWalk.add(node.type);
-  }
-  for (const schemaHash of schemasToWalk) {
-    let current: Hash | null = schemaHash;
-    while (current !== null && !nodes.has(current)) {
-      nodes.add(current);
-      const node = store.cas.get(current);
-      if (!node || node.type === current) break;
-      current = node.type;
-    }
-  }
-
-  // Phase 3: collect template variables for each schema in the closure.
+  // Phase 2: collect template variables for each schema in the closure.
   // Templates are stored as `@ocas/template/text/<schema-hash>` variables.
   // If a template exists for a schema in the closure, walk its content too.
   const templateVars: Variable[] = [];
@@ -71,26 +55,13 @@ export function computeClosure(store: Store, roots: Hash[]): ClosureResult {
     const variants = store.var.list({ exactName: templateName });
     for (const variant of variants) {
       templateVars.push(variant);
-      // Walk the template content node
-      walk(store, variant.value, (h, n) => {
+      walk(store, variant.value, (h) => {
         nodes.add(h);
-        nodes.add(n.type);
       });
-      // And its schema chain
-      const tNode = store.cas.get(variant.value);
-      if (tNode) {
-        let current: Hash | null = tNode.type;
-        while (current !== null && !nodes.has(current)) {
-          nodes.add(current);
-          const node = store.cas.get(current);
-          if (!node || node.type === current) break;
-          current = node.type;
-        }
-      }
     }
   }
 
-  // Phase 4: collect variables whose value is in the closure. Template
+  // Phase 3: collect variables whose value is in the closure. Template
   // variables are already collected; deduplicate.
   const varKey = (v: Variable): string => `${v.name}\u0000${v.schema}`;
   const seenVars = new Set<string>(templateVars.map(varKey));
@@ -104,7 +75,7 @@ export function computeClosure(store: Store, roots: Hash[]): ClosureResult {
     vars.push(v);
   }
 
-  // Phase 5: collect tags for each node in the closure.
+  // Phase 4: collect tags for each node in the closure.
   const tags = new Map<Hash, Tag[]>();
   for (const hash of nodes) {
     const tagList = store.tag.tags(hash);

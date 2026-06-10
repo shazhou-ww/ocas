@@ -38,40 +38,16 @@ export function gc(store: Store): GcStats {
     roots.add(variable.value);
   }
 
-  // Mark phase: walk from all roots
+  // Mark phase: walk from all roots.
+  // walk() now traverses both ocas_ref payload edges AND node.type,
+  // so the entire schema chain (including self-referencing meta-schemas)
+  // is reached automatically — no manual type-chain chasing needed.
   const reachable = new Set<Hash>();
 
   for (const rootHash of roots) {
-    walk(store, rootHash, (hash, node) => {
-      // Mark the node itself
+    walk(store, rootHash, (hash) => {
       reachable.add(hash);
-      // Mark the schema (type) of the node
-      reachable.add(node.type);
     });
-  }
-
-  // Walk the schema chain to ensure bootstrap meta-schema is preserved
-  // For each reachable schema, walk its schema chain (not its references)
-  const schemasToWalk = new Set<Hash>();
-  for (const hash of reachable) {
-    const node = store.cas.get(hash);
-    if (node) {
-      schemasToWalk.add(node.type);
-    }
-  }
-
-  for (const schemaHash of schemasToWalk) {
-    // Walk the schema's type chain (meta-schema, etc.)
-    let current: Hash | null = schemaHash;
-    while (current !== null && !reachable.has(current)) {
-      reachable.add(current);
-      const node = store.cas.get(current);
-      if (!node || node.type === current) {
-        // Self-referencing or missing node, stop
-        break;
-      }
-      current = node.type;
-    }
   }
 
   // Template phase: include `@ocas/template/text/<schema>` content nodes
@@ -83,33 +59,13 @@ export function gc(store: Store): GcStats {
     const templateName = `${TEMPLATE_VAR_PREFIX}${hash}`;
     const variants = store.var.list({ exactName: templateName });
     for (const variant of variants) {
-      walk(store, variant.value, (h, n) => {
+      walk(store, variant.value, (h) => {
         reachable.add(h);
-        reachable.add(n.type);
       });
-      // Walk the template content's schema chain too
-      const tNode = store.cas.get(variant.value);
-      if (tNode) {
-        let current: Hash | null = tNode.type;
-        while (current !== null && !reachable.has(current)) {
-          reachable.add(current);
-          const node = store.cas.get(current);
-          if (!node || node.type === current) break;
-          current = node.type;
-        }
-      }
     }
   }
 
-  // Preserve all self-referencing nodes (bootstrap meta-schema)
-  // These are nodes where type === hash
   const allHashes = store.cas.listAll();
-  for (const hash of allHashes) {
-    const node = store.cas.get(hash);
-    if (node && node.type === hash) {
-      reachable.add(hash);
-    }
-  }
 
   // Count total nodes
   const total = allHashes.length;
