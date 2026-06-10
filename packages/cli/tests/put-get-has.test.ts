@@ -108,3 +108,40 @@ describe("Phase 1: CAS Core", () => {
     expect(value.map((e) => e.hash)).toContain(nodeHash);
   });
 });
+
+describe("ocas has predicate contract (#117)", () => {
+  test("has returns false for unresolvable bare name", async () => {
+    const { stdout, stderr, exitCode } = await runCli(["has", "short"]);
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(envValue(stdout)).toBe(false);
+  });
+
+  test("has returns false for unresolvable @scope/name", async () => {
+    const { stdout, exitCode } = await runCli(["has", "@nonexistent/var"]);
+    expect(exitCode).toBe(0);
+    expect(envValue(stdout)).toBe(false);
+  });
+
+  test("has returns true for a registered builtin variable name", async () => {
+    const { stdout, exitCode } = await runCli(["has", "@ocas/schema"]);
+    expect(exitCode).toBe(0);
+    expect(envValue(stdout)).toBe(true);
+  });
+
+  test("has envelope type is @ocas/output/has regardless of outcome", async () => {
+    const a = await runCli(["has", "short"]);
+    const b = await runCli(["has", "@ocas/schema"]);
+    const aType = (JSON.parse(a.stdout.trim()) as { type: string }).type;
+    const bType = (JSON.parse(b.stdout.trim()) as { type: string }).type;
+    expect(aType).toBe(bType);
+    expect(envValue(a.stdout)).toBe(false);
+    expect(envValue(b.stdout)).toBe(true);
+  });
+
+  test("get on unresolvable name dies with 'Name not found'", async () => {
+    const { stderr, exitCode } = await runCli(["get", "@nonexistent/name"]);
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("Error: Name not found:");
+  });
+});

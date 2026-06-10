@@ -276,6 +276,6 @@ describe("@ Alias Resolution - hash params (Phase 3)", () => {
     const { stderr, exitCode } = await runCliAlias("get", "@nonexistent/name");
 
     expect(exitCode).not.toBe(0);
-    expect(stderr).toContain("Error: Schema not found:");
+    expect(stderr).toContain("Error: Name not found:");
   });
 });
