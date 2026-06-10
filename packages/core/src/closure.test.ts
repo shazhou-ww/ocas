@@ -202,4 +202,32 @@ describe("computeClosure", () => {
     expect(result.nodes.has(tplA)).toBe(true);
     expect(result.nodes.has(tplInner)).toBe(true);
   });
+
+  test("C.1 closure includes refs embedded inside schema payloads (#130)", () => {
+    const store = createMemoryStore();
+    const aliases = bootstrap(store);
+    const metaHash = aliases["@ocas/schema"] as string;
+    const stringHash = aliases["@ocas/string"] as string;
+
+    const customMeta = store.cas.put(metaHash, {
+      type: "object",
+      properties: {
+        extraRef: { type: "string", format: "ocas_ref" },
+        type: { type: "string" },
+      },
+    });
+    const targetHash = store.cas.put(stringHash, "secret");
+    const S = store.cas.put(customMeta, {
+      extraRef: targetHash,
+      type: "string",
+    });
+    const D = store.cas.put(S, "hello");
+
+    const result = computeClosure(store, [D]);
+
+    expect(result.nodes.has(D)).toBe(true);
+    expect(result.nodes.has(S)).toBe(true);
+    expect(result.nodes.has(customMeta)).toBe(true);
+    expect(result.nodes.has(targetHash)).toBe(true);
+  });
 });

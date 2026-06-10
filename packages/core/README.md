@@ -87,7 +87,7 @@ function walk(
 
 - `putSchema` — stores a schema typed by the meta-schema; returned hash is the `typeHash` for conforming payloads.
 - `refs` — collects all `format: "ocas_ref"` values in the payload per schema shape. Pass `onDangling` to be notified once per unique referenced hash that is missing from the store; the returned array is unaffected.
-- `walk` — BFS from `rootHash`, following `ocas_ref` edges; cycles are visited once. Dangling refs (including a missing root) are silently skipped by default; pass `onDangling` to be notified once per unique missing hash discovered during the traversal.
+- `walk` — BFS from `rootHash`, following both `ocas_ref` edges in the payload and each node's `type` hash (so the schema chain is reachable). Cycles are visited once via the visited-set dedup, which terminates on self-referencing meta-schemas. Dangling refs (including a missing root or missing type) are silently skipped by default; pass `onDangling` to be notified once per unique missing hash discovered during the traversal.
 
 ### Store
 
@@ -181,7 +181,7 @@ const bobHash = store.put(personType, {
 const bob = store.get(bobHash)!;
 console.log(validate(store, bob));           // true
 console.log(refs(store, bob));               // [aliceHash]
-walk(store, bobHash, (h) => console.log(h)); // bobHash, aliceHash
+walk(store, bobHash, (h) => console.log(h)); // bobHash, aliceHash, personSchemaHash, metaSchemaHash
 ```
 
 ## Internal Structure
