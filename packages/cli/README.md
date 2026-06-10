@@ -48,7 +48,7 @@ Usage: ocas [--home <path>] [--json] <command> [args]
 Every JSON-emitting command prints a uniform `{ type, value }` envelope. `type` is the hash
 of the command's `@output/*` result schema and `value` is the command payload. The output
 is therefore self-describing and pipeable: feed any envelope into `render -p` to render its
-`value` (embedded `cas_ref` hashes are expanded). `render` is the only command that emits
+`value` (embedded `ocas_ref` hashes are expanded). `render` is the only command that emits
 raw, non-envelope text.
 
 ```jsonc
@@ -110,7 +110,7 @@ Because every command shares the `{ type, value }` envelope, output composes dir
 `render -p`:
 
 ```bash
-# put emits a cas_ref hash envelope; render -p dereferences and renders the node
+# put emits a ocas_ref hash envelope; render -p dereferences and renders the node
 ocas put @ocas/schema ./schemas/item.json | ocas render -p
 
 # render gc statistics

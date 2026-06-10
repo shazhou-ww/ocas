@@ -13,7 +13,7 @@ All commands output `{ type, value }` JSON envelopes, making them composable via
 ## When to Use
 
 - Storing structured, schema-validated JSON data with content addressing
-- Building knowledge graphs or DAGs with typed nodes and `cas_ref` edges
+- Building knowledge graphs or DAGs with typed nodes and `ocas_ref` edges
 - Agent memory, config versioning, or any use case needing immutable data + mutable pointers
 - Don't use for: binary blobs, large files, or high-throughput streaming
 
@@ -73,7 +73,7 @@ ocas verify <hash>              # integrity + schema validation
 ### Graph Traversal
 
 ```bash
-ocas refs <hash>                # direct cas_ref edges
+ocas refs <hash>                # direct ocas_ref edges
 ocas walk <hash>                # recursive DAG traversal
 ocas walk <hash> --format tree  # tree view
 ```
