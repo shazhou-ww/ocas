@@ -1,4 +1,5 @@
 name: "retrospect-workflow"
+version: 1
 description: "Post-execution retrospective: analyze a completed thread, find inefficiencies, and improve the workflow definition."
 roles:
   analyst:
@@ -212,21 +213,21 @@ roles:
           required: [$status, error]
 graph:
   $START:
-    new: { role: "analyst", prompt: "Analyze completed thread {{{threadId}}} for execution anomalies." }
-    resume: { role: "analyst", prompt: "Review previous analysis of thread {{{threadId}}} and continue." }
+    new: { role: "analyst", prompt: "Analyze completed thread {{ threadId }} for execution anomalies." }
+    resume: { role: "analyst", prompt: "Review previous analysis of thread {{ threadId }} and continue." }
   analyst:
     clean: { role: "$END", prompt: "No issues found. Thread executed cleanly." }
-    findings: { role: "proposer", prompt: "Findings report: {{{report}}}. Target workflow: {{{targetWorkflow}}}. Propose minimal edits." }
-    wrong_project: { role: "$END", prompt: "Thread uses workflow '{{{workflowName}}}' which does not exist in this project. Run retrospect from the correct repo." }
+    findings: { role: "proposer", prompt: "Findings report: {{ report }}. Target workflow: {{ targetWorkflow }}. Propose minimal edits." }
+    wrong_project: { role: "$END", prompt: "Thread uses workflow '{{ workflowName }}' which does not exist in this project. Run retrospect from the correct repo." }
   proposer:
-    no_action: { role: "$END", prompt: "No actionable changes needed: {{{reason}}}." }
-    ready: { role: "developer", prompt: "Apply the change plan (CAS hash: {{{plan}}}) to the workflow definitions in this repo." }
+    no_action: { role: "$END", prompt: "No actionable changes needed: {{ reason }}." }
+    ready: { role: "developer", prompt: "Apply the change plan (CAS hash: {{ plan }}) to the workflow definitions in this repo." }
   developer:
-    done: { role: "reviewer", prompt: "Review workflow edits on branch {{{branch}}} at {{{worktree}}}." }
-    failed: { role: "$END", prompt: "Developer failed: {{{reason}}}. Ending workflow." }
+    done: { role: "reviewer", prompt: "Review workflow edits on branch {{ branch }} at {{ worktree }}." }
+    failed: { role: "$END", prompt: "Developer failed: {{ reason }}. Ending workflow." }
   reviewer:
-    rejected: { role: "developer", prompt: "Reviewer rejected: {{{comments}}}. Fix the issues in {{{worktree}}}." }
-    approved: { role: "committer", prompt: "Approved. Commit and push branch {{{branch}}} from {{{worktree}}}." }
+    rejected: { role: "developer", prompt: "Reviewer rejected: {{ comments }}. Fix the issues in {{ worktree }}." }
+    approved: { role: "committer", prompt: "Approved. Commit and push branch {{ branch }} from {{ worktree }}." }
   committer:
-    hook_failed: { role: "developer", prompt: "Push hook failed: {{{error}}}. Fix and re-submit." }
-    committed: { role: "$END", prompt: "PR created: {{{prUrl}}}. Workflow improved." }
+    hook_failed: { role: "developer", prompt: "Push hook failed: {{ error }}. Fix and re-submit." }
+    committed: { role: "$END", prompt: "PR created: {{ prUrl }}. Workflow improved." }
