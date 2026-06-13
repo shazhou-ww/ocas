@@ -189,6 +189,7 @@ const WRITE_COMMANDS = new Set([
   "tag",
   "untag",
   "gc",
+  "reindex",
   "import",
   "var:set",
   "var:delete",
@@ -1387,7 +1388,6 @@ switch (cmd) {
     break;
 
   case "reindex":
-    ensureWritable("reindex");
     await cmdReindex(rest);
     break;
 
