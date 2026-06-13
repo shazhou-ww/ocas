@@ -250,9 +250,17 @@ function appendToTypeIndex(
  * The CAS sub-store of an FS-backed `Store` — also satisfies the legacy
  * `BootstrapCapableStore` interface so `bootstrap()` can run against it.
  */
+export type ReindexResult = {
+  types: number;
+  nodes: number;
+  removed: number;
+  rebuilt: boolean;
+};
+
 export type FsCasStore = BootstrapCapableStore & {
   put(typeHash: Hash, payload: unknown): Hash;
   delete(hash: Hash): boolean;
+  reindex(): ReindexResult;
 };
 
 export function createFsStore(dir: string): FsCasStore {
@@ -440,6 +448,72 @@ export function createFsStore(dir: string): FsCasStore {
     },
 
     [BOOTSTRAP_STORE]: putSelfReferencing,
+
+    reindex(): ReindexResult {
+      // Count duplicates and stale entries from on-disk index files
+      let removed = 0;
+      const idxDir = join(dir, INDEX_DIR);
+      try {
+        const indexFiles = readdirSync(idxDir);
+        for (const f of indexFiles) {
+          if (f === META_FILE) continue;
+          try {
+            const raw = readFileSync(join(idxDir, f), "utf8");
+            const lines = raw.split("\n").filter((l) => l.length > 0);
+            const unique = new Set(lines);
+            // Duplicates within the file
+            removed += lines.length - unique.size;
+            // Stale entries pointing to nodes not on disk
+            for (const h of unique) {
+              if (!hashSet.has(h as Hash)) removed++;
+            }
+          } catch {
+            // skip unreadable
+          }
+        }
+      } catch {
+        // no index dir
+      }
+
+      // Rebuild from disk: scan all nodes, decode type field
+      const freshIndex = buildTypeIndexFromDisk(nodesDir, hashSet);
+      const freshMeta = new Set<Hash>();
+      for (const hash of hashSet) {
+        const node = readNodeFromDisk(nodesDir, hash);
+        if (node && node.type === hash) {
+          freshMeta.add(hash);
+        }
+      }
+
+      // Replace in-memory state
+      typeIndex.clear();
+      for (const [type, list] of freshIndex) {
+        typeIndex.set(type, list);
+      }
+      metaSet.clear();
+      for (const h of freshMeta) {
+        metaSet.add(h);
+      }
+
+      // Rewrite on disk
+      try {
+        const oldFiles = readdirSync(idxDir);
+        for (const f of oldFiles) {
+          unlinkSync(join(idxDir, f));
+        }
+      } catch {
+        // index dir may not exist
+      }
+      writeTypeIndex(idxDir, typeIndex);
+      rewriteMetaSet(idxDir, metaSet);
+
+      return {
+        types: typeIndex.size,
+        nodes: hashSet.size,
+        removed,
+        rebuilt: true,
+      };
+    },
   };
 
   return store;
