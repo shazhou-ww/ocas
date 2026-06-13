@@ -495,7 +495,8 @@ export function refs(
  *
  * Traversal enqueues both:
  *   1. payload refs returned by {@link refs} (ocas_ref fields), and
- *   2. the node's own type hash (so the schema chain is reachable).
+ *   2. the node's own type hash (so the schema chain is reachable),
+ *      unless `followType` is `false`.
  *
  * The visited-set dedup naturally handles self-referencing meta-schemas
  * (where `node.type === hash`). Because schema nodes are traversed like any
