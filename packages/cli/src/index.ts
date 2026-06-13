@@ -32,7 +32,11 @@ import {
   walk,
   wrapEnvelope,
 } from "@ocas/core";
-import { openStore as openFsStore } from "@ocas/fs";
+import {
+  type FsCasStore,
+  openStore as openFsStore,
+  prepareStore,
+} from "@ocas/fs";
 
 // ---- Argument parsing ----
 
@@ -1075,6 +1079,15 @@ async function cmdGc(_args: string[]): Promise<void> {
   await out(await wrapEnvelope(store, "@ocas/output/gc", stats), store);
 }
 
+async function cmdReindex(_args: string[]): Promise<void> {
+  const fullPath = resolve(storePath);
+  const cas = (await prepareStore(fullPath)) as FsCasStore;
+  const result = cas.reindex();
+  console.log(
+    `Reindexed: ${result.nodes} nodes, ${result.types} type indexes, ${result.removed} stale entries removed.`,
+  );
+}
+
 async function cmdExport(args: string[]): Promise<void> {
   if (args.length === 0) {
     die(
@@ -1371,6 +1384,11 @@ switch (cmd) {
 
   case "gc":
     await cmdGc(rest);
+    break;
+
+  case "reindex":
+    ensureWritable("reindex");
+    await cmdReindex(rest);
     break;
 
   case "export":
