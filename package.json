@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/shazhou-ww/ocas",
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=24.15.0"
   },
   "bugs": {
     "url": "https://github.com/shazhou-ww/ocas/issues"

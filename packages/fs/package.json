@@ -9,7 +9,7 @@
     "storage"
   ],
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=24.15.0"
   },
   "type": "module",
   "main": "./dist/index.js",
