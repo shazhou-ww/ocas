@@ -75,6 +75,79 @@ pnpm run format   # Biome format (auto-fix)
 - **Variable naming**: all names must follow `@scope/name` format (`@[a-zA-Z][a-zA-Z0-9]*/segments`). `@ocas/*` is reserved for builtins. The `@` prefix ensures names are visually distinct from hashes.
 - **`openStore()`** returns a unified `Store` with `cas`, `var`, and `tag` sub-stores, and bootstraps automatically. `@ocas/core` has zero SQLite dependency.
 
+### Template & Render System
+
+Two distinct template systems coexist:
+
+1. **Output templates** (`output-templates.ts`) — format CLI command output (e.g. `ocas put`, `ocas var list`). Registered automatically during bootstrap for `@ocas/output/*` schemas. Currently text-only.
+2. **Render templates** (user-managed) — format CAS node content via `ocas render`. Managed via `ocas template set/get/list/delete`.
+
+#### Three Namespaces (all flat, parallel)
+
+| Namespace | Variable pattern | Purpose |
+|-----------|-----------------|---------|
+| Instance | `@ocas/template/{format}/{type-hash}` | Per-type LiquidJS template producing a content fragment |
+| Static | `@ocas/template-static/{format}/{type-hash}` | Type-level assets as JSON `{"css": "...", "js": "..."}` |
+| Compose | `@ocas/template-compose/{format}` | Document shell wrapping all content + collected statics |
+
+#### Map-Reduce-Compose Pipeline (`renderAsync`)
+
+1. **Map** — DFS render each node via its instance template; collect encountered type hashes.
+2. **Reduce** — For each encountered type, look up its static template → parse JSON → deduplicate by type (10 person nodes = 1 CSS block).
+3. **Compose** — Wrap `content` + `type_statics[]` in compose template. Fallback: builtin HTML5 shell (CSS in `<head>`, JS at `</body>`); text format uses identity (no wrapping).
+
+#### LiquidJS Template Context
+
+Inside instance templates, these variables are available:
+
+- **Auto-spread payload** — object payload properties are exposed as top-level vars: `{{ title }}` = `{{ payload.title }}`
+- **Reserved keys** (always win over payload): `hash`, `type`, `resolution`, `epsilon`, `payload`, `timestamp`
+- **Custom `{% render %}` tag** — `{% render ref_field %}` or `{% render ref_field, decay: 0.7 %}` for recursive CAS ref expansion with resolution decay
+
+Inside compose templates:
+
+- `{{ content }}` — the rendered body from map phase
+- `{% for ts in type_statics %}{{ ts.css }}{% endfor %}` — collected static assets
+
+#### Static Template Format
+
+Static templates must produce valid JSON with string values:
+
+```json
+{"css": ".person { color: blue; }", "js": "console.log('init')"}
+```
+
+Any keys are allowed; `css` and `js` are convention consumed by the builtin HTML shell.
+
+#### Fallback Behavior
+
+| Condition | Result |
+|-----------|--------|
+| No instance template for type | YAML text fallback |
+| HTML format + no template | YAML in `<pre><code>` |
+| No compose template + HTML | Builtin HTML5 document shell |
+| No compose template + text | Identity (content as-is) |
+
+#### CLI Template Commands
+
+```bash
+ocas template set <type> <file> [--format html]           # set instance template
+ocas template set <type> <file> --format html --static    # set static template
+ocas template get <type> [--format html]                  # read template
+ocas template list [--format html]                        # list templates
+ocas template delete <type> [--format html]               # delete template
+ocas render <hash> [--format html]                        # render with templates
+```
+
+Default format is `text`; `--format html` switches to the `html` namespace.
+
+#### Key Source Files
+
+- `packages/core/src/render.ts` — `renderAsync()`, map-reduce-compose pipeline, builtin HTML shell
+- `packages/core/src/liquid-render.ts` — LiquidJS engine, `{% render %}` tag, template discovery
+- `packages/core/src/output-templates.ts` — builtin CLI output templates (text-only)
+- `packages/cli/src/index.ts` — `template` CLI commands, `--format` flag handling
+
 ### Internal Dependencies
 
 Workspace packages reference each other with `workspace:*` in `package.json`.
