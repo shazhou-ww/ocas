@@ -463,9 +463,13 @@ Commands:
   var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
   var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
   template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
+                                    [--format html] [--static]
   template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
+                                    [--format html]
   template list                     List all templates                                 (@ocas/output/template-list)
+                                    [--format html]
   template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
+                                    [--format html]
   gc                                Run garbage collection                             (@ocas/output/gc)
   export <root>... -o <file>        Export CAS closure of roots to a tar bundle
   import <bundle> [--scope @s]      Import nodes/vars/tags from a bundle into the store
@@ -478,7 +482,8 @@ Flags:
   --schema <hash>     Schema hash filter for var get/delete/tag/list
   --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
   --inline <text>     Inline text content for template set
-  --format <fmt>      Output format for render (text or html, default: text)
+  --static            Store as static template (CSS/JS); requires --format html
+  --format <fmt>      Output format for render/template (text or html, default: text)
   --resolution <n>    Initial resolution for render (default: 1.0)
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)

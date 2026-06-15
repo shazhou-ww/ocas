@@ -926,11 +926,18 @@ async function cmdVarList(args: string[]): Promise<void> {
 async function cmdTemplateSet(args: string[]): Promise<void> {
   const schemaInput = args[0];
   const inlineFlag = flags.inline;
+  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const isStatic = flags.static === true;
 
   if (!schemaInput) {
     die(
-      "Usage: ocas template set <schema-hash-or-name> <file> | --inline <text>",
+      "Usage: ocas template set <schema-hash-or-name> <file> | --inline <text> [--format html] [--static]",
     );
+  }
+
+  // --static requires --format html
+  if (isStatic && formatFlag !== "html") {
+    die("Error: --static is only valid with --format html");
   }
 
   const store = await openStore();
@@ -956,14 +963,18 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
       // --inline flag present but no value
       const contentArg = args[1];
       if (!contentArg) {
-        die("Usage: ocas template set <schema-hash> <file> | --inline <text>");
+        die(
+          "Usage: ocas template set <schema-hash> <file> | --inline <text> [--format html] [--static]",
+        );
       }
       content = contentArg;
     } else {
       // File mode
       const file = args[1];
       if (!file) {
-        die("Usage: ocas template set <schema-hash> <file> | --inline <text>");
+        die(
+          "Usage: ocas template set <schema-hash> <file> | --inline <text> [--format html] [--static]",
+        );
       }
       if (!existsSync(file)) {
         die(`Error: File not found: ${file}`);
@@ -975,8 +986,10 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
     const stringHash = resolveHash("@ocas/string", store);
     const contentHash = store.cas.put(stringHash, content);
 
-    // Create variable binding: @ocas/template/text/<schema-hash>
-    const varName = `@ocas/template/text/${schemaHash}`;
+    // Create variable binding based on format and static flag
+    const varName = isStatic
+      ? `@ocas/template/html/${schemaHash}/static`
+      : `@ocas/template/${formatFlag}/${schemaHash}`;
     store.var.set(varName, contentHash);
 
     await out(
@@ -996,14 +1009,15 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
 
 async function cmdTemplateGet(args: string[]): Promise<void> {
   const schemaInput = args[0];
+  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
 
   if (!schemaInput) {
-    die("Usage: ocas template get <schema-hash-or-name>");
+    die("Usage: ocas template get <schema-hash-or-name> [--format html]");
   }
 
   const store = await openStore();
   const schemaHash = resolveHash(schemaInput, store);
-  const varName = `@ocas/template/text/${schemaHash}`;
+  const varName = `@ocas/template/${formatFlag}/${schemaHash}`;
   const stringHash = resolveHash("@ocas/string", store);
   const variable = store.var.get(varName, stringHash);
 
@@ -1028,15 +1042,17 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
 }
 
 async function cmdTemplateList(_args: string[]): Promise<void> {
+  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
   const store = await openStore();
   const stringHash = resolveHash("@ocas/string", store);
+  const namePrefix = `@ocas/template/${formatFlag}/`;
   const variables = store.var.list({
-    namePrefix: "@ocas/template/text/",
+    namePrefix,
     schema: stringHash,
   });
 
   const templates = variables.map((v) => ({
-    schemaHash: v.name.replace("@ocas/template/text/", ""),
+    schemaHash: v.name.replace(namePrefix, ""),
     contentHash: v.value,
   }));
 
@@ -1048,16 +1064,17 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
 
 async function cmdTemplateDelete(args: string[]): Promise<void> {
   const schemaInput = args[0];
+  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
 
   if (!schemaInput) {
-    die("Usage: ocas template delete <schema-hash-or-name>");
+    die("Usage: ocas template delete <schema-hash-or-name> [--format html]");
   }
 
   const store = await openStore();
 
   try {
     const schemaHash = resolveHash(schemaInput, store);
-    const varName = `@ocas/template/text/${schemaHash}`;
+    const varName = `@ocas/template/${formatFlag}/${schemaHash}`;
     const stringHash = resolveHash("@ocas/string", store);
     const removed = store.var.remove(varName, stringHash);
     if (removed.length === 0) {
@@ -1247,9 +1264,13 @@ Commands:
   var list [prefix] [--schema <hash>] [--tag <tag>...] List variables                  (@ocas/output/var-list)
   var history <name> [--schema <hash>] Show value history (LRU)                        (@ocas/output/var-history)
   template set <schema-hash> <file> | --inline <text> Set template for schema          (@ocas/output/template-set)
+                                    [--format html] [--static]
   template get <schema-hash>        Get template content (value=string)                (@ocas/output/template-get)
+                                    [--format html]
   template list                     List all templates                                 (@ocas/output/template-list)
+                                    [--format html]
   template delete <schema-hash>     Delete template for schema                         (@ocas/output/template-delete)
+                                    [--format html]
   gc                                Run garbage collection                             (@ocas/output/gc)
   export <root>... -o <file>        Export CAS closure of roots to a tar bundle
   import <bundle> [--scope @s]      Import nodes/vars/tags from a bundle into the store
@@ -1262,7 +1283,8 @@ Flags:
   --schema <hash>     Schema hash filter for var get/delete/tag/list
   --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
   --inline <text>     Inline text content for template set
-  --format <fmt>      Output format for render (text or html, default: text)
+  --static            Store as static template (CSS/JS); requires --format html
+  --format <fmt>      Output format for render/template (text or html, default: text)
   --resolution <n>    Initial resolution for render (default: 1.0)
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)
