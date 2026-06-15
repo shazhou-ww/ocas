@@ -6,3 +6,4 @@ dist/
 .worktrees/
 bun.lock
 
+.cards-index.json
