@@ -1,5 +1,4 @@
 import { type Context, Liquid, type TagToken } from "liquidjs";
-import type { RenderOptions } from "./render.js";
 import { putSchema } from "./schema.js";
 import type { Hash, Store } from "./types.js";
 
@@ -20,20 +19,42 @@ const RESERVED_CONTEXT_KEYS = new Set<string>([
   "payload",
   "timestamp",
   "__visited",
+  "__encountered_types",
 ]);
+
+export type RenderOptionsWithFormat = {
+  resolution?: number;
+  decay?: number;
+  epsilon?: number;
+  format?: string;
+};
 
 /**
  * Render a CAS node using LiquidJS templates with resolution-based decay.
- * Templates are discovered via variables: @ocas/template/text/<type-hash>
+ * Templates are discovered via variables: @ocas/template/{format}/<type-hash>
  */
 export async function renderWithTemplate(
   store: Store,
   hash: Hash,
-  options?: RenderOptions,
+  options?: RenderOptionsWithFormat,
 ): Promise<string> {
+  const result = await renderWithTemplateInternal(store, hash, options);
+  return result.output;
+}
+
+/**
+ * Internal version that returns both output and encountered types.
+ * Used by render.ts for the map-reduce-compose pipeline.
+ */
+export async function renderWithTemplateInternal(
+  store: Store,
+  hash: Hash,
+  options?: RenderOptionsWithFormat,
+): Promise<{ output: string; encounteredTypes: Set<Hash> }> {
   const resolution = options?.resolution ?? DEFAULT_RESOLUTION;
   const decay = options?.decay ?? DEFAULT_DECAY;
   const epsilon = options?.epsilon ?? DEFAULT_EPSILON;
+  const format = options?.format ?? "text";
 
   // Validate parameters
   if (resolution < 0 || resolution > 1) {
@@ -47,17 +68,33 @@ export async function renderWithTemplate(
   }
 
   const visited = new Set<Hash>();
+  const encounteredTypes = new Set<Hash>();
 
   // Create Liquid engine
-  const engine = createLiquidEngine(store, decay);
+  const engine = createLiquidEngine(store, decay, format);
 
-  return await renderNode(engine, store, hash, resolution, epsilon, visited);
+  const output = await renderNode(
+    engine,
+    store,
+    hash,
+    resolution,
+    epsilon,
+    visited,
+    encounteredTypes,
+    format,
+  );
+
+  return { output, encounteredTypes };
 }
 
 /**
  * Create a Liquid engine instance with custom render tag
  */
-function createLiquidEngine(store: Store, globalDecay: number): Liquid {
+function createLiquidEngine(
+  store: Store,
+  globalDecay: number,
+  format: string,
+): Liquid {
   const engine = new Liquid({
     strictFilters: false,
     strictVariables: false,
@@ -70,7 +107,7 @@ function createLiquidEngine(store: Store, globalDecay: number): Liquid {
   };
 
   // Register custom {% render %} tag
-  // Capture store, globalDecay in closure
+  // Capture store, globalDecay, format in closure
   engine.registerTag("render", {
     parse(token: TagToken) {
       // Parse "variable" or "variable, decay: 0.7" syntax
@@ -134,6 +171,9 @@ function createLiquidEngine(store: Store, globalDecay: number): Liquid {
 
       // Recursively render the referenced node
       const visited = ctxLiquid.get(["__visited"]) as Set<Hash>;
+      const encounteredTypes = ctxLiquid.get([
+        "__encountered_types",
+      ]) as Set<Hash>;
       const output = await renderNode(
         engine,
         store,
@@ -141,6 +181,8 @@ function createLiquidEngine(store: Store, globalDecay: number): Liquid {
         childResolution,
         currentEpsilon,
         visited,
+        encounteredTypes,
+        format,
       );
 
       return output;
@@ -160,6 +202,8 @@ async function renderNode(
   currentResolution: number,
   epsilon: number,
   visited: Set<Hash>,
+  encounteredTypes: Set<Hash>,
+  format: string,
 ): Promise<string> {
   // Check if resolution is below threshold
   if (currentResolution < epsilon + FLOAT_TOLERANCE) {
@@ -178,9 +222,12 @@ async function renderNode(
   }
   visited.add(hash);
 
+  // Collect encountered type
+  encounteredTypes.add(node.type);
+
   try {
     // Try to find a template for this node's type
-    const template = await findTemplate(store, node.type);
+    const template = await findTemplate(store, node.type, format);
 
     if (template === null) {
       // No template found - this is handled by the caller (fallback to YAML)
@@ -217,6 +264,7 @@ async function renderNode(
     context.type = node.type;
     context.timestamp = node.timestamp;
     context.__visited = visited; // Pass visited set through context
+    context.__encountered_types = encounteredTypes; // Pass encountered types set
 
     const output = await engine.parseAndRender(template, context);
 
@@ -234,8 +282,9 @@ async function renderNode(
 async function findTemplate(
   store: Store,
   typeHash: Hash,
+  format: string,
 ): Promise<string | null> {
-  const varName = `@ocas/template/text/${typeHash}`;
+  const varName = `@ocas/template/${format}/${typeHash}`;
 
   try {
     // Find the string schema hash (we need this to query variables)
