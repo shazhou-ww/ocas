@@ -1045,16 +1045,27 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
   const formatFlag = typeof flags.format === "string" ? flags.format : "text";
   const store = await openStore();
   const stringHash = resolveHash("@ocas/string", store);
-  const namePrefix = `@ocas/template/${formatFlag}/`;
-  const variables = store.var.list({
-    namePrefix,
+  const instancePrefix = `@ocas/template/${formatFlag}/`;
+  const staticPrefix = `@ocas/template-static/${formatFlag}/`;
+  const instanceVars = store.var.list({
+    namePrefix: instancePrefix,
+    schema: stringHash,
+  });
+  const staticVars = store.var.list({
+    namePrefix: staticPrefix,
     schema: stringHash,
   });
 
-  const templates = variables.map((v) => ({
-    schemaHash: v.name.replace(namePrefix, ""),
-    contentHash: v.value,
-  }));
+  const templates = [
+    ...instanceVars.map((v) => ({
+      schemaHash: v.name.replace(instancePrefix, ""),
+      contentHash: v.value,
+    })),
+    ...staticVars.map((v) => ({
+      schemaHash: `${v.name.replace(staticPrefix, "")}/static`,
+      contentHash: v.value,
+    })),
+  ];
 
   await out(
     await wrapEnvelope(store, "@ocas/output/template-list", templates),
