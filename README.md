@@ -167,7 +167,7 @@ HTML template discovery uses the `@ocas/template/html/<type-hash>` namespace.
 When no HTML template is registered for a type, the node's payload is rendered
 as YAML inside `<pre><code>` tags. A builtin HTML document shell wraps the
 output in a minimal `<!DOCTYPE html>` page. To customize the document shell,
-register a compose template at `@ocas/template/html/_compose`.
+register a compose template at `@ocas/template-compose/html`.
 
 ### Garbage Collection
 
