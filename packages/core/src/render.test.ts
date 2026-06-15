@@ -1170,7 +1170,7 @@ describe("Suite 11: Map-Reduce-Compose Pipeline", () => {
     const stringSchema = putSchema(store, { type: "string" });
     const staticTemplate = `{"slot1": "value1"}`;
     const staticTemplateHash = store.cas.put(stringSchema, staticTemplate);
-    store.var.set(`@ocas/template/text/${t1Schema}/static`, staticTemplateHash);
+    store.var.set(`@ocas/template-static/text/${t1Schema}`, staticTemplateHash);
 
     // Register T1 template
     const t1Template = "T1: {{ value }}";
@@ -1182,7 +1182,7 @@ describe("Suite 11: Map-Reduce-Compose Pipeline", () => {
 {{ content }}
 STATICS: {{ type_statics | json }}`;
     const composeTemplateHash = store.cas.put(stringSchema, composeTemplate);
-    store.var.set("@ocas/template/text/_compose", composeTemplateHash);
+    store.var.set("@ocas/template-compose/text", composeTemplateHash);
 
     // Render
     const output = await renderAsync(store, t1Hash, { format: "text" });
@@ -1310,11 +1310,11 @@ STATICS: {{ type_statics | json }}`;
     // Register static templates for both types
     const t1StaticTemplate = `{"css": ".t1 { color: red; }"}`;
     const t1StaticHash = store.cas.put(stringSchema, t1StaticTemplate);
-    store.var.set(`@ocas/template/text/${t1Schema}/static`, t1StaticHash);
+    store.var.set(`@ocas/template-static/text/${t1Schema}`, t1StaticHash);
 
     const t2StaticTemplate = `{"css": ".t2 { color: blue; }"}`;
     const t2StaticHash = store.cas.put(stringSchema, t2StaticTemplate);
-    store.var.set(`@ocas/template/text/${t2Schema}/static`, t2StaticHash);
+    store.var.set(`@ocas/template-static/text/${t2Schema}`, t2StaticHash);
 
     // Register compose template
     const composeTemplate = `=== PAGE ===
@@ -1323,7 +1323,7 @@ STATICS: {{ type_statics | json }}`;
 {% for entry in type_statics %}{{ entry.css }}
 {% endfor %}`;
     const composeTemplateHash = store.cas.put(stringSchema, composeTemplate);
-    store.var.set("@ocas/template/text/_compose", composeTemplateHash);
+    store.var.set("@ocas/template-compose/text", composeTemplateHash);
 
     // Render
     const output = await renderAsync(store, rootHash, { format: "text" });

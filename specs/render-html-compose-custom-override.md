@@ -1,5 +1,5 @@
 ---
-scenario: "User-defined @ocas/template/html/_compose overrides builtin shell"
+scenario: "User-defined @ocas/template-compose/html overrides builtin shell"
 feature: render
 tags: [render, html, compose-template, customization]
 ---
@@ -8,7 +8,7 @@ tags: [render, html, compose-template, customization]
 
 - A store with a root node
 - Format is `'html'`
-- A custom compose template registered at variable `@ocas/template/html/_compose`
+- A custom compose template registered at variable `@ocas/template-compose/html`
 - The variable points to a node with type `@ocas/string` containing LiquidJS template
 
 ## When

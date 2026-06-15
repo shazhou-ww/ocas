@@ -166,7 +166,7 @@ describe("HTML Render MVP", () => {
       expect(output).toContain("</html>");
     });
 
-    test("custom @ocas/template/html/_compose overrides builtin", async () => {
+    test("custom @ocas/template-compose/html overrides builtin", async () => {
       const store = createMemoryStore();
       const aliases = bootstrap(store);
 
@@ -186,7 +186,7 @@ describe("HTML Render MVP", () => {
       const customCompose =
         '<!DOCTYPE html>\n<html>\n<head><title>Custom</title></head>\n<body class="custom">\n{{ content }}\n</body>\n</html>';
       const composeHash = store.cas.put(stringHash, customCompose);
-      store.var.set("@ocas/template/html/_compose", composeHash);
+      store.var.set("@ocas/template-compose/html", composeHash);
 
       const nodeHash = store.cas.put(simpleSchema, { message: "Custom Shell" });
 
@@ -317,7 +317,7 @@ describe("HTML Render MVP", () => {
       const staticContent =
         '{"css": ".person { color: blue; font-size: 14px; }", "js": "console.log(\'person loaded\');"}';
       const staticHash = store.cas.put(stringHash, staticContent);
-      store.var.set(`@ocas/template/html/${personSchema}/static`, staticHash);
+      store.var.set(`@ocas/template-static/html/${personSchema}`, staticHash);
 
       // Create a person node
       const personHash = store.cas.put(personSchema, {
@@ -376,7 +376,7 @@ describe("HTML Render MVP", () => {
       // Register person static template with CSS only
       const staticContent = '{"css": ".person { margin: 8px; }"}';
       const staticHash = store.cas.put(stringHash, staticContent);
-      store.var.set(`@ocas/template/html/${personSchema}/static`, staticHash);
+      store.var.set(`@ocas/template-static/html/${personSchema}`, staticHash);
 
       // Create 3 person nodes
       const alice = store.cas.put(personSchema, { name: "Alice" });
@@ -446,7 +446,7 @@ describe("HTML Render MVP", () => {
       // Register static template with both CSS and JS
       const staticContent = '{"css": "body { margin: 0; }", "js": "init();"}';
       const staticHash = store.cas.put(stringHash, staticContent);
-      store.var.set(`@ocas/template/html/${schema}/static`, staticHash);
+      store.var.set(`@ocas/template-static/html/${schema}`, staticHash);
 
       // No custom compose template registered
       const nodeHash = store.cas.put(schema, { msg: "hello" });
@@ -531,7 +531,7 @@ describe("HTML Render MVP", () => {
       // Register static template
       const staticContent = '{"css": ".custom { display: flex; }"}';
       const staticHash = store.cas.put(stringHash, staticContent);
-      store.var.set(`@ocas/template/html/${schema}/static`, staticHash);
+      store.var.set(`@ocas/template-static/html/${schema}`, staticHash);
 
       // Register custom compose template that iterates type_statics
       const customCompose = `<!DOCTYPE html>
@@ -550,7 +550,7 @@ describe("HTML Render MVP", () => {
 </body>
 </html>`;
       const composeHash = store.cas.put(stringHash, customCompose);
-      store.var.set("@ocas/template/html/_compose", composeHash);
+      store.var.set("@ocas/template-compose/html", composeHash);
 
       const nodeHash = store.cas.put(schema, { title: "My Page" });
 
@@ -595,19 +595,19 @@ describe("HTML Render MVP", () => {
         '{"css": ".person { color: blue; }", "js": "initPerson();"}';
       const personStaticHash = store.cas.put(stringHash, personStatic);
       store.var.set(
-        `@ocas/template/html/${personSchema}/static`,
+        `@ocas/template-static/html/${personSchema}`,
         personStaticHash,
       );
 
       const docStatic = '{"css": ".doc { padding: 16px; }"}';
       const docStaticHash = store.cas.put(stringHash, docStatic);
-      store.var.set(`@ocas/template/html/${docSchema}/static`, docStaticHash);
+      store.var.set(`@ocas/template-static/html/${docSchema}`, docStaticHash);
 
       // Custom compose that outputs JSON for introspection
       const composeTemplate =
         "STATICS_JSON:{{ type_statics | json }}:END\n{{ content }}";
       const composeHash = store.cas.put(stringHash, composeTemplate);
-      store.var.set("@ocas/template/html/_compose", composeHash);
+      store.var.set("@ocas/template-compose/html", composeHash);
 
       // Root referencing both types
       const rootSchema = putSchema(store, {
@@ -690,7 +690,7 @@ describe("HTML Render MVP", () => {
 
       // Static template only for the first type
       store.var.set(
-        `@ocas/template/html/${withStatic}/static`,
+        `@ocas/template-static/html/${withStatic}`,
         store.cas.put(stringHash, '{"css": ".a {}"}'),
       );
 
@@ -698,7 +698,7 @@ describe("HTML Render MVP", () => {
       const composeTemplate =
         "COUNT:{{ type_statics.size }}:END\nARRAY:{{ type_statics | json }}:END\n{{ content }}";
       store.var.set(
-        "@ocas/template/html/_compose",
+        "@ocas/template-compose/html",
         store.cas.put(stringHash, composeTemplate),
       );
 
@@ -759,14 +759,14 @@ describe("HTML Render MVP", () => {
 
       // Static templates for both
       store.var.set(
-        `@ocas/template/html/${t1}/static`,
+        `@ocas/template-static/html/${t1}`,
         store.cas.put(
           stringHash,
           '{"css": "/* t1 css */", "js": "/* t1 js */"}',
         ),
       );
       store.var.set(
-        `@ocas/template/html/${t2}/static`,
+        `@ocas/template-static/html/${t2}`,
         store.cas.put(
           stringHash,
           '{"css": "/* t2 css */", "js": "/* t2 js */"}',

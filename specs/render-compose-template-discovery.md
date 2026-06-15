@@ -7,7 +7,7 @@ tags: [render, map-reduce-compose, compose-template]
 ## Given
 
 - A store with a root node of type `T_root`
-- Compose template registered at variable `@ocas/template/{format}/@compose`
+- Compose template registered at variable `@ocas/template-compose/{format}`
 - Format is `'text'` or `'html'`
 
 ## When
@@ -18,7 +18,7 @@ tags: [render, map-reduce-compose, compose-template]
 
 ## Then
 
-- First attempt: query variable `@ocas/template/{format}/@compose` (global compose template)
+- First attempt: query variable `@ocas/template-compose/{format}` (global compose template)
 - If found, return the template string
 - If not found, return `null` (identity compose will be used)
 - The compose template variable must have type `@ocas/string` (string schema)

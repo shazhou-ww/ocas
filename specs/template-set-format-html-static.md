@@ -1,5 +1,5 @@
 ---
-scenario: "template set --format html --static stores at @ocas/template/html/<schema-hash>/static"
+scenario: "template set --format html --static stores at @ocas/template-static/html/<schema-hash>"
 feature: template
 tags: [template, html, static, cli]
 ---
@@ -17,7 +17,7 @@ tags: [template, html, static, cli]
 ## Then
 
 - The file content is stored in CAS as a `@ocas/string` node, producing `<contentHash>`
-- A variable binding is created at `@ocas/template/html/<schemaHash>/static` pointing to `<contentHash>`
+- A variable binding is created at `@ocas/template-static/html/<schemaHash>` pointing to `<contentHash>`
 - The output envelope has type `@ocas/output/template-set` with payload `{ schemaHash, contentHash }`
 - Exit code is 0
 - The variable is distinct from `@ocas/template/html/<schemaHash>` (instance template) and `@ocas/template/text/<schemaHash>` (text template)

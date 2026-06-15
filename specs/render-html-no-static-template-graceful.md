@@ -10,13 +10,13 @@ tags: [render, html, type-statics, graceful-degradation]
 - A schema `noteSchema` with properties `{ text: string }`
 - An HTML instance template registered at `@ocas/template/html/<noteSchema>`
   - Content: `<div class="note">{{ text }}</div>`
-- **No** static template registered at `@ocas/template/html/<noteSchema>/static`
+- **No** static template registered at `@ocas/template-static/html/<noteSchema>`
 - A note node stored with `{ text: "Hello world" }`
 
 ## When
 
 - `renderAsync(store, noteHash, { format: 'html' })` is called
-- `collectTypeStatics` queries `@ocas/template/html/<noteSchema>/static`
+- `collectTypeStatics` queries `@ocas/template-static/html/<noteSchema>`
 - The variable is not found
 
 ## Then

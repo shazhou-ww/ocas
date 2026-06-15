@@ -20,7 +20,7 @@ tags: [render, html, text, backward-compat]
 
 - Format defaults to `'text'`
 - Template discovery uses `@ocas/template/text/...` namespace
-- Compose template uses `@ocas/template/text/@compose` (identity compose)
+- Compose template uses `@ocas/template-compose/text` (identity compose)
 - All existing tests pass without modification
 - Text output format is identical to pre-HTML implementation
 - No regression in text rendering behavior

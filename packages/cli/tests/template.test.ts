@@ -742,11 +742,11 @@ describe("template set --format html", () => {
     const { exitCode: getTextExit } = runCli("template", "get", stringHash);
     expect(getTextExit).toBe(1);
 
-    // Verify stored under var with /static suffix
+    // Verify stored under var with template-static namespace
     const { stdout: varList } = runCli(
       "var",
       "list",
-      `@ocas/template/html/${stringHash}/static`,
+      `@ocas/template-static/html/${stringHash}`,
     );
     const vars = JSON.parse(varList).value;
     expect(vars.length).toBe(1);

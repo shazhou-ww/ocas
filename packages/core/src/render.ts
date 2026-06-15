@@ -262,7 +262,7 @@ async function collectTypeStatics(
   const result: Record<Hash, TypeStatics> = {};
 
   for (const typeHash of types) {
-    const staticVarName = `@ocas/template/${format}/${typeHash}/static`;
+    const staticVarName = `@ocas/template-static/${format}/${typeHash}`;
 
     try {
       const stringSchema = putSchema(store, { type: "string" });
@@ -322,7 +322,7 @@ async function findComposeTemplate(
   store: Store,
   format: string,
 ): Promise<string | null> {
-  const composeVarName = `@ocas/template/${format}/_compose`;
+  const composeVarName = `@ocas/template-compose/${format}`;
 
   try {
     const stringSchema = putSchema(store, { type: "string" });

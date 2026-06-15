@@ -988,7 +988,7 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
 
     // Create variable binding based on format and static flag
     const varName = isStatic
-      ? `@ocas/template/html/${schemaHash}/static`
+      ? `@ocas/template-static/html/${schemaHash}`
       : `@ocas/template/${formatFlag}/${schemaHash}`;
     store.var.set(varName, contentHash);
 

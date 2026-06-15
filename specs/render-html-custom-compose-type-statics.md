@@ -9,7 +9,7 @@ tags: [render, html, compose-template, type-statics, customization]
 - A store with bootstrap
 - A schema with an HTML instance template
 - A static template producing `{"css": ".custom { display: flex; }"}`
-- A custom compose template registered at `@ocas/template/html/_compose`:
+- A custom compose template registered at `@ocas/template-compose/html`:
   ```html
   <!DOCTYPE html>
   <html>

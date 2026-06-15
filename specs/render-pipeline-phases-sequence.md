@@ -22,12 +22,12 @@ tags: [render, map-reduce-compose, pipeline]
   
 - **Phase 2 (Reduce)**: Type statics collection
   - For each unique type in `encounteredTypes`
-  - Query `@ocas/template/{format}/{typeHash}/static`
+  - Query `@ocas/template-static/{format}/{typeHash}`
   - Render static template (if exists)
   - Produces: `typeStatics` Record<Hash, TypeStatics>
   
 - **Phase 3 (Compose)**: Final assembly
-  - Query `@ocas/template/{format}/@compose` for compose template
+  - Query `@ocas/template-compose/{format}` for compose template
   - If exists: render with `{ content, type_statics: typeStatics }`
   - If missing: return `content` as-is (identity)
   - Produces: final output string

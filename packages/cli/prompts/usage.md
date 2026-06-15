@@ -130,11 +130,11 @@ ocas render --pipe/-p                  # render from piped envelope
 ocas get <hash> -r                     # inline render shorthand
 ```
 
-All template subcommands accept `--format html` to operate on the HTML template namespace (`@ocas/template/html/<type-hash>`). Without `--format`, commands default to the text namespace (`@ocas/template/text/<type-hash>`). The `--static` flag (requires `--format html`) stores static assets (CSS/JS) at `@ocas/template/html/<type-hash>/static`.
+All template subcommands accept `--format html` to operate on the HTML template namespace (`@ocas/template/html/<type-hash>`). Without `--format`, commands default to the text namespace (`@ocas/template/text/<type-hash>`). The `--static` flag (requires `--format html`) stores static assets (CSS/JS) at `@ocas/template-static/html/<type-hash>`.
 
 Render options: `--resolution N` (max depth), `--decay N` (depth decay), `--epsilon N` (cutoff), `--format <text|html>` (output format, default: text).
 
-HTML templates use the `@ocas/template/html/<type-hash>` namespace. Types without an HTML template fall back to YAML in `<pre><code>` tags. A builtin HTML document shell wraps output; override it with `@ocas/template/html/_compose`.
+HTML templates use the `@ocas/template/html/<type-hash>` namespace. Types without an HTML template fall back to YAML in `<pre><code>` tags. A builtin HTML document shell wraps output; override it with `@ocas/template-compose/html`.
 
 ### Garbage Collection
 

@@ -18,6 +18,6 @@ tags: [render, map-reduce-compose, options]
 
 - Format defaults to `'text'`
 - Template discovery uses `@ocas/template/text/...` namespace
-- Compose template discovery uses `@ocas/template/text/@compose`
-- Static templates use `@ocas/template/text/{typeHash}/static`
+- Compose template discovery uses `@ocas/template-compose/text`
+- Static templates use `@ocas/template-static/text/{typeHash}`
 - Existing behavior is preserved (all current callers get text format)

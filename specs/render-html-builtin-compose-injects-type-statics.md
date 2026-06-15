@@ -8,7 +8,7 @@ tags: [render, html, compose-template, type-statics, builtin]
 
 - A store with bootstrap
 - A schema with an HTML instance template and a static template providing CSS and JS
-- No custom compose template registered at `@ocas/template/html/_compose`
+- No custom compose template registered at `@ocas/template-compose/html`
 - `collectTypeStatics` returns a non-empty `Record<Hash, TypeStatics>` with at least one type having both `css` and `js` slots
 
 ## When

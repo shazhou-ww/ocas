@@ -10,7 +10,7 @@ tags: [render, html, type-statics, css, js]
 - A schema `personSchema` with properties `{ name: string, age: number }`
 - An HTML instance template registered at `@ocas/template/html/<personSchema>`
   - Content: `<div class="person"><h2>{{ name }}</h2><p>Age: {{ age }}</p></div>`
-- A static template registered at `@ocas/template/html/<personSchema>/static`
+- A static template registered at `@ocas/template-static/html/<personSchema>`
   - Content: `{"css": ".person { color: blue; font-size: 14px; }", "js": "console.log('person loaded');"}`
 - A person node stored with `{ name: "Alice", age: 30 }`
 
