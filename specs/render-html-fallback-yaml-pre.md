@@ -1,24 +1,19 @@
 ---
-scenario: "Nodes without HTML templates fall back to YAML in <pre><code>"
+scenario: "[SUPERSEDED by #179] Nodes without HTML templates fell back to YAML in <pre><code>"
 feature: render
-tags: [render, html, fallback]
+tags: [render, html, fallback, superseded]
 ---
 
 ## Given
 
-- A node of type `T`
-- No HTML instance template exists at `@ocas/template/html/<type-hash-of-T>`
-- Format is `'html'`
+- This spec described the pre-#179 behavior where HTML fallback wrapped YAML in `<pre><code>` tags
+- **Superseded by:** `render-html-fallback-structured-object.md` and related structured HTML fallback specs
 
 ## When
 
-- `renderAsync(store, rootHash, { format: 'html' })` processes the node
-- Map phase fails to find an HTML template for type `T`
-- Fallback render is invoked
+- N/A — this behavior is replaced by structured HTML rendering (issue #179)
 
 ## Then
 
-- The node's payload is serialized to YAML format
-- Output is wrapped in `<pre><code>` tags: `<pre><code>field: value\n...</code></pre>`
-- The fallback HTML fragment is valid and safe (no unescaped angle brackets in YAML content)
-- The fragment is passed to reduce/compose phases like any other rendered fragment
+- The old `<pre><code>` YAML wrapping is no longer used for HTML fallback
+- See `render-html-fallback-structured-*.md` specs for the new behavior

@@ -117,9 +117,35 @@ export async function renderAsync(
         content = result.output;
         encounteredTypes = result.encounteredTypes;
       } else {
-        // Fallback to YAML rendering
+        // Fallback rendering
         const visited = new Set<Hash>();
-        const yamlContent = renderNode(
+        if (format === "html") {
+          // Structured HTML fallback
+          content = renderNodeHtml(
+            store,
+            hash,
+            resolution,
+            decay,
+            epsilon,
+            visited,
+          );
+        } else {
+          content = renderNode(
+            store,
+            hash,
+            resolution,
+            decay,
+            epsilon,
+            visited,
+          );
+        }
+        encounteredTypes = new Set<Hash>();
+      }
+    } else {
+      // Fallback rendering
+      const visited = new Set<Hash>();
+      if (format === "html") {
+        content = renderNodeHtml(
           store,
           hash,
           resolution,
@@ -127,35 +153,26 @@ export async function renderAsync(
           epsilon,
           visited,
         );
-        // For HTML format, wrap YAML in <pre><code> tags
-        content =
-          format === "html"
-            ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
-            : yamlContent;
-        encounteredTypes = new Set<Hash>();
+      } else {
+        content = renderNode(store, hash, resolution, decay, epsilon, visited);
       }
-    } else {
-      // Fallback to YAML rendering
-      const visited = new Set<Hash>();
-      content = renderNode(store, hash, resolution, decay, epsilon, visited);
       encounteredTypes = new Set<Hash>();
     }
   } catch {
-    // Fall through to YAML rendering
+    // Fall through to fallback rendering
     const visited = new Set<Hash>();
-    const yamlContent = renderNode(
-      store,
-      hash,
-      resolution,
-      decay,
-      epsilon,
-      visited,
-    );
-    // For HTML format, wrap YAML in <pre><code> tags
-    content =
-      format === "html"
-        ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
-        : yamlContent;
+    if (format === "html") {
+      content = renderNodeHtml(
+        store,
+        hash,
+        resolution,
+        decay,
+        epsilon,
+        visited,
+      );
+    } else {
+      content = renderNode(store, hash, resolution, decay, epsilon, visited);
+    }
     encounteredTypes = new Set<Hash>();
   }
 
@@ -233,27 +250,50 @@ export async function renderDirectAsync(
       );
       content = result;
     } else {
-      // Fallback: YAML via the sync renderDirect path
-      const yamlContent = renderDirect(typeHash, value, store, {
+      // Fallback rendering
+      if (format === "html") {
+        // Structured HTML fallback for direct values
+        const refSet = getDirectRefSet(store, typeHash, value);
+        const childResolution = resolution * decay;
+        const visited = new Set<Hash>();
+        content = renderValueHtml(
+          store,
+          value,
+          refSet,
+          childResolution,
+          decay,
+          epsilon,
+          visited,
+        );
+      } else {
+        content = renderDirect(typeHash, value, store, {
+          resolution,
+          decay,
+          epsilon,
+        });
+      }
+    }
+  } catch {
+    if (format === "html") {
+      const refSet = getDirectRefSet(store, typeHash, value);
+      const childResolution = resolution * decay;
+      const visited = new Set<Hash>();
+      content = renderValueHtml(
+        store,
+        value,
+        refSet,
+        childResolution,
+        decay,
+        epsilon,
+        visited,
+      );
+    } else {
+      content = renderDirect(typeHash, value, store, {
         resolution,
         decay,
         epsilon,
       });
-      content =
-        format === "html"
-          ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
-          : yamlContent;
     }
-  } catch {
-    const yamlContent = renderDirect(typeHash, value, store, {
-      resolution,
-      decay,
-      epsilon,
-    });
-    content =
-      format === "html"
-        ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
-        : yamlContent;
   }
 
   // Phase 2: Reduce — collect type statics
@@ -283,6 +323,22 @@ export async function renderDirectAsync(
     content,
     type_statics: typeStaticsArray,
   });
+}
+
+/**
+ * Extract the set of ocas_ref hashes from a direct (in-memory) value,
+ * using schema lookup on the store. Returns empty set if store or schema
+ * is unavailable.
+ */
+function getDirectRefSet(
+  store: Store | null,
+  typeHash: Hash,
+  value: unknown,
+): Set<Hash> {
+  if (store === null) return new Set<Hash>();
+  const schema = getSchema(store, typeHash);
+  if (schema === null) return new Set<Hash>();
+  return new Set(collectRefs(schema, value));
 }
 
 /**
@@ -689,6 +745,148 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * Render a CAS node as structured HTML (fallback when no HTML template exists).
+ * Produces <ul> for objects/arrays, <details>/<summary> for CAS refs,
+ * and inline <span>/<code> for primitives.
+ */
+function renderNodeHtml(
+  store: Store | null,
+  hash: Hash,
+  currentResolution: number,
+  decay: number,
+  epsilon: number,
+  visited: Set<Hash>,
+): string {
+  // Check if resolution is below threshold (with floating point tolerance)
+  if (currentResolution < epsilon + FLOAT_TOLERANCE) {
+    return `<code>cas:${escapeHtml(hash)}</code>`;
+  }
+
+  // Fetch the node
+  const node = store !== null ? store.cas.get(hash) : null;
+  if (node === null) {
+    return `<code>cas:${escapeHtml(hash)}</code>`;
+  }
+
+  // Cycle detection
+  if (visited.has(hash)) {
+    return `<code>cas:${escapeHtml(hash)}</code>`;
+  }
+  visited.add(hash);
+
+  // Get references from this node's schema
+  const nodeRefs = store !== null ? refs(store, node) : [];
+  const refSet = new Set(nodeRefs);
+
+  // Calculate child resolution for next level
+  const childResolution = currentResolution * decay;
+
+  const rendered = renderValueHtml(
+    store,
+    node.payload,
+    refSet,
+    childResolution,
+    decay,
+    epsilon,
+    visited,
+  );
+
+  visited.delete(hash);
+  return rendered;
+}
+
+/**
+ * Render a value as structured HTML.
+ */
+function renderValueHtml(
+  store: Store | null,
+  value: unknown,
+  refHashes: Set<Hash>,
+  childResolution: number,
+  decay: number,
+  epsilon: number,
+  visited: Set<Hash>,
+): string {
+  // Handle null
+  if (value === null) {
+    return "<code>null</code>";
+  }
+
+  // Handle primitives
+  if (typeof value === "string") {
+    // Check if this string is an ocas_ref
+    if (refHashes.has(value as Hash)) {
+      // Check if resolution is below epsilon — render opaque
+      if (childResolution < epsilon + FLOAT_TOLERANCE) {
+        return `<code>cas:${escapeHtml(value)}</code>`;
+      }
+      // Render as collapsible <details> with recursive child
+      const childHtml = renderNodeHtml(
+        store,
+        value as Hash,
+        childResolution,
+        decay,
+        epsilon,
+        visited,
+      );
+      return `<details><summary>cas:${escapeHtml(value)}</summary>${childHtml}</details>`;
+    }
+    return `<span>${escapeHtml(value)}</span>`;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return `<span>${escapeHtml(String(value))}</span>`;
+  }
+
+  // Handle arrays
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return "<code>[]</code>";
+    }
+    const items = value.map((item) => {
+      const itemHtml = renderValueHtml(
+        store,
+        item,
+        refHashes,
+        childResolution,
+        decay,
+        epsilon,
+        visited,
+      );
+      return `<li>${itemHtml}</li>`;
+    });
+    return `<ul>${items.join("")}</ul>`;
+  }
+
+  // Handle objects
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj);
+
+    if (keys.length === 0) {
+      return "<code>{}</code>";
+    }
+
+    const items = keys.map((key) => {
+      const val = obj[key];
+      const valHtml = renderValueHtml(
+        store,
+        val,
+        refHashes,
+        childResolution,
+        decay,
+        epsilon,
+        visited,
+      );
+      return `<li><strong>${escapeHtml(key)}</strong>: ${valHtml}</li>`;
+    });
+    return `<ul>${items.join("")}</ul>`;
+  }
+
+  return "<code>null</code>";
 }
 
 /**
