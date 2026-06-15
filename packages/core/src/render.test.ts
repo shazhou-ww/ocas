@@ -1320,7 +1320,7 @@ STATICS: {{ type_statics | json }}`;
     const composeTemplate = `=== PAGE ===
 {{ content }}
 === STYLES ===
-{% for entry in type_statics %}{{ entry[1].css }}
+{% for entry in type_statics %}{{ entry.css }}
 {% endfor %}`;
     const composeTemplateHash = store.cas.put(stringSchema, composeTemplate);
     store.var.set("@ocas/template/text/_compose", composeTemplateHash);
