@@ -79,7 +79,7 @@ pnpm run format   # Biome format (auto-fix)
 
 Two distinct template systems coexist:
 
-1. **Output templates** (`output-templates.ts`) — format CLI command output (e.g. `ocas put`, `ocas var list`). Registered automatically during bootstrap for `@ocas/output/*` schemas. Currently text-only.
+1. **Output templates** (`output-templates.ts`) — format CLI command output (e.g. `ocas put`, `ocas var list`). Registered automatically during bootstrap for `@ocas/output/*` schemas. Supports both text and HTML formats.
 2. **Render templates** (user-managed) — format CAS node content via `ocas render`. Managed via `ocas template set/get/list/delete`.
 
 #### Three Namespaces (all flat, parallel)
@@ -145,7 +145,7 @@ Default format is `text`; `--format html` switches to the `html` namespace.
 
 - `packages/core/src/render.ts` — `renderAsync()`, map-reduce-compose pipeline, builtin HTML shell
 - `packages/core/src/liquid-render.ts` — LiquidJS engine, `{% render %}` tag, template discovery
-- `packages/core/src/output-templates.ts` — builtin CLI output templates (text-only)
+- `packages/core/src/output-templates.ts` — builtin CLI output templates (text and HTML formats)
 - `packages/cli/src/index.ts` — `template` CLI commands, `--format` flag handling
 
 ### Internal Dependencies
