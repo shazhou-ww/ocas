@@ -7,9 +7,9 @@ tags: [render, map-reduce-compose, type-statics]
 ## Given
 
 - A store with types `T1`, `T2`, `T3`
-- Type `T1` has a static template at `@ocas/template/{format}/T1/static` containing LiquidJS template
+- Type `T1` has a static template at `@ocas/template-static/{format}/T1` containing LiquidJS template
 - Type `T2` has no static template registered
-- Type `T3` has a static template at `@ocas/template/{format}/T3/static`
+- Type `T3` has a static template at `@ocas/template-static/{format}/T3`
 
 ## When
 
@@ -18,7 +18,7 @@ tags: [render, map-reduce-compose, type-statics]
 
 ## Then
 
-- For each type in the set, query variable `@ocas/template/{format}/{typeHash}/static`
+- For each type in the set, query variable `@ocas/template-static/{format}/{typeHash}`
 - If found, render the static template and collect its output
 - Static template receives empty context (no node payload)
 - Result is `Record<Hash, TypeStatics>` where:

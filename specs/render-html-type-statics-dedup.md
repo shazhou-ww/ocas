@@ -9,7 +9,7 @@ tags: [render, html, type-statics, dedup]
 - A store with bootstrap
 - A schema `personSchema` with properties `{ name: string }`
 - An HTML instance template registered at `@ocas/template/html/<personSchema>`
-- A static template registered at `@ocas/template/html/<personSchema>/static`
+- A static template registered at `@ocas/template-static/html/<personSchema>`
   - Content: `{"css": ".person { margin: 8px; }"}`
 - A container schema with an array of `ocas_ref` to person nodes
 - An HTML instance template registered for the container schema that renders each child

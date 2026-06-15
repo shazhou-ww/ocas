@@ -9,13 +9,13 @@ tags: [render, map-reduce-compose, testing]
 - A test store with:
   - Root node with type `T_root` and content referencing child nodes
   - Child nodes with types `T1`, `T2`
-  - Compose template registered at `@ocas/template/text/@compose`:
+  - Compose template registered at `@ocas/template-compose/text`:
     ```liquid
     COMPOSED:
     {{ content }}
     STATICS: {{ type_statics | json }}
     ```
-  - Static template for `T1` at `@ocas/template/text/T1/static` outputs:
+  - Static template for `T1` at `@ocas/template-static/text/T1` outputs:
     ```yaml
     slot1: "value1"
     ```

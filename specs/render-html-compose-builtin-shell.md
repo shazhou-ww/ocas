@@ -8,7 +8,7 @@ tags: [render, html, compose-template]
 
 - A store with a root node
 - Format is `'html'`
-- No user-defined compose template at `@ocas/template/html/_compose`
+- No user-defined compose template at `@ocas/template-compose/html`
 
 ## When
 

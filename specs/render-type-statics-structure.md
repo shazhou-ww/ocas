@@ -6,7 +6,7 @@ tags: [render, map-reduce-compose, type-statics, data-structure]
 
 ## Given
 
-- A type `T1` with static template at `@ocas/template/html/T1/static`
+- A type `T1` with static template at `@ocas/template-static/html/T1`
 - The static template renders to JSON or YAML with slot structure:
   ```yaml
   css: ".foo { color: red; }"
