@@ -62,6 +62,17 @@ At each level, `resolution *= decay`. When resolution drops below epsilon, refer
 ## Render Modes
 
 - **`ocas render <hash>`** — render a stored node by hash, expanding ocas_ref references
+- **`ocas render <hash> --format html`** — render as a self-contained HTML5 document
 - **`ocas render -p`** — read a `{ type, value }` envelope from stdin and render it
 - **`ocas <any-command> -r`** — inline render shortcut; any command with `-r` / `--render` automatically pipes its envelope output through the renderer, equivalent to `| ocas render -p`
 - **`renderDirect(type, value, store, options)`** — in-memory render without requiring the data to be stored (used internally for CLI output)
+
+### HTML Format
+
+The `--format html` option produces complete, self-contained HTML5 documents. Key behaviors:
+
+- **Template namespace**: HTML templates are discovered at `@ocas/template/html/<type-hash>`, separate from text templates (`@ocas/template/text/<type-hash>`).
+- **LiquidJS rendering**: HTML instance templates are rendered with LiquidJS, receiving `{ payload, hash, type, resolution, ... }` as context variables.
+- **YAML fallback**: Types without an HTML template fall back to YAML rendered inside `<pre><code>` tags, with HTML special characters escaped.
+- **Builtin HTML shell**: When no custom compose template exists, a builtin `<!DOCTYPE html>` document shell wraps the rendered content with `<html>`, `<head>`, and `<body>` elements.
+- **Custom compose override**: Register `@ocas/template/html/_compose` to replace the builtin shell with a custom LiquidJS template. The template receives `{{ content }}` and `{{ type_statics }}`.

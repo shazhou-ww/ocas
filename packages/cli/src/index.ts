@@ -567,6 +567,7 @@ async function cmdRender(args: string[]): Promise<void> {
     typeof flags.epsilon === "string"
       ? Number.parseFloat(flags.epsilon)
       : undefined;
+  const format = typeof flags.format === "string" ? flags.format : undefined;
 
   // Validate numeric values
   if (resolution !== undefined && Number.isNaN(resolution)) {
@@ -623,6 +624,7 @@ async function cmdRender(args: string[]): Promise<void> {
           ...(resolution !== undefined && { resolution }),
           ...(decay !== undefined && { decay }),
           ...(epsilon !== undefined && { epsilon }),
+          ...(format !== undefined && { format }),
         });
         process.stdout.write(`${output}\n`);
       } else {
@@ -634,6 +636,7 @@ async function cmdRender(args: string[]): Promise<void> {
             ...(resolution !== undefined && { resolution }),
             ...(decay !== undefined && { decay }),
             ...(epsilon !== undefined && { epsilon }),
+            ...(format !== undefined && { format }),
           },
         );
         process.stdout.write(`${output}\n`);
@@ -644,6 +647,7 @@ async function cmdRender(args: string[]): Promise<void> {
         ...(resolution !== undefined && { resolution }),
         ...(decay !== undefined && { decay }),
         ...(epsilon !== undefined && { epsilon }),
+        ...(format !== undefined && { format }),
       });
       // Output to stdout without JSON wrapping (raw output)
       process.stdout.write(`${output}\n`);
@@ -1230,7 +1234,7 @@ Commands:
   refs <hash>                       List direct ocas_ref edges                          (@ocas/output/refs)
   walk <hash> [--format tree]       Recursive traversal (--follow-type to include schemas) (@ocas/output/walk)
   hash <type-hash> <file.json|--pipe> Compute hash without storing                     (@ocas/output/hash)
-  render <hash> [options]           Render node as text with resolution decay (raw output)
+  render <hash> [options]           Render node as text/html with resolution decay (raw output)
   render --pipe/-p [options]        Render { type, value } from stdin (raw output)
   list --type <hash-or-name> [--tag <tag>...]  List hashes for a type, optionally filtered by tags    (@ocas/output/list)
   list-meta                         List meta-schema hashes (value=string[])           (@ocas/output/list-meta)
@@ -1258,6 +1262,7 @@ Flags:
   --schema <hash>     Schema hash filter for var get/delete/tag/list
   --tag <tag>         Tag/label (can be repeated): key:value (tag), name (label), :name (delete)
   --inline <text>     Inline text content for template set
+  --format <fmt>      Output format for render (text or html, default: text)
   --resolution <n>    Initial resolution for render (default: 1.0)
   --decay <n>         Decay factor for render (default: 0.5)
   --epsilon <n>       Cutoff threshold for render (default: 0.01)
