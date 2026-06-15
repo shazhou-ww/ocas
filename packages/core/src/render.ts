@@ -197,6 +197,95 @@ export async function renderAsync(
 }
 
 /**
+ * Async render of a direct (in-memory) value through the full template +
+ * compose pipeline — just like `renderAsync`, but for values that are
+ * **not** stored in CAS.
+ *
+ * Looks up the instance template for `typeHash` in the requested `format`,
+ * runs it through LiquidJS when found, falls back to YAML otherwise, and
+ * finishes with the same reduce → compose phases that `renderAsync` uses.
+ */
+export async function renderDirectAsync(
+  typeHash: Hash,
+  value: unknown,
+  store: Store,
+  options: RenderOptions | null,
+): Promise<string> {
+  const { resolution, decay, epsilon } = validateAndExtractOptions(options);
+  const format = options?.format ?? "text";
+
+  // Phase 1: Map — render the value through its template (or fallback)
+  let content: string;
+  const encounteredTypes = new Set<Hash>();
+
+  try {
+    const templateExists = await hasTemplate(store, typeHash, format);
+    if (templateExists) {
+      const result = await renderDirectWithTemplate(
+        store,
+        typeHash,
+        value,
+        resolution,
+        decay,
+        epsilon,
+        format,
+        encounteredTypes,
+      );
+      content = result;
+    } else {
+      // Fallback: YAML via the sync renderDirect path
+      const yamlContent = renderDirect(typeHash, value, store, {
+        resolution,
+        decay,
+        epsilon,
+      });
+      content =
+        format === "html"
+          ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
+          : yamlContent;
+    }
+  } catch {
+    const yamlContent = renderDirect(typeHash, value, store, {
+      resolution,
+      decay,
+      epsilon,
+    });
+    content =
+      format === "html"
+        ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
+        : yamlContent;
+  }
+
+  // Phase 2: Reduce — collect type statics
+  const typeStaticsRecord = await collectTypeStatics(
+    store,
+    encounteredTypes,
+    format,
+  );
+  const typeStaticsArray = typeStaticsRecordToArray(typeStaticsRecord);
+
+  // Phase 3: Compose — apply compose template or builtin shell
+  const composeTemplate = await findComposeTemplate(store, format);
+
+  if (composeTemplate === null) {
+    if (format === "html") {
+      return applyBuiltinHtmlShell(content, typeStaticsArray);
+    }
+    return content;
+  }
+
+  const engine = new Liquid({
+    strictFilters: false,
+    strictVariables: false,
+  });
+
+  return await engine.parseAndRender(composeTemplate, {
+    content,
+    type_statics: typeStaticsArray,
+  });
+}
+
+/**
  * Render a value directly (in-memory) without requiring it to be stored.
  * Accepts a raw { type, value } pair. Store is optional and read-only —
  * used only for schema lookup and expanding nested ocas_ref references.
@@ -249,6 +338,75 @@ async function hasTemplate(
   } catch {
     return false;
   }
+}
+
+/**
+ * Find and return a template string for a given type hash + format.
+ */
+async function findInstanceTemplate(
+  store: Store,
+  typeHash: Hash,
+  format: string,
+): Promise<string | null> {
+  const varName = `@ocas/template/${format}/${typeHash}`;
+  try {
+    const stringSchema = putSchema(store, { type: "string" });
+    const variable = store.var.get(varName, stringSchema);
+    if (variable === null) return null;
+    const templateNode = store.cas.get(variable.value);
+    if (templateNode === null || typeof templateNode.payload !== "string")
+      return null;
+    return templateNode.payload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Render a raw value through a LiquidJS instance template.
+ * Used by `renderDirectAsync` for object-valued envelopes that are
+ * not stored in CAS.
+ */
+async function renderDirectWithTemplate(
+  store: Store,
+  typeHash: Hash,
+  value: unknown,
+  resolution: number,
+  _decay: number,
+  epsilon: number,
+  format: string,
+  encounteredTypes: Set<Hash>,
+): Promise<string> {
+  const template = await findInstanceTemplate(store, typeHash, format);
+  if (template === null) {
+    throw new Error("No template found");
+  }
+
+  encounteredTypes.add(typeHash);
+
+  const engine = new Liquid({
+    strictFilters: false,
+    strictVariables: false,
+  });
+
+  // Build LiquidJS context matching the same convention as renderNode
+  // in liquid-render.ts: auto-spread object payload properties, then
+  // set reserved keys.
+  const context: Record<string, unknown> = {};
+
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    for (const key of Object.keys(obj)) {
+      context[key] = obj[key];
+    }
+  }
+
+  context.resolution = resolution;
+  context.epsilon = epsilon;
+  context.payload = value;
+  context.type = typeHash;
+
+  return await engine.parseAndRender(template, context);
 }
 
 /**

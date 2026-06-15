@@ -36,6 +36,7 @@ export {
   render,
   renderAsync,
   renderDirect,
+  renderDirectAsync,
   type TypeStaticsEntry,
 } from "./render.js";
 export type {
