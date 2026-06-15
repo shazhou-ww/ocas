@@ -116,14 +116,21 @@ ocas untag @myapp/config status                # remove tag/label by key
 
 ```bash
 ocas template set <schema-hash> --inline "{{ payload.title }}"
+ocas template set <schema-hash> tpl.html --format html
+ocas template set <schema-hash> static.json --format html --static
 ocas template get <schema-hash>
+ocas template get <schema-hash> --format html
 ocas template list
+ocas template list --format html
 ocas template delete <schema-hash>
+ocas template delete <schema-hash> --format html
 ocas render <hash>                     # render with template (or YAML fallback)
 ocas render <hash> --format html       # render as self-contained HTML5 document
 ocas render --pipe/-p                  # render from piped envelope
 ocas get <hash> -r                     # inline render shorthand
 ```
+
+All template subcommands accept `--format html` to operate on the HTML template namespace (`@ocas/template/html/<type-hash>`). Without `--format`, commands default to the text namespace (`@ocas/template/text/<type-hash>`). The `--static` flag (requires `--format html`) stores static assets (CSS/JS) at `@ocas/template/html/<type-hash>/static`.
 
 Render options: `--resolution N` (max depth), `--decay N` (depth decay), `--epsilon N` (cutoff), `--format <text|html>` (output format, default: text).
 

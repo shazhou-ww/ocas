@@ -626,3 +626,456 @@ describe("template error handling", () => {
     expect(stderr).toContain("Usage:");
   });
 });
+
+// ---- --format html tests (Phase 2c) ----
+
+describe("template set --format html", () => {
+  test("stores HTML template at @ocas/template/html/<schema-hash>", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const templateFile = join(testDir, "tpl.html");
+    writeFileSync(
+      templateFile,
+      '<div class="person"><h2>{{ name }}</h2></div>',
+    );
+
+    const { stdout, exitCode } = runCli(
+      "template",
+      "set",
+      stringHash,
+      templateFile,
+      "--format",
+      "html",
+    );
+
+    expect(exitCode).toBe(0);
+    const envelope = JSON.parse(stdout);
+    expect(envelope.value).toHaveProperty("schemaHash", stringHash);
+    expect(envelope.value).toHaveProperty("contentHash");
+
+    // Verify stored at html namespace
+    const { stdout: getHtml, exitCode: getHtmlExit } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+    expect(getHtmlExit).toBe(0);
+    expect(JSON.parse(getHtml).value).toBe(
+      '<div class="person"><h2>{{ name }}</h2></div>',
+    );
+
+    // Verify NOT stored at text namespace
+    const { exitCode: getTextExit } = runCli("template", "get", stringHash);
+    expect(getTextExit).toBe(1);
+  });
+
+  test("--format html with --inline", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const { stdout, exitCode } = runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      "<p>{{ name }}</p>",
+      "--format",
+      "html",
+    );
+
+    expect(exitCode).toBe(0);
+    const envelope = JSON.parse(stdout);
+    expect(envelope.value).toHaveProperty("schemaHash", stringHash);
+    expect(envelope.value).toHaveProperty("contentHash");
+
+    // Verify content
+    const { stdout: getOut } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+    expect(JSON.parse(getOut).value).toBe("<p>{{ name }}</p>");
+  });
+
+  test("--format html --static stores at .../static suffix", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const staticFile = join(testDir, "static.json");
+    writeFileSync(
+      staticFile,
+      '{"css": ".person { color: blue; }", "js": "console.log(\'loaded\');"}',
+    );
+
+    const { stdout, exitCode } = runCli(
+      "template",
+      "set",
+      stringHash,
+      staticFile,
+      "--format",
+      "html",
+      "--static",
+    );
+
+    expect(exitCode).toBe(0);
+    const envelope = JSON.parse(stdout);
+    expect(envelope.value).toHaveProperty("schemaHash", stringHash);
+    expect(envelope.value).toHaveProperty("contentHash");
+
+    // Verify distinct from instance template and text template
+    // Instance template should not exist
+    const { exitCode: getInstanceExit } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+    expect(getInstanceExit).toBe(1);
+
+    // Text template should not exist
+    const { exitCode: getTextExit } = runCli("template", "get", stringHash);
+    expect(getTextExit).toBe(1);
+
+    // Verify stored under var with /static suffix
+    const { stdout: varList } = runCli(
+      "var",
+      "list",
+      `@ocas/template/html/${stringHash}/static`,
+    );
+    const vars = JSON.parse(varList).value;
+    expect(vars.length).toBe(1);
+  });
+
+  test("--static without --format html is rejected", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const staticFile = join(testDir, "static.json");
+    writeFileSync(staticFile, '{"css": "", "js": ""}');
+
+    const { stderr, exitCode } = runCli(
+      "template",
+      "set",
+      stringHash,
+      staticFile,
+      "--static",
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("--static");
+    expect(stderr).toContain("--format html");
+
+    // Verify no variable was created
+    const { stdout: varList } = runCli(
+      "var",
+      "list",
+      `@ocas/template/html/${stringHash}`,
+    );
+    const vars = JSON.parse(varList).value;
+    expect(vars.length).toBe(0);
+  });
+});
+
+describe("template get --format html", () => {
+  test("retrieves HTML instance template", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const content = '<div class="person"><h2>{{ name }}</h2></div>';
+    runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      content,
+      "--format",
+      "html",
+    );
+
+    const { stdout, exitCode } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+
+    expect(exitCode).toBe(0);
+    const envelope = JSON.parse(stdout);
+    expect(envelope.value).toBe(content);
+  });
+
+  test("not found when no HTML template exists", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const { stderr, exitCode } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Template not found");
+  });
+
+  test("does not return text template when --format html", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    // Set a text template
+    runCli("template", "set", stringHash, "--inline", "Text template");
+
+    // Request HTML — should fail
+    const { exitCode } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+    expect(exitCode).toBe(1);
+  });
+});
+
+describe("template list --format html", () => {
+  test("lists only HTML templates", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    // Create a text template for stringHash (schema A)
+    runCli("template", "set", stringHash, "--inline", "Text A");
+
+    // Create an HTML instance template for stringHash (schema A)
+    runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      "<p>HTML A</p>",
+      "--format",
+      "html",
+    );
+
+    // Create a text template for SCHEMA_HASH_2 (schema B)
+    runCli("template", "set", "SCHEMA_HASH_2", "--inline", "Text B");
+
+    // List HTML templates
+    const { stdout, exitCode } = runCli("template", "list", "--format", "html");
+
+    expect(exitCode).toBe(0);
+    const envelope = JSON.parse(stdout);
+    expect(Array.isArray(envelope.value)).toBe(true);
+
+    // Should contain only schema A
+    const schemaHashes = envelope.value.map(
+      (v: { schemaHash: string }) => v.schemaHash,
+    );
+    expect(schemaHashes).toContain(stringHash);
+
+    // Text templates for B should NOT appear
+    // (schemaHashes should not contain values corresponding to text-only templates)
+    for (const item of envelope.value) {
+      // All items should come from html namespace
+      expect(item).toHaveProperty("schemaHash");
+      expect(item).toHaveProperty("contentHash");
+    }
+  });
+
+  test("includes static templates in list", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    // Create an HTML static template
+    runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      '{"css":"","js":""}',
+      "--format",
+      "html",
+      "--static",
+    );
+
+    const { stdout, exitCode } = runCli("template", "list", "--format", "html");
+
+    expect(exitCode).toBe(0);
+    const items = JSON.parse(stdout).value;
+    expect(items.length).toBeGreaterThanOrEqual(1);
+
+    // Should include entry with /static suffix
+    const staticEntry = items.find(
+      (i: { schemaHash: string }) => i.schemaHash === `${stringHash}/static`,
+    );
+    expect(staticEntry).toBeDefined();
+  });
+});
+
+describe("template delete --format html", () => {
+  test("removes HTML template, text template unaffected", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    // Set both text and HTML templates
+    runCli("template", "set", stringHash, "--inline", "Text template");
+    runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      "<p>HTML template</p>",
+      "--format",
+      "html",
+    );
+
+    // Delete HTML template
+    const { stdout, exitCode } = runCli(
+      "template",
+      "delete",
+      stringHash,
+      "--format",
+      "html",
+    );
+
+    expect(exitCode).toBe(0);
+    const envelope = JSON.parse(stdout);
+    expect(envelope.value).toHaveProperty("deleted", true);
+
+    // HTML template should be gone
+    const { exitCode: getHtmlExit } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+    expect(getHtmlExit).toBe(1);
+
+    // Text template should still exist
+    const { stdout: textOut, exitCode: getTextExit } = runCli(
+      "template",
+      "get",
+      stringHash,
+    );
+    expect(getTextExit).toBe(0);
+    expect(JSON.parse(textOut).value).toBe("Text template");
+  });
+
+  test("not found when no HTML template exists", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const { stderr, exitCode } = runCli(
+      "template",
+      "delete",
+      stringHash,
+      "--format",
+      "html",
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Template not found");
+  });
+});
+
+describe("template default format text (backward compat)", () => {
+  test("set without --format stores at text namespace", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    const templateFile = join(testDir, "tpl.txt");
+    writeFileSync(templateFile, "Name: {{ name }}");
+
+    const { exitCode } = runCli("template", "set", stringHash, templateFile);
+    expect(exitCode).toBe(0);
+
+    // Verify stored in text namespace
+    const { stdout: varList } = runCli(
+      "var",
+      "list",
+      `@ocas/template/text/${stringHash}`,
+    );
+    const vars = JSON.parse(varList).value;
+    expect(vars.length).toBe(1);
+  });
+
+  test("get without --format retrieves from text namespace", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    runCli("template", "set", stringHash, "--inline", "Name: {{ name }}");
+
+    const { stdout, exitCode } = runCli("template", "get", stringHash);
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).value).toBe("Name: {{ name }}");
+  });
+
+  test("list without --format lists only text templates", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    // Set both text and HTML templates
+    runCli("template", "set", stringHash, "--inline", "Text");
+    runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      "<p>HTML</p>",
+      "--format",
+      "html",
+    );
+
+    const { stdout } = runCli("template", "list");
+    const items = JSON.parse(stdout).value;
+
+    // Should only contain text templates
+    expect(items.length).toBe(1);
+    expect(items[0].schemaHash).toBe(stringHash);
+  });
+
+  test("delete without --format removes from text namespace only", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    // Set both text and HTML templates
+    runCli("template", "set", stringHash, "--inline", "Text");
+    runCli(
+      "template",
+      "set",
+      stringHash,
+      "--inline",
+      "<p>HTML</p>",
+      "--format",
+      "html",
+    );
+
+    // Delete without --format
+    const { exitCode } = runCli("template", "delete", stringHash);
+    expect(exitCode).toBe(0);
+
+    // Text should be gone
+    const { exitCode: getTextExit } = runCli("template", "get", stringHash);
+    expect(getTextExit).toBe(1);
+
+    // HTML should still exist
+    const { stdout: htmlOut, exitCode: getHtmlExit } = runCli(
+      "template",
+      "get",
+      stringHash,
+      "--format",
+      "html",
+    );
+    expect(getHtmlExit).toBe(0);
+    expect(JSON.parse(htmlOut).value).toBe("<p>HTML</p>");
+  });
+});
