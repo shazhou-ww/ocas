@@ -209,19 +209,47 @@ const HTML_TEMPLATES: ReadonlyArray<
   ],
   [
     "@ocas/output/list",
-    '<table class="ocas-output ocas-list"><thead><tr><th>hash</th><th>created</th><th>updated</th></tr></thead><tbody>{% for item in payload %}<tr><td><code class="ocas-hash">{{ item.hash }}</code></td><td>{{ item.created }}</td><td>{{ item.updated }}</td></tr>{% endfor %}</tbody></table>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Nodes · {{ payload.size }} entries</div>' +
+      '<table class="ocas-table"><thead><tr><th>HASH</th><th>CREATED</th><th>UPDATED</th></tr></thead>' +
+      "<tbody>{% for item in payload %}<tr>" +
+      '<td><code class="ocas-hash">{{ item.hash }}</code></td>' +
+      '<td class="ocas-col-time">{{ item.created }}</td>' +
+      '<td class="ocas-col-time">{{ item.updated }}</td>' +
+      "</tr>{% endfor %}</tbody></table></div>",
   ],
   [
     "@ocas/output/list-meta",
-    '<table class="ocas-output ocas-list-meta"><thead><tr><th>hash</th><th>created</th><th>updated</th></tr></thead><tbody>{% for item in payload %}<tr><td><code class="ocas-hash">{{ item.hash }}</code></td><td>{{ item.created }}</td><td>{{ item.updated }}</td></tr>{% endfor %}</tbody></table>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Meta-Schemas · {{ payload.size }} entries</div>' +
+      '<table class="ocas-table"><thead><tr><th>HASH</th><th>CREATED</th><th>UPDATED</th></tr></thead>' +
+      "<tbody>{% for item in payload %}<tr>" +
+      '<td><code class="ocas-hash">{{ item.hash }}</code></td>' +
+      '<td class="ocas-col-time">{{ item.created }}</td>' +
+      '<td class="ocas-col-time">{{ item.updated }}</td>' +
+      "</tr>{% endfor %}</tbody></table></div>",
   ],
   [
     "@ocas/output/list-schema",
-    '<table class="ocas-output ocas-list-schema"><thead><tr><th>hash</th><th>created</th><th>updated</th></tr></thead><tbody>{% for item in payload %}<tr><td><code class="ocas-hash">{{ item.hash }}</code></td><td>{{ item.created }}</td><td>{{ item.updated }}</td></tr>{% endfor %}</tbody></table>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Schemas · {{ payload.size }} entries</div>' +
+      '<table class="ocas-table"><thead><tr><th>HASH</th><th>CREATED</th><th>UPDATED</th></tr></thead>' +
+      "<tbody>{% for item in payload %}<tr>" +
+      '<td><code class="ocas-hash">{{ item.hash }}</code></td>' +
+      '<td class="ocas-col-time">{{ item.created }}</td>' +
+      '<td class="ocas-col-time">{{ item.updated }}</td>' +
+      "</tr>{% endfor %}</tbody></table></div>",
   ],
   [
     "@ocas/output/var-list",
-    '<table class="ocas-output ocas-var-list"><thead><tr><th>name</th><th>schema</th><th>value</th></tr></thead><tbody>{% for v in payload %}<tr><td>{{ v.name }}</td><td><code class="ocas-hash">{{ v.schema }}</code></td><td><code class="ocas-hash">{{ v.value }}</code></td></tr>{% endfor %}</tbody></table>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Variables · {{ payload.size }} entries</div>' +
+      '<table class="ocas-table"><thead><tr><th>NAME</th><th>SCHEMA</th><th>VALUE</th></tr></thead>' +
+      "<tbody>{% for v in payload %}<tr>" +
+      '<td class="ocas-col-name">{{ v.name }}</td>' +
+      '<td><code class="ocas-hash">{{ v.schema }}</code></td>' +
+      '<td><code class="ocas-hash">{{ v.value }}</code></td>' +
+      "</tr>{% endfor %}</tbody></table></div>",
   ],
   [
     "@ocas/output/var-history",
@@ -232,15 +260,35 @@ const HTML_TEMPLATES: ReadonlyArray<
   ],
   [
     "@ocas/output/template-list",
-    '<table class="ocas-output ocas-template-list"><thead><tr><th>schema</th><th>content</th></tr></thead><tbody>{% for t in payload %}<tr><td><code class="ocas-hash">{{ t.schemaHash }}</code></td><td><code class="ocas-hash">{{ t.contentHash }}</code></td></tr>{% endfor %}</tbody></table>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Templates · {{ payload.size }} entries</div>' +
+      '<table class="ocas-table"><thead><tr><th>SCHEMA</th><th>CONTENT</th></tr></thead>' +
+      "<tbody>{% for t in payload %}<tr>" +
+      '<td><code class="ocas-hash">{{ t.schemaHash }}</code></td>' +
+      '<td><code class="ocas-hash">{{ t.contentHash }}</code></td>' +
+      "</tr>{% endfor %}</tbody></table></div>",
   ],
   [
     "@ocas/output/tag",
-    '<table class="ocas-output ocas-tag"><thead><tr><th>key</th><th>value</th><th>target</th></tr></thead><tbody>{% for t in payload %}<tr><td>{{ t.key }}</td><td>{% if t.value %}{{ t.value }}{% endif %}</td><td><code class="ocas-hash">{{ t.target }}</code></td></tr>{% endfor %}</tbody></table>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Tags · {{ payload.size }} entries</div>' +
+      '<table class="ocas-table"><thead><tr><th>KEY</th><th>VALUE</th><th>TARGET</th></tr></thead>' +
+      "<tbody>{% for t in payload %}<tr>" +
+      "<td>{{ t.key }}</td>" +
+      '<td>{% if t.value %}{{ t.value }}{% else %}<span style="color: var(--ocas-text-muted)">—</span>{% endif %}</td>' +
+      '<td><code class="ocas-hash">{{ t.target }}</code></td>' +
+      "</tr>{% endfor %}</tbody></table></div>",
   ],
   [
     "@ocas/output/untag",
-    '<table class="ocas-output ocas-untag"><thead><tr><th>key</th><th>value</th><th>target</th></tr></thead><tbody>{% for t in payload %}<tr><td>{{ t.key }}</td><td>{% if t.value %}{{ t.value }}{% endif %}</td><td><code class="ocas-hash">{{ t.target }}</code></td></tr>{% endfor %}</tbody></table>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Untagged · {{ payload.size }} entries</div>' +
+      '<table class="ocas-table"><thead><tr><th>KEY</th><th>VALUE</th><th>TARGET</th></tr></thead>' +
+      "<tbody>{% for t in payload %}<tr>" +
+      "<td>{{ t.key }}</td>" +
+      '<td>{% if t.value %}{{ t.value }}{% else %}<span style="color: var(--ocas-text-muted)">—</span>{% endif %}</td>' +
+      '<td><code class="ocas-hash">{{ t.target }}</code></td>' +
+      "</tr>{% endfor %}</tbody></table></div>",
   ],
 
   // Statistics templates (card-style)
@@ -353,6 +401,18 @@ const OUTPUT_CSS = [
   ".ocas-verify-ok .ocas-status { color: var(--ocas-green); }",
   ".ocas-verify-corrupted .ocas-status { color: var(--ocas-red); }",
   ".ocas-verify-invalid .ocas-status { color: var(--ocas-yellow); }",
+
+  // Table styles (design-guide-compliant)
+  ".ocas-table { border-collapse: collapse; width: 100%; }",
+  ".ocas-table th { text-align: left; padding: 0.4rem 0.75rem;" +
+    " text-transform: uppercase; font-size: 0.75em; font-weight: 600;" +
+    " color: var(--ocas-text-muted); letter-spacing: 0.05em;" +
+    " border-bottom: 1px solid var(--ocas-card-border); }",
+  ".ocas-table td { text-align: left; padding: 0.4rem 0.75rem;" +
+    " border-bottom: 1px solid var(--ocas-card-border); }",
+  ".ocas-table tr:last-child td { border-bottom: none; }",
+  ".ocas-col-name { font-weight: 500; }",
+  ".ocas-col-time { color: var(--ocas-text-muted); font-variant-numeric: tabular-nums; }",
 ].join(" ");
 
 /**

@@ -630,7 +630,7 @@ describe("List/Array HTML output", () => {
     expect(html).toContain("BBBBBBBBBBBBB");
   });
 
-  test("list: renders as <table> with hash, created, updated columns", async () => {
+  test("list: card layout with 'Nodes' header, styled table, hash pills, time columns", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -638,24 +638,39 @@ describe("List/Array HTML output", () => {
       { hash: "AAAAAAAAAAAAA", created: 1000, updated: 2000 },
       { hash: "BBBBBBBBBBBBB", created: 3000, updated: 4000 },
     ]);
-    expect(html).toContain("<table");
-    expect(html).toContain("AAAAAAAAAAAAA");
-    expect(html).toContain("BBBBBBBBBBBBB");
-    expect(html).toContain("<code");
+    // Card layout
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Nodes");
+    expect(html).toContain("2 entries");
+    // Styled table
+    expect(html).toContain('class="ocas-table"');
+    // Uppercase th headers
+    expect(html).toContain("<th>HASH</th>");
+    expect(html).toContain("<th>CREATED</th>");
+    expect(html).toContain("<th>UPDATED</th>");
+    // Hash pills
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+    // Time columns
+    expect(html).toContain('class="ocas-col-time"');
   });
 
-  test("list-meta: renders as <table> like list", async () => {
+  test("list-meta: card layout with 'Meta-Schemas' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
     const html = await renderOutput(store, aliases, "@ocas/output/list-meta", [
       { hash: "AAAAAAAAAAAAA", created: 1000, updated: 2000 },
     ]);
-    expect(html).toContain("<table");
-    expect(html).toContain("AAAAAAAAAAAAA");
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Meta-Schemas");
+    expect(html).toContain("1 entries");
+    expect(html).toContain('class="ocas-table"');
+    expect(html).toContain("<th>HASH</th>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
   });
 
-  test("list-schema: renders as <table> like list", async () => {
+  test("list-schema: card layout with 'Schemas' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -665,11 +680,15 @@ describe("List/Array HTML output", () => {
       "@ocas/output/list-schema",
       [{ hash: "AAAAAAAAAAAAA", created: 1000, updated: 2000 }],
     );
-    expect(html).toContain("<table");
-    expect(html).toContain("AAAAAAAAAAAAA");
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Schemas");
+    expect(html).toContain("1 entries");
+    expect(html).toContain('class="ocas-table"');
+    expect(html).toContain("<th>HASH</th>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
   });
 
-  test("var-list: renders as <table> with name, schema, value columns", async () => {
+  test("var-list: card layout with 'Variables' header, name bold, hash pills", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -685,10 +704,24 @@ describe("List/Array HTML output", () => {
         value: "DDDDDDDDDDDDD",
       },
     ]);
-    expect(html).toContain("<table");
+    // Card layout
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Variables");
+    expect(html).toContain("2 entries");
+    // Styled table
+    expect(html).toContain('class="ocas-table"');
+    // Uppercase th headers
+    expect(html).toContain("<th>NAME</th>");
+    expect(html).toContain("<th>SCHEMA</th>");
+    expect(html).toContain("<th>VALUE</th>");
+    // Name column bold class
+    expect(html).toContain('class="ocas-col-name"');
+    // Hash pills for schema and value
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+    // Contains variable names
     expect(html).toContain("@test/a");
     expect(html).toContain("@test/b");
-    expect(html).toContain("<code");
   });
 
   test("var-history: renders name + list of historical values", async () => {
@@ -710,7 +743,7 @@ describe("List/Array HTML output", () => {
     expect(html).toContain("CCCCCCCCCCCCC");
   });
 
-  test("template-list: renders as <table> with schema and content hash", async () => {
+  test("template-list: card layout with 'Templates' header, 2-column table", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -723,13 +756,21 @@ describe("List/Array HTML output", () => {
         { schemaHash: "CCCCCCCCCCCCC", contentHash: "DDDDDDDDDDDDD" },
       ],
     );
-    expect(html).toContain("<table");
-    expect(html).toContain("AAAAAAAAAAAAA");
-    expect(html).toContain("BBBBBBBBBBBBB");
-    expect(html).toContain("<code");
+    // Card layout
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Templates");
+    expect(html).toContain("2 entries");
+    // Styled table
+    expect(html).toContain('class="ocas-table"');
+    // Uppercase th headers
+    expect(html).toContain("<th>SCHEMA</th>");
+    expect(html).toContain("<th>CONTENT</th>");
+    // Hash pills
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
   });
 
-  test("tag: renders tag entries with key, value, target", async () => {
+  test("tag: card layout with 'Tags' header, em-dash for null values", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -747,12 +788,25 @@ describe("List/Array HTML output", () => {
         created: 1700000000,
       },
     ]);
+    // Card layout
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Tags");
+    expect(html).toContain("2 entries");
+    // Styled table
+    expect(html).toContain('class="ocas-table"');
+    // Uppercase th headers
+    expect(html).toContain("<th>KEY</th>");
+    expect(html).toContain("<th>VALUE</th>");
+    expect(html).toContain("<th>TARGET</th>");
+    // Content
     expect(html).toContain("env");
     expect(html).toContain("prod");
-    expect(html).toContain("AAAAAAAAAAAAA");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    // Em-dash for null value
+    expect(html).toContain("—");
   });
 
-  test("untag: renders untag entries", async () => {
+  test("untag: card layout with 'Untagged' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -764,17 +818,48 @@ describe("List/Array HTML output", () => {
         created: 1700000000,
       },
     ]);
+    // Card layout
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Untagged");
+    expect(html).toContain("1 entries");
+    // Styled table
+    expect(html).toContain('class="ocas-table"');
+    expect(html).toContain("<th>KEY</th>");
     expect(html).toContain("env");
     expect(html).toContain("prod");
   });
 
-  test("empty arrays render an empty state", async () => {
+  test("empty arrays render card with '0 entries' header and empty tbody", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
-    const html = await renderOutput(store, aliases, "@ocas/output/list", []);
-    // Should still produce valid HTML (maybe an empty table body)
-    expect(html).toContain("<table");
+    // Test all 7 table templates with empty arrays
+    const tableTemplates: Array<[string, string]> = [
+      ["@ocas/output/list", "Nodes"],
+      ["@ocas/output/list-meta", "Meta-Schemas"],
+      ["@ocas/output/list-schema", "Schemas"],
+      ["@ocas/output/var-list", "Variables"],
+      ["@ocas/output/tag", "Tags"],
+      ["@ocas/output/untag", "Untagged"],
+      ["@ocas/output/template-list", "Templates"],
+    ];
+
+    for (const [alias, title] of tableTemplates) {
+      const html = await renderOutput(store, aliases, alias, []);
+      // Card layout preserved
+      expect(html).toContain('class="ocas-card"');
+      // Header shows 0 entries
+      expect(html).toContain("0 entries");
+      expect(html).toContain(title);
+      // Table structure preserved
+      expect(html).toContain("<table");
+      // No data rows (tbody is empty)
+      const tbodyMatch = html.match(/<tbody>([\s\S]*?)<\/tbody>/);
+      expect(tbodyMatch).not.toBeNull();
+      if (tbodyMatch) {
+        expect(tbodyMatch[1]).not.toContain("<tr>");
+      }
+    }
   });
 });
 
@@ -926,6 +1011,45 @@ describe("Shared CSS via static templates", () => {
     expect(css).toContain(".ocas-badge-error");
     expect(css).toContain(".ocas-badge-warn");
     expect(css).toContain(".ocas-template-content");
+  });
+
+  test("CSS includes table styles per design guide", async () => {
+    const { store, aliases, stringHash } = setup();
+    await registerOutputTemplates(store);
+
+    const putHash = aliases["@ocas/output/put"];
+    if (!putHash) throw new Error("@ocas/output/put not found");
+
+    const staticVar = store.var.get(
+      `@ocas/template-static/html/${putHash}`,
+      stringHash,
+    );
+    if (!staticVar) throw new Error("Static var not found");
+
+    const node = store.cas.get(staticVar.value);
+    if (!node) throw new Error("Static node not found");
+
+    const parsed = JSON.parse(node.payload as string);
+    const css: string = parsed.css;
+
+    // Table styles from design guide
+    expect(css).toContain(".ocas-table");
+    expect(css).toContain("border-collapse: collapse");
+    expect(css).toContain("width: 100%");
+    // th: uppercase, small font, muted, letter-spacing
+    expect(css).toContain("text-transform: uppercase");
+    expect(css).toContain("letter-spacing: 0.05em");
+    expect(css).toContain("var(--ocas-text-muted)");
+    // td: left-aligned, padded, bottom border
+    expect(css).toContain("0.4rem 0.75rem");
+    expect(css).toContain("var(--ocas-card-border)");
+    // last row no bottom border
+    expect(css).toContain("tr:last-child td");
+    // Column-specific styles
+    expect(css).toContain(".ocas-col-name");
+    expect(css).toContain("font-weight: 500");
+    expect(css).toContain(".ocas-col-time");
+    expect(css).toContain("tabular-nums");
   });
 
   test("CSS is injected into <style> blocks in the rendered document", async () => {
