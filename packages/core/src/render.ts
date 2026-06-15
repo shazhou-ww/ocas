@@ -113,7 +113,19 @@ export async function renderAsync(
       } else {
         // Fallback to YAML rendering
         const visited = new Set<Hash>();
-        content = renderNode(store, hash, resolution, decay, epsilon, visited);
+        const yamlContent = renderNode(
+          store,
+          hash,
+          resolution,
+          decay,
+          epsilon,
+          visited,
+        );
+        // For HTML format, wrap YAML in <pre><code> tags
+        content =
+          format === "html"
+            ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
+            : yamlContent;
         encounteredTypes = new Set<Hash>();
       }
     } else {
@@ -125,7 +137,19 @@ export async function renderAsync(
   } catch {
     // Fall through to YAML rendering
     const visited = new Set<Hash>();
-    content = renderNode(store, hash, resolution, decay, epsilon, visited);
+    const yamlContent = renderNode(
+      store,
+      hash,
+      resolution,
+      decay,
+      epsilon,
+      visited,
+    );
+    // For HTML format, wrap YAML in <pre><code> tags
+    content =
+      format === "html"
+        ? `<pre><code>${escapeHtml(yamlContent)}</code></pre>`
+        : yamlContent;
     encounteredTypes = new Set<Hash>();
   }
 
@@ -136,6 +160,10 @@ export async function renderAsync(
   const composeTemplate = await findComposeTemplate(store, format);
 
   if (composeTemplate === null) {
+    // For HTML format without compose template, use builtin HTML shell
+    if (format === "html") {
+      return applyBuiltinHtmlShell(content);
+    }
     // Identity compose: no template, return content as-is
     return content;
   }
@@ -478,4 +506,33 @@ function indent(text: string, spaces: number): string {
     .split("\n")
     .map((line) => (line ? prefix + line : line))
     .join("\n");
+}
+
+/**
+ * Escape HTML special characters for safe inclusion in HTML
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Apply builtin HTML document shell (used when no custom compose template is registered)
+ */
+function applyBuiltinHtmlShell(content: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCAS Render</title>
+</head>
+<body>
+  ${content}
+</body>
+</html>`;
 }
