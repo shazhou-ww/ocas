@@ -133,50 +133,69 @@ const HTML_TEMPLATES: ReadonlyArray<
       "</div></div>",
   ],
 
-  // Structured templates (key-value)
+  // Structured templates (card layout with key-value grid)
   [
     "@ocas/output/get",
-    '<dl class="ocas-output ocas-get">' +
-      '<dt>type</dt><dd><code class="ocas-hash">{{ payload.type }}</code></dd>' +
-      "<dt>timestamp</dt><dd>{{ payload.timestamp }}</dd>" +
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Node Detail</div>' +
+      '<dl class="ocas-dl">' +
+      '<dt>Type</dt><dd><code class="ocas-hash">{{ payload.type }}</code></dd>' +
+      "<dt>Timestamp</dt><dd>{{ payload.timestamp }}</dd>" +
       "{% if payload.tags %}" +
-      '<dt>tags</dt><dd><ul>{% for t in payload.tags %}<li>{{ t.key }}{% if t.value %}:{{ t.value }}{% endif %} → <code class="ocas-hash">{{ t.target }}</code></li>{% endfor %}</ul></dd>' +
+      "<dt>Tags</dt><dd>{% for t in payload.tags %}" +
+      '<span class="ocas-tag">{{ t.key }}{% if t.value %}:{{ t.value }}{% endif %}</span>' +
+      "{% endfor %}</dd>" +
       "{% endif %}" +
-      "</dl>",
+      "</dl>" +
+      "</div>",
   ],
   [
     "@ocas/output/var-set",
-    '<dl class="ocas-output ocas-var-set">' +
-      "<dt>name</dt><dd>{{ payload.name }}</dd>" +
-      '<dt>schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd>' +
-      '<dt>value</dt><dd><code class="ocas-hash">{{ payload.value }}</code></dd>' +
-      "</dl>",
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Variable Set</div>' +
+      '<dl class="ocas-dl">' +
+      "<dt>Name</dt><dd>{{ payload.name }}</dd>" +
+      '<dt>Schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd>' +
+      '<dt>Value</dt><dd><code class="ocas-hash">{{ payload.value }}</code></dd>' +
+      "</dl>" +
+      "</div>",
   ],
   [
     "@ocas/output/var-get",
-    '<dl class="ocas-output ocas-var-get">' +
-      "<dt>name</dt><dd>{{ payload.name }}</dd>" +
-      '<dt>schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd>' +
-      '<dt>value</dt><dd><code class="ocas-hash">{{ payload.value }}</code></dd>' +
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Variable Detail</div>' +
+      '<dl class="ocas-dl">' +
+      "<dt>Name</dt><dd>{{ payload.name }}</dd>" +
+      '<dt>Schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd>' +
+      '<dt>Value</dt><dd><code class="ocas-hash">{{ payload.value }}</code></dd>' +
       "{% if payload.valueTags %}" +
-      "<dt>tags</dt><dd><ul>{% for t in payload.valueTags %}<li>{{ t.key }}{% if t.value %}:{{ t.value }}{% endif %}</li>{% endfor %}</ul></dd>" +
+      "<dt>Tags</dt><dd>{% for t in payload.valueTags %}" +
+      '<span class="ocas-tag">{{ t.key }}{% if t.value %}:{{ t.value }}{% endif %}</span>' +
+      "{% endfor %}</dd>" +
       "{% endif %}" +
-      "</dl>",
+      "</dl>" +
+      "</div>",
   ],
   [
     "@ocas/output/var-delete",
-    '<dl class="ocas-output ocas-var-delete">' +
-      "<dt>name</dt><dd>{{ payload.name }}</dd>" +
-      '<dt>schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd>' +
-      '<dt>value</dt><dd><code class="ocas-hash">{{ payload.value }}</code></dd>' +
-      "</dl>",
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Variable Deleted</div>' +
+      '<dl class="ocas-dl">' +
+      "<dt>Name</dt><dd>{{ payload.name }}</dd>" +
+      '<dt>Schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd>' +
+      '<dt>Value</dt><dd><code class="ocas-hash">{{ payload.value }}</code></dd>' +
+      "</dl>" +
+      "</div>",
   ],
   [
     "@ocas/output/template-set",
-    '<dl class="ocas-output ocas-template-set">' +
-      '<dt>schema</dt><dd><code class="ocas-hash">{{ payload.schemaHash }}</code></dd>' +
-      '<dt>content</dt><dd><code class="ocas-hash">{{ payload.contentHash }}</code></dd>' +
-      "</dl>",
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Template Set</div>' +
+      '<dl class="ocas-dl">' +
+      '<dt>Schema</dt><dd><code class="ocas-hash">{{ payload.schemaHash }}</code></dd>' +
+      '<dt>Content</dt><dd><code class="ocas-hash">{{ payload.contentHash }}</code></dd>' +
+      "</dl>" +
+      "</div>",
   ],
 
   // List/Array templates
@@ -298,6 +317,15 @@ const OUTPUT_CSS = [
   ".ocas-hash { font-family: var(--ocas-mono); font-size: 0.9em;" +
     " background: var(--ocas-hash-bg); color: var(--ocas-hash-text);" +
     " padding: 0.15em 0.4em; border-radius: 4px; word-break: break-all; }",
+
+  // Key-value grid
+  ".ocas-dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin: 0; padding: 1rem; }",
+  ".ocas-dl dt { font-weight: 600; color: var(--ocas-text-muted); }",
+  ".ocas-dl dd { margin: 0; }",
+
+  // Tag pills
+  ".ocas-tag { display: inline-block; background: #eff6ff; color: #2563eb;" +
+    " font-size: 0.85em; padding: 0.1em 0.5em; border-radius: 9999px; margin-right: 0.25rem; }",
 
   // Status badges
   ".ocas-badge { display: inline-block; padding: 0.25em 0.75em; border-radius: 9999px;" +

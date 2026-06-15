@@ -321,10 +321,12 @@ describe("Simple value HTML output", () => {
   });
 });
 
-// ── Structured HTML templates ───────────────────────────────────────
+// ── Structured HTML templates (card layout) ────────────────────────
 
-describe("Structured HTML output", () => {
-  test("get: renders type, timestamp, payload as key-value pairs", async () => {
+describe("Structured HTML output — card layout", () => {
+  // ── @ocas/output/get ──
+
+  test("get: wrapped in ocas-card with 'Node Detail' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -333,12 +335,27 @@ describe("Structured HTML output", () => {
       payload: { name: "test" },
       timestamp: 1700000000,
     });
-    expect(html).toContain("<code");
-    expect(html).toContain("AAAAAAAAAAAAA");
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain('<div class="ocas-card-header">Node Detail</div>');
+  });
+
+  test("get: uses ocas-dl grid with Type and Timestamp rows", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/get", {
+      type: "AAAAAAAAAAAAA",
+      payload: { name: "test" },
+      timestamp: 1700000000,
+    });
+    expect(html).toContain('<dl class="ocas-dl">');
+    expect(html).toContain("<dt>Type</dt>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain("<dt>Timestamp</dt>");
     expect(html).toContain("1700000000");
   });
 
-  test("get: includes tags when present", async () => {
+  test("get: renders tag pills with ocas-tag class when tags present", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -355,11 +372,39 @@ describe("Structured HTML output", () => {
         },
       ],
     });
-    expect(html).toContain("env");
-    expect(html).toContain("prod");
+    expect(html).toContain("<dt>Tags</dt>");
+    expect(html).toContain('<span class="ocas-tag">env:prod</span>');
   });
 
-  test("var-set: renders name, schema, value as key-value pairs", async () => {
+  test("get: omits tags row when no tags present", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/get", {
+      type: "AAAAAAAAAAAAA",
+      payload: "hello",
+      timestamp: 1700000000,
+    });
+    expect(html).not.toContain("<dt>Tags</dt>");
+    expect(html).not.toContain('<span class="ocas-tag">');
+  });
+
+  test("get: renders tag key only when value is absent", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/get", {
+      type: "AAAAAAAAAAAAA",
+      payload: "hello",
+      timestamp: 1700000000,
+      tags: [{ key: "pinned", target: "BBBBBBBBBBBBB", created: 1700000000 }],
+    });
+    expect(html).toContain('<span class="ocas-tag">pinned</span>');
+  });
+
+  // ── @ocas/output/var-set ──
+
+  test("var-set: wrapped in ocas-card with 'Variable Set' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -368,13 +413,63 @@ describe("Structured HTML output", () => {
       schema: "AAAAAAAAAAAAA",
       value: "BBBBBBBBBBBBB",
     });
-    expect(html).toContain("@test/my-var");
-    expect(html).toContain("<code");
-    expect(html).toContain("AAAAAAAAAAAAA");
-    expect(html).toContain("BBBBBBBBBBBBB");
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain('<div class="ocas-card-header">Variable Set</div>');
   });
 
-  test("var-get: renders name, schema, value, and valueTags", async () => {
+  test("var-set: uses ocas-dl grid with Name, Schema, Value rows", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/var-set", {
+      name: "@test/my-var",
+      schema: "AAAAAAAAAAAAA",
+      value: "BBBBBBBBBBBBB",
+    });
+    expect(html).toContain('<dl class="ocas-dl">');
+    expect(html).toContain("<dt>Name</dt>");
+    expect(html).toContain("@test/my-var");
+    expect(html).toContain("<dt>Schema</dt>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain("<dt>Value</dt>");
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+  });
+
+  // ── @ocas/output/var-get ──
+
+  test("var-get: wrapped in ocas-card with 'Variable Detail' header", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/var-get", {
+      name: "@test/v",
+      schema: "AAAAAAAAAAAAA",
+      value: "BBBBBBBBBBBBB",
+    });
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain(
+      '<div class="ocas-card-header">Variable Detail</div>',
+    );
+  });
+
+  test("var-get: uses ocas-dl grid with Name, Schema, Value rows", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/var-get", {
+      name: "@test/v",
+      schema: "AAAAAAAAAAAAA",
+      value: "BBBBBBBBBBBBB",
+    });
+    expect(html).toContain('<dl class="ocas-dl">');
+    expect(html).toContain("<dt>Name</dt>");
+    expect(html).toContain("<dt>Schema</dt>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain("<dt>Value</dt>");
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+  });
+
+  test("var-get: renders tag pills with ocas-tag when valueTags present", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -391,12 +486,26 @@ describe("Structured HTML output", () => {
         },
       ],
     });
-    expect(html).toContain("@test/v");
-    expect(html).toContain("status");
-    expect(html).toContain("active");
+    expect(html).toContain("<dt>Tags</dt>");
+    expect(html).toContain('<span class="ocas-tag">status:active</span>');
   });
 
-  test("var-delete: renders deleted variable info", async () => {
+  test("var-get: omits tags row when no valueTags present", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/var-get", {
+      name: "@test/v",
+      schema: "AAAAAAAAAAAAA",
+      value: "BBBBBBBBBBBBB",
+    });
+    expect(html).not.toContain("<dt>Tags</dt>");
+    expect(html).not.toContain('<span class="ocas-tag">');
+  });
+
+  // ── @ocas/output/var-delete ──
+
+  test("var-delete: wrapped in ocas-card with 'Variable Deleted' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -405,11 +514,33 @@ describe("Structured HTML output", () => {
       schema: "AAAAAAAAAAAAA",
       value: "BBBBBBBBBBBBB",
     });
-    expect(html).toContain("@test/deleted");
-    expect(html).toContain("<code");
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain(
+      '<div class="ocas-card-header">Variable Deleted</div>',
+    );
   });
 
-  test("template-set: renders schema hash and content hash", async () => {
+  test("var-delete: uses ocas-dl grid with Name, Schema, Value rows", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/var-delete", {
+      name: "@test/deleted",
+      schema: "AAAAAAAAAAAAA",
+      value: "BBBBBBBBBBBBB",
+    });
+    expect(html).toContain('<dl class="ocas-dl">');
+    expect(html).toContain("<dt>Name</dt>");
+    expect(html).toContain("@test/deleted");
+    expect(html).toContain("<dt>Schema</dt>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain("<dt>Value</dt>");
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+  });
+
+  // ── @ocas/output/template-set ──
+
+  test("template-set: wrapped in ocas-card with 'Template Set' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -417,14 +548,57 @@ describe("Structured HTML output", () => {
       store,
       aliases,
       "@ocas/output/template-set",
-      {
-        schemaHash: "AAAAAAAAAAAAA",
-        contentHash: "BBBBBBBBBBBBB",
-      },
+      { schemaHash: "AAAAAAAAAAAAA", contentHash: "BBBBBBBBBBBBB" },
     );
-    expect(html).toContain("AAAAAAAAAAAAA");
-    expect(html).toContain("BBBBBBBBBBBBB");
-    expect(html).toContain("<code");
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain('<div class="ocas-card-header">Template Set</div>');
+  });
+
+  test("template-set: uses ocas-dl grid with Schema and Content rows", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(
+      store,
+      aliases,
+      "@ocas/output/template-set",
+      { schemaHash: "AAAAAAAAAAAAA", contentHash: "BBBBBBBBBBBBB" },
+    );
+    expect(html).toContain('<dl class="ocas-dl">');
+    expect(html).toContain("<dt>Schema</dt>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain("<dt>Content</dt>");
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+  });
+});
+
+// ── Card CSS in static templates ───────────────────────────────────
+
+describe("Card CSS in static templates", () => {
+  test("static CSS includes ocas-card styles", async () => {
+    const { store, aliases, stringHash } = setup();
+    await registerOutputTemplates(store);
+
+    const getHash = aliases["@ocas/output/get"];
+    if (!getHash) throw new Error("@ocas/output/get not found");
+
+    const staticVar = store.var.get(
+      `@ocas/template-static/html/${getHash}`,
+      stringHash,
+    );
+    expect(staticVar).not.toBeNull();
+    if (staticVar) {
+      const node = store.cas.get(staticVar.value);
+      expect(node).not.toBeNull();
+      if (node) {
+        const parsed = JSON.parse(node.payload as string);
+        expect(parsed.css).toContain(".ocas-card");
+        expect(parsed.css).toContain(".ocas-card-header");
+        expect(parsed.css).toContain(".ocas-dl");
+        expect(parsed.css).toContain(".ocas-hash");
+        expect(parsed.css).toContain(".ocas-tag");
+      }
+    }
   });
 });
 
