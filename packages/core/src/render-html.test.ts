@@ -82,7 +82,7 @@ describe("HTML Render MVP", () => {
   });
 
   describe("YAML fallback for missing HTML templates", () => {
-    test("falls back to YAML in <pre><code> when no HTML template exists", async () => {
+    test("falls back to structured HTML when no HTML template exists", async () => {
       const store = createMemoryStore();
       bootstrap(store);
 
@@ -94,22 +94,22 @@ describe("HTML Render MVP", () => {
         },
       });
 
-      // NO HTML template registered - should fall back
+      // NO HTML template registered - should fall back to structured HTML
       const personHash = store.cas.put(personSchema, { name: "Bob", age: 25 });
 
       // Render with HTML format
       const output = await renderAsync(store, personHash, { format: "html" });
 
-      // Should contain YAML wrapped in <pre><code>
-      expect(output).toContain("<pre><code>");
-      expect(output).toContain("name:");
+      // Should contain structured HTML (not <pre><code> YAML)
+      expect(output).toContain("<ul");
+      expect(output).toContain("name");
       expect(output).toContain("Bob");
-      expect(output).toContain("age:");
+      expect(output).toContain("age");
       expect(output).toContain("25");
-      expect(output).toContain("</code></pre>");
+      expect(output).not.toContain("<pre><code>");
     });
 
-    test("fallback escapes HTML special characters in YAML content", async () => {
+    test("fallback escapes HTML special characters in values", async () => {
       const store = createMemoryStore();
       bootstrap(store);
 
@@ -127,9 +127,9 @@ describe("HTML Render MVP", () => {
 
       const output = await renderAsync(store, hash, { format: "html" });
 
-      // Angle brackets should be escaped in the fallback YAML
+      // Angle brackets should be escaped in the fallback
       expect(output).toContain("&lt;script&gt;");
-      expect(output).not.toContain("<script>");
+      expect(output).not.toContain("<script>alert");
     });
   });
 
@@ -224,7 +224,7 @@ describe("HTML Render MVP", () => {
     });
   });
 
-  test("fallback YAML is also wrapped in builtin HTML shell", async () => {
+  test("fallback structured HTML is also wrapped in builtin HTML shell", async () => {
     const store = createMemoryStore();
     bootstrap(store);
 
@@ -242,8 +242,10 @@ describe("HTML Render MVP", () => {
     expect(output).toContain("<!DOCTYPE html>");
     expect(output).toContain("<html");
     expect(output).toContain("<body>");
-    expect(output).toContain("<pre><code>");
-    expect(output).toContain("</code></pre>");
+    // Should use structured HTML, not <pre><code>
+    expect(output).toContain("<ul");
+    expect(output).toContain("fallback");
+    expect(output).not.toContain("<pre><code>");
     expect(output).toContain("</body>");
     expect(output).toContain("</html>");
   });

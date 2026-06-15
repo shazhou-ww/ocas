@@ -1,5 +1,5 @@
 ---
-scenario: "Pipe render with object-valued envelope and --format html falls back to YAML in <pre><code> when no template"
+scenario: "Pipe render with object-valued envelope and --format html falls back to structured HTML when no template"
 feature: render
 tags: [render, pipe, html, fallback, object]
 ---
@@ -17,6 +17,6 @@ tags: [render, pipe, html, fallback, object]
 
 ## Then
 
-- Output falls back to YAML wrapped in `<pre><code>` tags (consistent with `renderAsync` fallback for stored nodes)
+- Output falls back to structured HTML (`<ul>`, `<span>`, etc.) instead of YAML in `<pre><code>` tags
 - The builtin HTML shell is applied (wrapping with `<!DOCTYPE html>`, `<head>`, `<body>`)
 - Output is a complete HTML document, not raw YAML

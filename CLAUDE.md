@@ -124,7 +124,7 @@ Any keys are allowed; `css` and `js` are convention consumed by the builtin HTML
 | Condition | Result |
 |-----------|--------|
 | No instance template for type | YAML text fallback |
-| HTML format + no template | YAML in `<pre><code>` |
+| HTML format + no template | Structured HTML (`<ul>`, `<details>`, `<span>`) |
 | No compose template + HTML | Builtin HTML5 document shell |
 | No compose template + text | Identity (content as-is) |
 

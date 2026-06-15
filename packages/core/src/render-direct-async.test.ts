@@ -82,7 +82,7 @@ describe("renderDirectAsync — object-valued envelope rendering with templates"
     expect(output).toContain("count: 42");
   });
 
-  test("falls back to YAML in <pre><code> with HTML shell when no html template", async () => {
+  test("falls back to structured HTML with HTML shell when no html template", async () => {
     // Spec: render-pipe-object-html-fallback-no-template
     const store = createMemoryStore();
     bootstrap(store);
@@ -105,9 +105,11 @@ describe("renderDirectAsync — object-valued envelope rendering with templates"
     expect(output).toContain("<!DOCTYPE html>");
     expect(output).toContain("<head>");
     expect(output).toContain("<body>");
-    // YAML should be wrapped in <pre><code>
-    expect(output).toContain("<pre><code>");
-    expect(output).toContain("key: value");
+    // Should use structured HTML, not <pre><code> YAML
+    expect(output).toContain("<ul");
+    expect(output).toContain("key");
+    expect(output).toContain("value");
+    expect(output).not.toContain("<pre><code>");
   });
 
   test("hash-valued envelope still uses renderAsync (backward compat)", async () => {

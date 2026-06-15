@@ -229,7 +229,7 @@ If no compose template is registered:
 | Condition | Result |
 |-----------|--------|
 | No instance template for type | YAML text rendering |
-| HTML format + no instance template | YAML wrapped in `<pre><code>` |
+| HTML format + no instance template | Structured HTML (`<ul>`, `<details>`, `<span>`) |
 | No compose template (HTML) | Builtin HTML5 document shell |
 | No compose template (text) | Identity (no wrapping) |
 
