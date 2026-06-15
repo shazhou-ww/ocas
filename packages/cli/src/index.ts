@@ -24,7 +24,7 @@ import {
   putSchema,
   refs,
   renderAsync,
-  renderDirect,
+  renderDirectAsync,
   TagLabelConflictError,
   VariableNotFoundError,
   validate,
@@ -143,8 +143,13 @@ async function out(data: unknown, store?: Store): Promise<void> {
   ) {
     const envelope = data as { type: string; value: unknown };
     const s = store ?? (await openStore());
-    // renderDirect is synchronous; passing null options uses defaults.
-    const output = renderDirect(envelope.type as Hash, envelope.value, s, null);
+    const format = typeof flags.format === "string" ? flags.format : undefined;
+    const output = await renderDirectAsync(
+      envelope.type as Hash,
+      envelope.value,
+      s,
+      { ...(format !== undefined && { format }) },
+    );
     process.stdout.write(`${output}\n`);
     return;
   }
@@ -618,7 +623,8 @@ async function cmdRender(args: string[]): Promise<void> {
 
       // If the envelope value is a hash string (e.g. from `put` output),
       // resolve it through renderAsync to apply templates and expand refs.
-      // Otherwise, use renderDirect for inline rendering of the envelope value.
+      // Otherwise, use renderDirectAsync to run the full template + compose
+      // pipeline on the in-memory value.
       if (typeof envelope.value === "string" && isHash(envelope.value)) {
         const output = await renderAsync(store, envelope.value as Hash, {
           ...(resolution !== undefined && { resolution }),
@@ -628,7 +634,7 @@ async function cmdRender(args: string[]): Promise<void> {
         });
         process.stdout.write(`${output}\n`);
       } else {
-        const output = renderDirect(
+        const output = await renderDirectAsync(
           envelope.type as Hash,
           envelope.value,
           store,
