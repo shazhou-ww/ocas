@@ -201,11 +201,19 @@ const HTML_TEMPLATES: ReadonlyArray<
   // List/Array templates
   [
     "@ocas/output/refs",
-    '<ul class="ocas-output ocas-refs">{% for ref in payload %}<li><code class="ocas-hash">{{ ref }}</code></li>{% endfor %}</ul>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">References · {{ payload.size }} entries</div>' +
+      '<div class="ocas-card-body"><ul class="ocas-hash-list">' +
+      '{% for ref in payload %}<li><code class="ocas-hash">{{ ref }}</code></li>{% endfor %}' +
+      "</ul></div></div>",
   ],
   [
     "@ocas/output/walk",
-    '<ul class="ocas-output ocas-walk">{% for item in payload %}<li><code class="ocas-hash">{{ item }}</code></li>{% endfor %}</ul>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Walk · {{ payload.size }} entries</div>' +
+      '<div class="ocas-card-body"><ul class="ocas-hash-list">' +
+      '{% for item in payload %}<li><code class="ocas-hash">{{ item }}</code></li>{% endfor %}' +
+      "</ul></div></div>",
   ],
   [
     "@ocas/output/list",
@@ -253,9 +261,17 @@ const HTML_TEMPLATES: ReadonlyArray<
   ],
   [
     "@ocas/output/var-history",
-    '<div class="ocas-output ocas-var-history">' +
-      '<dl><dt>name</dt><dd>{{ payload.name }}</dd><dt>schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd></dl>' +
-      '<ol class="ocas-history-values" start="0">{% for v in payload.values %}<li><code class="ocas-hash">{{ v }}</code></li>{% endfor %}</ol>' +
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Variable History</div>' +
+      '<dl class="ocas-dl">' +
+      "<dt>Name</dt><dd>{{ payload.name }}</dd>" +
+      '<dt>Schema</dt><dd><code class="ocas-hash">{{ payload.schema }}</code></dd>' +
+      "</dl>" +
+      '<ol class="ocas-history-values" start="0">' +
+      "{% for v in payload.values %}<li>" +
+      '<code class="ocas-hash">{{ v }}</code>' +
+      '{% if forloop.first %} <span class="ocas-current-marker">← current</span>{% endif %}' +
+      "</li>{% endfor %}</ol>" +
       "</div>",
   ],
   [
@@ -291,39 +307,53 @@ const HTML_TEMPLATES: ReadonlyArray<
       "</tr>{% endfor %}</tbody></table></div>",
   ],
 
-  // Statistics templates (card-style)
+  // Statistics templates (card + stats-grid)
   [
     "@ocas/output/gc",
-    '<div class="ocas-output ocas-gc ocas-stats">' +
-      "<dl>" +
-      '<dt>total</dt><dd class="ocas-metric">{{ payload.total }}</dd>' +
-      '<dt>reachable</dt><dd class="ocas-metric">{{ payload.reachable }}</dd>' +
-      '<dt>collected</dt><dd class="ocas-metric">{{ payload.collected }}</dd>' +
-      '<dt>scanned</dt><dd class="ocas-metric">{{ payload.scanned }}</dd>' +
-      "</dl>" +
-      "</div>",
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Garbage Collection</div>' +
+      '<div class="ocas-card-body"><div class="ocas-stats-grid">' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.total }}</span>' +
+      '<span class="ocas-stat-label">total nodes</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.reachable }}</span>' +
+      '<span class="ocas-stat-label">reachable</span></div>' +
+      '<div class="ocas-stat">' +
+      '{% if payload.collected == 0 %}<span class="ocas-stat-value ocas-success">{{ payload.collected }}</span>' +
+      '{% else %}<span class="ocas-stat-value">{{ payload.collected }}</span>{% endif %}' +
+      '<span class="ocas-stat-label">collected</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.scanned }}</span>' +
+      '<span class="ocas-stat-label">scanned</span></div>' +
+      "</div></div></div>",
   ],
   [
     "@ocas/output/export",
-    '<div class="ocas-output ocas-export ocas-stats">' +
-      "<dl>" +
-      '<dt>nodes</dt><dd class="ocas-metric">{{ payload.nodes }}</dd>' +
-      '<dt>vars</dt><dd class="ocas-metric">{{ payload.vars }}</dd>' +
-      '<dt>tags</dt><dd class="ocas-metric">{{ payload.tags }}</dd>' +
-      "</dl>" +
-      "</div>",
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Export Summary</div>' +
+      '<div class="ocas-card-body"><div class="ocas-stats-grid">' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.nodes }}</span>' +
+      '<span class="ocas-stat-label">nodes</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.vars }}</span>' +
+      '<span class="ocas-stat-label">variables</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.tags }}</span>' +
+      '<span class="ocas-stat-label">tags</span></div>' +
+      "</div></div></div>",
   ],
   [
     "@ocas/output/import",
-    '<div class="ocas-output ocas-import ocas-stats">' +
-      "<dl>" +
-      '<dt>nodes imported</dt><dd class="ocas-metric">{{ payload.nodes.imported }}</dd>' +
-      '<dt>nodes skipped</dt><dd class="ocas-metric">{{ payload.nodes.skipped }}</dd>' +
-      '<dt>vars created</dt><dd class="ocas-metric">{{ payload.vars.created }}</dd>' +
-      '<dt>vars updated</dt><dd class="ocas-metric">{{ payload.vars.updated }}</dd>' +
-      '<dt>tags</dt><dd class="ocas-metric">{{ payload.tags }}</dd>' +
-      "</dl>" +
-      "</div>",
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Import Summary</div>' +
+      '<div class="ocas-card-body"><div class="ocas-stats-grid">' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.nodes.imported }}</span>' +
+      '<span class="ocas-stat-label">nodes imported</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.nodes.skipped }}</span>' +
+      '<span class="ocas-stat-label">nodes skipped</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.vars.created }}</span>' +
+      '<span class="ocas-stat-label">variables created</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.vars.updated }}</span>' +
+      '<span class="ocas-stat-label">variables updated</span></div>' +
+      '<div class="ocas-stat"><span class="ocas-stat-value">{{ payload.tags }}</span>' +
+      '<span class="ocas-stat-label">tags</span></div>' +
+      "</div></div></div>",
   ],
 ];
 
@@ -386,6 +416,26 @@ const OUTPUT_CSS = [
   ".ocas-template-content { white-space: pre-wrap; background: var(--ocas-hash-bg);" +
     " font-family: var(--ocas-mono); padding: 0.75rem; border-radius: 4px;" +
     " overflow-x: auto; margin: 0; }",
+
+  // Stats grid (gc, export, import)
+  ".ocas-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }",
+  ".ocas-stat { display: flex; flex-direction: column; }",
+  ".ocas-stat-value { font-size: var(--ocas-metric-size); font-weight: 600;" +
+    " font-variant-numeric: tabular-nums; }",
+  ".ocas-stat-label { color: var(--ocas-text-muted); font-size: 0.85em; }",
+
+  // Semantic highlights
+  ".ocas-success { color: var(--ocas-green); }",
+  ".ocas-zero { color: var(--ocas-text-muted); }",
+
+  // Hash list (refs, walk)
+  ".ocas-hash-list { list-style: none; padding: 0; margin: 0; }",
+  ".ocas-hash-list li { padding: 0.25rem 0; }",
+
+  // History (var-history)
+  ".ocas-history-values { padding-left: 1.5rem; margin: 0; }",
+  ".ocas-history-values li { padding: 0.25rem 0; }",
+  ".ocas-current-marker { color: var(--ocas-green); font-size: 0.85em; font-weight: 500; }",
 
   // Legacy .ocas-output support (structured/list/stats templates)
   ".ocas-output { font-family: var(--ocas-font); line-height: 1.5; max-width: 48rem; }",

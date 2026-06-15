@@ -47,15 +47,17 @@ describe("renderDirectAsync — object-valued envelope rendering with templates"
       format: "html",
     });
 
-    // Should use HTML template
-    expect(output).toContain('<div class="ocas-output ocas-gc ocas-stats">');
+    // Should use HTML template (new card layout)
+    expect(output).toContain('<div class="ocas-card">');
+    expect(output).toContain("Garbage Collection");
+    expect(output).toContain('class="ocas-stats-grid"');
     // Compose phase should apply builtin HTML shell
     expect(output).toContain("<!DOCTYPE html>");
     expect(output).toContain("<head>");
     expect(output).toContain("<body>");
     // Static CSS should be included
     expect(output).toContain("<style>");
-    expect(output).toContain(".ocas-output");
+    expect(output).toContain(".ocas-card");
   });
 
   test("falls back to YAML when no template exists (text format)", async () => {

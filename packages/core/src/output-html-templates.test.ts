@@ -605,20 +605,25 @@ describe("Card CSS in static templates", () => {
 // ── List/Array HTML templates ───────────────────────────────────────
 
 describe("List/Array HTML output", () => {
-  test("refs: renders hash list with <code> items", async () => {
+  test("refs: card layout with 'References · N entries' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
     const html = await renderOutput(store, aliases, "@ocas/output/refs", [
       "AAAAAAAAAAAAA",
       "BBBBBBBBBBBBB",
+      "CCCCCCCCCCCCC",
     ]);
-    expect(html).toContain("AAAAAAAAAAAAA");
-    expect(html).toContain("BBBBBBBBBBBBB");
-    expect(html).toContain("<code");
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain("References");
+    expect(html).toContain("3");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+    expect(html).toContain('<code class="ocas-hash">CCCCCCCCCCCCC</code>');
+    expect(html).not.toContain('class="ocas-output');
   });
 
-  test("walk: renders walked node list", async () => {
+  test("walk: card layout with 'Walk · N entries' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -626,8 +631,12 @@ describe("List/Array HTML output", () => {
       "AAAAAAAAAAAAA",
       "BBBBBBBBBBBBB",
     ]);
-    expect(html).toContain("AAAAAAAAAAAAA");
-    expect(html).toContain("BBBBBBBBBBBBB");
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain("Walk");
+    expect(html).toContain("2");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+    expect(html).not.toContain('class="ocas-output');
   });
 
   test("list: card layout with 'Nodes' header, styled table, hash pills, time columns", async () => {
@@ -724,7 +733,7 @@ describe("List/Array HTML output", () => {
     expect(html).toContain("@test/b");
   });
 
-  test("var-history: renders name + list of historical values", async () => {
+  test("var-history: card layout with 'Variable History' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -733,14 +742,55 @@ describe("List/Array HTML output", () => {
       aliases,
       "@ocas/output/var-history",
       {
-        name: "@test/var",
+        name: "@user/myvar",
         schema: "AAAAAAAAAAAAA",
-        values: ["BBBBBBBBBBBBB", "CCCCCCCCCCCCC"],
+        values: ["CCCCCCCCCCCCC", "BBBBBBBBBBBBB"],
       },
     );
-    expect(html).toContain("@test/var");
-    expect(html).toContain("BBBBBBBBBBBBB");
-    expect(html).toContain("CCCCCCCCCCCCC");
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain("Variable History");
+    expect(html).not.toContain('class="ocas-output');
+  });
+
+  test("var-history: meta section with ocas-dl key-value grid", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(
+      store,
+      aliases,
+      "@ocas/output/var-history",
+      {
+        name: "@user/myvar",
+        schema: "AAAAAAAAAAAAA",
+        values: ["CCCCCCCCCCCCC", "BBBBBBBBBBBBB"],
+      },
+    );
+    expect(html).toContain('<dl class="ocas-dl">');
+    expect(html).toContain("<dt>Name</dt>");
+    expect(html).toContain("@user/myvar");
+    expect(html).toContain("<dt>Schema</dt>");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
+  });
+
+  test("var-history: ordered list with current marker on index 0", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(
+      store,
+      aliases,
+      "@ocas/output/var-history",
+      {
+        name: "@user/myvar",
+        schema: "AAAAAAAAAAAAA",
+        values: ["CCCCCCCCCCCCC", "BBBBBBBBBBBBB"],
+      },
+    );
+    expect(html).toContain("<ol");
+    expect(html).toContain('<code class="ocas-hash">CCCCCCCCCCCCC</code>');
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+    expect(html).toContain("current");
   });
 
   test("template-list: card layout with 'Templates' header, 2-column table", async () => {
@@ -865,8 +915,8 @@ describe("List/Array HTML output", () => {
 
 // ── Statistics HTML templates ───────────────────────────────────────
 
-describe("Statistics HTML output", () => {
-  test("gc: renders total, reachable, collected, scanned as metrics", async () => {
+describe("Statistics HTML output — card + stats-grid", () => {
+  test("gc: card layout with 'Garbage Collection' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -876,18 +926,49 @@ describe("Statistics HTML output", () => {
       collected: 20,
       scanned: 5,
     });
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain("Garbage Collection");
+    expect(html).not.toContain('class="ocas-output');
+    expect(html).not.toContain("ocas-gc");
+  });
+
+  test("gc: stats grid with 4 stat blocks (value + label)", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/gc", {
+      total: 100,
+      reachable: 80,
+      collected: 20,
+      scanned: 5,
+    });
+    expect(html).toContain('class="ocas-stats-grid"');
+    expect(html).toContain('class="ocas-stat-value"');
+    expect(html).toContain('class="ocas-stat-label"');
     expect(html).toContain("100");
     expect(html).toContain("80");
     expect(html).toContain("20");
     expect(html).toContain("5");
-    // Metrics should have labels
-    expect(html).toMatch(/total/i);
+    expect(html).toMatch(/total nodes/i);
     expect(html).toMatch(/reachable/i);
     expect(html).toMatch(/collected/i);
     expect(html).toMatch(/scanned/i);
   });
 
-  test("export: renders nodes, vars, tags counts", async () => {
+  test("gc: collected=0 gets ocas-success class", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/gc", {
+      total: 50,
+      reachable: 50,
+      collected: 0,
+      scanned: 3,
+    });
+    expect(html).toContain("ocas-success");
+  });
+
+  test("export: card layout with 'Export Summary' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -896,12 +977,33 @@ describe("Statistics HTML output", () => {
       vars: 15,
       tags: 8,
     });
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain("Export Summary");
+    expect(html).not.toContain('class="ocas-output');
+    expect(html).not.toContain("ocas-export");
+  });
+
+  test("export: stats grid with 3 stat blocks (value + label)", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/export", {
+      nodes: 42,
+      vars: 15,
+      tags: 8,
+    });
+    expect(html).toContain('class="ocas-stats-grid"');
+    expect(html).toContain('class="ocas-stat-value"');
+    expect(html).toContain('class="ocas-stat-label"');
     expect(html).toContain("42");
     expect(html).toContain("15");
     expect(html).toContain("8");
+    expect(html).toMatch(/nodes/i);
+    expect(html).toMatch(/variables/i);
+    expect(html).toMatch(/tags/i);
   });
 
-  test("import: renders nested import stats", async () => {
+  test("import: card layout with 'Import Summary' header", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -910,11 +1012,34 @@ describe("Statistics HTML output", () => {
       vars: { created: 3, updated: 1 },
       tags: 5,
     });
+    expect(html).toContain('<div class="ocas-card">');
+    expect(html).toContain("Import Summary");
+    expect(html).not.toContain('class="ocas-output');
+    expect(html).not.toContain("ocas-import");
+  });
+
+  test("import: stats grid with 5 stat blocks (value + label)", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/import", {
+      nodes: { imported: 10, skipped: 2 },
+      vars: { created: 3, updated: 1 },
+      tags: 5,
+    });
+    expect(html).toContain('class="ocas-stats-grid"');
+    expect(html).toContain('class="ocas-stat-value"');
+    expect(html).toContain('class="ocas-stat-label"');
     expect(html).toContain("10");
     expect(html).toContain("2");
     expect(html).toContain("3");
     expect(html).toContain("1");
     expect(html).toContain("5");
+    expect(html).toMatch(/nodes imported/i);
+    expect(html).toMatch(/nodes skipped/i);
+    expect(html).toMatch(/variables created/i);
+    expect(html).toMatch(/variables updated/i);
+    expect(html).toMatch(/tags/i);
   });
 });
 
@@ -1050,6 +1175,59 @@ describe("Shared CSS via static templates", () => {
     expect(css).toContain("font-weight: 500");
     expect(css).toContain(".ocas-col-time");
     expect(css).toContain("tabular-nums");
+  });
+
+  test("CSS includes stats-grid, stat-value, stat-label rules", async () => {
+    const { store, aliases, stringHash } = setup();
+    await registerOutputTemplates(store);
+
+    const putHash = aliases["@ocas/output/put"];
+    if (!putHash) throw new Error("@ocas/output/put not found");
+
+    const staticVar = store.var.get(
+      `@ocas/template-static/html/${putHash}`,
+      stringHash,
+    );
+    if (!staticVar) throw new Error("Static var not found");
+
+    const node = store.cas.get(staticVar.value);
+    if (!node) throw new Error("Static node not found");
+
+    const parsed = JSON.parse(node.payload as string);
+    const css: string = parsed.css;
+
+    expect(css).toContain(".ocas-stats-grid");
+    expect(css).toContain("grid-template-columns");
+    expect(css).toContain("repeat(2, 1fr)");
+    expect(css).toContain(".ocas-stat-value");
+    expect(css).toContain("var(--ocas-metric-size)");
+    expect(css).toContain("font-weight: 600");
+    expect(css).toContain("tabular-nums");
+    expect(css).toContain(".ocas-stat-label");
+    expect(css).toContain("var(--ocas-text-muted)");
+  });
+
+  test("CSS includes ocas-success and ocas-zero rules", async () => {
+    const { store, aliases, stringHash } = setup();
+    await registerOutputTemplates(store);
+
+    const putHash = aliases["@ocas/output/put"];
+    if (!putHash) throw new Error("@ocas/output/put not found");
+
+    const staticVar = store.var.get(
+      `@ocas/template-static/html/${putHash}`,
+      stringHash,
+    );
+    if (!staticVar) throw new Error("Static var not found");
+
+    const node = store.cas.get(staticVar.value);
+    if (!node) throw new Error("Static node not found");
+
+    const parsed = JSON.parse(node.payload as string);
+    const css: string = parsed.css;
+
+    expect(css).toContain(".ocas-success");
+    expect(css).toContain(".ocas-zero");
   });
 
   test("CSS is injected into <style> blocks in the rendered document", async () => {
