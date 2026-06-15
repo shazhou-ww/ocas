@@ -114,27 +114,124 @@ ocas untag @myapp/config status                # remove tag/label by key
 
 ### Templates & Rendering
 
+#### CLI Commands
+
 ```bash
-ocas template set <schema-hash> --inline "{{ payload.title }}"
-ocas template set <schema-hash> tpl.html --format html
-ocas template set <schema-hash> static.json --format html --static
-ocas template get <schema-hash>
-ocas template get <schema-hash> --format html
-ocas template list
-ocas template list --format html
-ocas template delete <schema-hash>
-ocas template delete <schema-hash> --format html
+ocas template set <type> --inline "{{ title }} [{{ done }}]"       # text template from string
+ocas template set <type> tpl.liquid                                # text template from file
+ocas template set <type> tpl.html --format html                    # HTML instance template
+ocas template set <type> static.json --format html --static        # HTML static template (CSS/JS)
+ocas template get <type> [--format html]                           # read template
+ocas template list [--format html]                                 # list templates
+ocas template delete <type> [--format html]                        # delete template
 ocas render <hash>                     # render with template (or YAML fallback)
 ocas render <hash> --format html       # render as self-contained HTML5 document
 ocas render --pipe/-p                  # render from piped envelope
 ocas get <hash> -r                     # inline render shorthand
 ```
 
-All template subcommands accept `--format html` to operate on the HTML template namespace (`@ocas/template/html/<type-hash>`). Without `--format`, commands default to the text namespace (`@ocas/template/text/<type-hash>`). The `--static` flag (requires `--format html`) stores static assets (CSS/JS) at `@ocas/template-static/html/<type-hash>`.
-
 Render options: `--resolution N` (max depth), `--decay N` (depth decay), `--epsilon N` (cutoff), `--format <text|html>` (output format, default: text).
 
-HTML templates use the `@ocas/template/html/<type-hash>` namespace. Types without an HTML template fall back to YAML in `<pre><code>` tags. A builtin HTML document shell wraps output; override it with `@ocas/template-compose/html`.
+#### Three Template Namespaces
+
+Templates live in three parallel namespaces, each stored as a variable:
+
+| Namespace | Variable pattern | Purpose |
+|-----------|-----------------|---------|
+| Instance | `@ocas/template/{format}/{type-hash}` | Per-type LiquidJS template → content fragment |
+| Static | `@ocas/template-static/{format}/{type-hash}` | Per-type assets as JSON (`{"css": "...", "js": "..."}`) |
+| Compose | `@ocas/template-compose/{format}` | Document shell wrapping content + collected statics |
+
+`{format}` is `text` (default) or `html`. `{type-hash}` is the schema hash of the node type.
+
+#### How Rendering Works (Map-Reduce-Compose)
+
+`ocas render <hash> --format html` runs a 3-phase pipeline:
+
+1. **Map** — DFS-render each node using its instance template; collect all encountered type hashes.
+2. **Reduce** — For each encountered type, look up its static template → parse JSON → deduplicate by type (10 person nodes = 1 CSS block).
+3. **Compose** — Wrap rendered `content` + collected `type_statics[]` in the compose template. If no compose template is registered, a builtin HTML5 shell is used.
+
+For `text` format, compose is identity (no wrapping) unless a user compose template exists.
+
+#### Writing Instance Templates (LiquidJS)
+
+Instance templates are LiquidJS. Inside them, these variables are available:
+
+| Variable | Description |
+|----------|-------------|
+| `{{ title }}`, `{{ done }}`, ... | Payload properties auto-spread as top-level vars |
+| `{{ payload }}` | The raw payload object |
+| `{{ payload.title }}` | Equivalent to `{{ title }}` (explicit access) |
+| `{{ hash }}` | The node's CAS hash |
+| `{{ type }}` | The node's type hash |
+| `{{ timestamp }}` | The node's creation timestamp |
+| `{{ resolution }}` | Current resolution level (for conditional detail) |
+| `{{ epsilon }}` | Resolution cutoff threshold |
+
+**Reserved keys** (`hash`, `type`, `resolution`, `epsilon`, `payload`, `timestamp`) always win over payload properties of the same name.
+
+**Recursive rendering** — use the custom `{% render %}` tag to expand `cas_ref` fields:
+
+```liquid
+<h2>{{ name }}</h2>
+<p>Author: {% render author %}</p>
+<p>Related: {% render related, decay: 0.3 %}</p>
+```
+
+`{% render field_name %}` resolves the field's hash and recursively renders it with the same format. Optional `decay:` overrides the resolution decay for that branch.
+
+#### Writing Static Templates (CSS/JS)
+
+Static templates produce a JSON object with string values. The keys `css` and `js` are convention consumed by the builtin HTML shell:
+
+```json
+{"css": ".person { font-family: sans-serif; padding: 1rem; }", "js": ""}
+```
+
+Set via: `ocas template set <type-hash> static.json --format html --static`
+
+These are **deduplicated by type** — if 10 nodes of the same type appear, the CSS/JS is injected only once.
+
+#### Writing Compose Templates
+
+Compose templates wrap the entire rendered output. Variables available:
+
+| Variable | Description |
+|----------|-------------|
+| `{{ content }}` | All rendered node content from the map phase |
+| `type_statics` | Array of `{ type_hash, css, js, ... }` from the reduce phase |
+
+Example custom compose template:
+
+```liquid
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  {% for ts in type_statics %}{% if ts.css %}<style>{{ ts.css }}</style>{% endif %}{% endfor %}
+</head>
+<body>
+  {{ content }}
+  {% for ts in type_statics %}{% if ts.js %}<script>{{ ts.js }}</script>{% endif %}{% endfor %}
+</body>
+</html>
+```
+
+Set via: `ocas var set @ocas/template-compose/html <hash>` (store the template string as a `@ocas/string` node first).
+
+If no compose template is registered:
+- **HTML format** → builtin HTML5 document shell (CSS in `<head>`, JS before `</body>`)
+- **Text format** → identity (content returned as-is)
+
+#### Fallback Behavior
+
+| Condition | Result |
+|-----------|--------|
+| No instance template for type | YAML text rendering |
+| HTML format + no instance template | YAML wrapped in `<pre><code>` |
+| No compose template (HTML) | Builtin HTML5 document shell |
+| No compose template (text) | Identity (no wrapping) |
 
 ### Garbage Collection
 
