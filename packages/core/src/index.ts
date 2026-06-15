@@ -36,6 +36,7 @@ export {
   render,
   renderAsync,
   renderDirect,
+  type TypeStaticsEntry,
 } from "./render.js";
 export type {
   JSONSchema,

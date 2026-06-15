@@ -16,6 +16,12 @@ export type RenderOptions = {
  */
 export type TypeStatics = Record<string, string>;
 
+/**
+ * Array-form entry for compose templates: type_hash + all slot values.
+ * This shape is iterable by LiquidJS {% for ts in type_statics %}.
+ */
+export type TypeStaticsEntry = { type_hash: Hash } & TypeStatics;
+
 const DEFAULT_RESOLUTION = 1.0;
 const DEFAULT_DECAY = 0.5;
 const DEFAULT_EPSILON = 0.01;
@@ -154,7 +160,14 @@ export async function renderAsync(
   }
 
   // Phase 2: Reduce - Collect type statics
-  const typeStatics = await collectTypeStatics(store, encounteredTypes, format);
+  const typeStaticsRecord = await collectTypeStatics(
+    store,
+    encounteredTypes,
+    format,
+  );
+
+  // Convert Record<Hash, TypeStatics> → TypeStaticsEntry[] for LiquidJS iteration
+  const typeStaticsArray = typeStaticsRecordToArray(typeStaticsRecord);
 
   // Phase 3: Compose - Apply compose template or identity
   const composeTemplate = await findComposeTemplate(store, format);
@@ -162,7 +175,7 @@ export async function renderAsync(
   if (composeTemplate === null) {
     // For HTML format without compose template, use builtin HTML shell
     if (format === "html") {
-      return applyBuiltinHtmlShell(content);
+      return applyBuiltinHtmlShell(content, typeStaticsArray);
     }
     // Identity compose: no template, return content as-is
     return content;
@@ -177,7 +190,7 @@ export async function renderAsync(
 
   const composedOutput = await engine.parseAndRender(composeTemplate, {
     content,
-    type_statics: typeStatics,
+    type_statics: typeStaticsArray,
   });
 
   return composedOutput;
@@ -521,18 +534,51 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Apply builtin HTML document shell (used when no custom compose template is registered)
+ * Convert Record<Hash, TypeStatics> to TypeStaticsEntry[] for LiquidJS iteration.
+ * Types that had no static template are excluded from the result (they have no entry
+ * in the record).
  */
-function applyBuiltinHtmlShell(content: string): string {
+function typeStaticsRecordToArray(
+  record: Record<Hash, TypeStatics>,
+): TypeStaticsEntry[] {
+  return Object.entries(record).map(([typeHash, slots]) => ({
+    type_hash: typeHash as Hash,
+    ...slots,
+  }));
+}
+
+/**
+ * Apply builtin HTML document shell (used when no custom compose template is registered).
+ * Injects CSS as <style> blocks in <head> and JS as <script> blocks at end of <body>.
+ */
+function applyBuiltinHtmlShell(
+  content: string,
+  typeStatics: TypeStaticsEntry[],
+): string {
+  // Build CSS <style> blocks for <head>
+  const styleBlocks = typeStatics
+    .filter((ts) => ts.css)
+    .map((ts) => `  <style>${ts.css}</style>`)
+    .join("\n");
+
+  // Build JS <script> blocks for bottom of <body>
+  const scriptBlocks = typeStatics
+    .filter((ts) => ts.js)
+    .map((ts) => `  <script>${ts.js}</script>`)
+    .join("\n");
+
+  const headExtras = styleBlocks ? `\n${styleBlocks}` : "";
+  const bodyExtras = scriptBlocks ? `\n${scriptBlocks}` : "";
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OCAS Render</title>
+  <title>OCAS Render</title>${headExtras}
 </head>
 <body>
-  ${content}
+  ${content}${bodyExtras}
 </body>
 </html>`;
 }
