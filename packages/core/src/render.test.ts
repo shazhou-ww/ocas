@@ -1150,3 +1150,191 @@ describe("Suite 10: Missing Root Hash Error Handling (Issue #53)", () => {
     expect(output).toContain("cas:");
   });
 });
+
+describe("Suite 11: Map-Reduce-Compose Pipeline", () => {
+  test("11.1 Compose template invoked with content and type_statics", async () => {
+    const store = createMemoryStore();
+    bootstrap(store);
+
+    // Create type T1 with static template
+    const t1Schema = putSchema(store, {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+    });
+
+    const t1Hash = store.cas.put(t1Schema, { value: "test1" });
+
+    // Register static template for T1
+    const stringSchema = putSchema(store, { type: "string" });
+    const staticTemplate = `{"slot1": "value1"}`;
+    const staticTemplateHash = store.cas.put(stringSchema, staticTemplate);
+    store.var.set(`@ocas/template/text/${t1Schema}/static`, staticTemplateHash);
+
+    // Register T1 template
+    const t1Template = "T1: {{ value }}";
+    const t1TemplateHash = store.cas.put(stringSchema, t1Template);
+    store.var.set(`@ocas/template/text/${t1Schema}`, t1TemplateHash);
+
+    // Register compose template
+    const composeTemplate = `COMPOSED:
+{{ content }}
+STATICS: {{ type_statics | json }}`;
+    const composeTemplateHash = store.cas.put(stringSchema, composeTemplate);
+    store.var.set("@ocas/template/text/_compose", composeTemplateHash);
+
+    // Render
+    const output = await renderAsync(store, t1Hash, { format: "text" });
+
+    // Verify compose template was invoked
+    expect(output).toContain("COMPOSED:");
+    expect(output).toContain("T1: test1"); // DFS content
+    expect(output).toContain("STATICS:"); // Type statics section
+    expect(output).toContain(`"${t1Schema}"`); // Type hash in statics
+    expect(output).toContain("slot1"); // Static slot name
+    expect(output).toContain("value1"); // Static slot value
+  });
+
+  test("11.2 Identity compose when no compose template exists", async () => {
+    const store = createMemoryStore();
+    bootstrap(store);
+
+    // Create a simple type with template
+    const schema = putSchema(store, {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+      },
+    });
+
+    const hash = store.cas.put(schema, { name: "Alice" });
+
+    // Register template for the type
+    const stringSchema = putSchema(store, { type: "string" });
+    const template = "Name: {{ name }}";
+    const templateHash = store.cas.put(stringSchema, template);
+    store.var.set(`@ocas/template/text/${schema}`, templateHash);
+
+    // NO compose template registered
+
+    // Render
+    const output = await renderAsync(store, hash, { format: "text" });
+
+    // Verify output is just the DFS content (identity compose)
+    expect(output).toBe("Name: Alice");
+    expect(output).not.toContain("COMPOSED:"); // No compose wrapper
+    expect(output).not.toContain("STATICS:"); // No statics
+  });
+
+  test("11.3 Format defaults to 'text'", async () => {
+    const store = createMemoryStore();
+    bootstrap(store);
+
+    // Create a simple type with text template
+    const schema = putSchema(store, {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+    });
+
+    const hash = store.cas.put(schema, { value: "test" });
+
+    // Register template in text namespace
+    const stringSchema = putSchema(store, { type: "string" });
+    const template = "Value: {{ value }}";
+    const templateHash = store.cas.put(stringSchema, template);
+    store.var.set(`@ocas/template/text/${schema}`, templateHash);
+
+    // Render without format option
+    const output = await renderAsync(store, hash);
+
+    // Should use text format by default
+    expect(output).toBe("Value: test");
+  });
+
+  test("11.4 Type collection across multiple nodes", async () => {
+    const store = createMemoryStore();
+    bootstrap(store);
+
+    // Create two different types
+    const t1Schema = putSchema(store, {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+    });
+
+    const t2Schema = putSchema(store, {
+      type: "object",
+      properties: {
+        count: { type: "number" },
+      },
+    });
+
+    const t1Hash = store.cas.put(t1Schema, { value: "test" });
+    const t2Hash = store.cas.put(t2Schema, { count: 42 });
+
+    // Create root that references both
+    const rootSchema = putSchema(store, {
+      type: "object",
+      properties: {
+        child1: { type: "string", format: "ocas_ref" },
+        child2: { type: "string", format: "ocas_ref" },
+      },
+    });
+
+    const rootHash = store.cas.put(rootSchema, {
+      child1: t1Hash,
+      child2: t2Hash,
+    });
+
+    // Register templates
+    const stringSchema = putSchema(store, { type: "string" });
+
+    const t1Template = "T1: {{ value }}";
+    const t1TemplateHash = store.cas.put(stringSchema, t1Template);
+    store.var.set(`@ocas/template/text/${t1Schema}`, t1TemplateHash);
+
+    const t2Template = "T2: {{ count }}";
+    const t2TemplateHash = store.cas.put(stringSchema, t2Template);
+    store.var.set(`@ocas/template/text/${t2Schema}`, t2TemplateHash);
+
+    const rootTemplate = `Root:
+{% render child1 %}
+{% render child2 %}`;
+    const rootTemplateHash = store.cas.put(stringSchema, rootTemplate);
+    store.var.set(`@ocas/template/text/${rootSchema}`, rootTemplateHash);
+
+    // Register static templates for both types
+    const t1StaticTemplate = `{"css": ".t1 { color: red; }"}`;
+    const t1StaticHash = store.cas.put(stringSchema, t1StaticTemplate);
+    store.var.set(`@ocas/template/text/${t1Schema}/static`, t1StaticHash);
+
+    const t2StaticTemplate = `{"css": ".t2 { color: blue; }"}`;
+    const t2StaticHash = store.cas.put(stringSchema, t2StaticTemplate);
+    store.var.set(`@ocas/template/text/${t2Schema}/static`, t2StaticHash);
+
+    // Register compose template
+    const composeTemplate = `=== PAGE ===
+{{ content }}
+=== STYLES ===
+{% for entry in type_statics %}{{ entry[1].css }}
+{% endfor %}`;
+    const composeTemplateHash = store.cas.put(stringSchema, composeTemplate);
+    store.var.set("@ocas/template/text/_compose", composeTemplateHash);
+
+    // Render
+    const output = await renderAsync(store, rootHash, { format: "text" });
+
+    // Verify all types were collected and their statics rendered
+    expect(output).toContain("=== PAGE ===");
+    expect(output).toContain("Root:");
+    expect(output).toContain("T1: test");
+    expect(output).toContain("T2: 42");
+    expect(output).toContain("=== STYLES ===");
+    expect(output).toContain(".t1 { color: red; }");
+    expect(output).toContain(".t2 { color: blue; }");
+  });
+});
