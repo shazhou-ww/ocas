@@ -141,12 +141,22 @@ ocas render <hash> [--format html]                        # render with template
 
 Default format is `text`; `--format html` switches to the `html` namespace.
 
+#### HTML Output Design Guide
+
+All `@ocas/output/*` HTML templates must follow the design system in `cards/html-output-design-guide.md`.
+Key rules: card container with human-readable header, `ocas-` class namespace, design tokens via CSS
+custom properties, semantic colors (green/red/yellow), hash always in `<code class="ocas-hash">`,
+tables with uppercase muted headers, stats in 2×N grid with large numbers.
+
+When modifying any HTML template in `output-templates.ts`, read the design guide card first.
+
 #### Key Source Files
 
 - `packages/core/src/render.ts` — `renderAsync()`, map-reduce-compose pipeline, builtin HTML shell
 - `packages/core/src/liquid-render.ts` — LiquidJS engine, `{% render %}` tag, template discovery
-- `packages/core/src/output-templates.ts` — builtin CLI output templates (text and HTML formats)
+- `packages/core/src/output-templates.ts` — builtin CLI output templates (text + HTML)
 - `packages/cli/src/index.ts` — `template` CLI commands, `--format` flag handling
+- `cards/html-output-design-guide.md` — HTML design tokens, component patterns, conventions
 
 ### Internal Dependencies
 
