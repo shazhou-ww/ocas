@@ -165,7 +165,9 @@ ocas var set @ocas/template/html/<type-hash> <template-node-hash>
 
 HTML template discovery uses the `@ocas/template/html/<type-hash>` namespace.
 When no HTML template is registered for a type, the node's payload is rendered
-as YAML inside `<pre><code>` tags. A builtin HTML document shell wraps the
+as structured, browsable HTML — objects and arrays become `<ul>` lists, CAS refs
+become collapsible `<details>/<summary>` elements, and primitives are inline
+`<span>`/`<code>` elements. A builtin HTML document shell wraps the
 output in a minimal `<!DOCTYPE html>` page. To customize the document shell,
 register a compose template at `@ocas/template-compose/html`.
 

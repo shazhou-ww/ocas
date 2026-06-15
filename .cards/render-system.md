@@ -73,6 +73,6 @@ The `--format html` option produces complete, self-contained HTML5 documents. Ke
 
 - **Template namespace**: HTML templates are discovered at `@ocas/template/html/<type-hash>`, separate from text templates (`@ocas/template/text/<type-hash>`).
 - **LiquidJS rendering**: HTML instance templates are rendered with LiquidJS, receiving `{ payload, hash, type, resolution, ... }` as context variables.
-- **YAML fallback**: Types without an HTML template fall back to YAML rendered inside `<pre><code>` tags, with HTML special characters escaped.
+- **Structured HTML fallback**: Types without an HTML template fall back to structured, browsable HTML — `<ul>` for objects/arrays, `<details>/<summary>` for CAS refs, `<span>`/`<code>` for primitives — with HTML special characters escaped.
 - **Builtin HTML shell**: When no custom compose template exists, a builtin `<!DOCTYPE html>` document shell wraps the rendered content with `<html>`, `<head>`, and `<body>` elements.
 - **Custom compose override**: Register `@ocas/template/html/_compose` to replace the builtin shell with a custom LiquidJS template. The template receives `{{ content }}` and `{{ type_statics }}`.
