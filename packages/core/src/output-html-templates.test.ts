@@ -180,10 +180,10 @@ describe("Missing text templates filled", () => {
   });
 });
 
-// ── Simple value HTML templates ─────────────────────────────────────
+// ── Simple value HTML templates (card layout) ──────────────────────
 
 describe("Simple value HTML output", () => {
-  test("put: renders hash in <code>", async () => {
+  test("put: card with 'Stored' header and hash pill", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -193,20 +193,35 @@ describe("Simple value HTML output", () => {
       "@ocas/output/put",
       "AAAAAAAAAAAAA",
     );
-    expect(html).toContain("<code");
-    expect(html).toContain("AAAAAAAAAAAAA");
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Stored");
+    expect(html).toContain('<code class="ocas-hash">AAAAAAAAAAAAA</code>');
     expect(html).not.toContain("<table");
+    expect(html).not.toContain("<dl");
   });
 
-  test("has: renders boolean result", async () => {
+  test("has: card with 'Exists' header and green badge for true", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
     const html = await renderOutput(store, aliases, "@ocas/output/has", true);
-    expect(html).toContain("true");
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Exists");
+    expect(html).toContain("ocas-badge");
+    expect(html).toContain("ocas-badge-ok");
+    expect(html).toContain("yes");
   });
 
-  test("hash: renders hash in <code>", async () => {
+  test("has: red badge for false", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(store, aliases, "@ocas/output/has", false);
+    expect(html).toContain("ocas-badge-error");
+    expect(html).toContain("no");
+  });
+
+  test("hash: card with 'Hash' header and hash pill", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -216,26 +231,51 @@ describe("Simple value HTML output", () => {
       "@ocas/output/hash",
       "BBBBBBBBBBBBB",
     );
-    expect(html).toContain("<code");
-    expect(html).toContain("BBBBBBBBBBBBB");
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Hash");
+    expect(html).toContain('<code class="ocas-hash">BBBBBBBBBBBBB</code>');
+    expect(html).not.toContain("<table");
+    expect(html).not.toContain("<dl");
   });
 
-  test("verify: renders status with clear indication", async () => {
+  test("verify: card with 'Verify' header and tri-state badges", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
-    for (const status of ["ok", "corrupted", "invalid"] as const) {
-      const html = await renderOutput(
-        store,
-        aliases,
-        "@ocas/output/verify",
-        status,
-      );
-      expect(html).toContain(status);
-    }
+    // ok → green badge
+    const okHtml = await renderOutput(
+      store,
+      aliases,
+      "@ocas/output/verify",
+      "ok",
+    );
+    expect(okHtml).toContain('class="ocas-card"');
+    expect(okHtml).toContain("Verify");
+    expect(okHtml).toContain("ocas-badge-ok");
+    expect(okHtml).toContain("ok");
+
+    // corrupted → red badge
+    const corruptedHtml = await renderOutput(
+      store,
+      aliases,
+      "@ocas/output/verify",
+      "corrupted",
+    );
+    expect(corruptedHtml).toContain("ocas-badge-error");
+    expect(corruptedHtml).toContain("corrupted");
+
+    // invalid → yellow badge
+    const invalidHtml = await renderOutput(
+      store,
+      aliases,
+      "@ocas/output/verify",
+      "invalid",
+    );
+    expect(invalidHtml).toContain("ocas-badge-warn");
+    expect(invalidHtml).toContain("invalid");
   });
 
-  test("template-get: renders raw template content in <pre>", async () => {
+  test("template-get: card with 'Template' header and <pre> code block", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -245,11 +285,12 @@ describe("Simple value HTML output", () => {
       "@ocas/output/template-get",
       "<div>{{ name }}</div>",
     );
-    expect(html).toContain("<pre");
-    // Template tags should be shown as text, not interpreted
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Template");
+    expect(html).toContain('<pre class="ocas-template-content">');
   });
 
-  test("template-delete: renders deletion result", async () => {
+  test("template-delete: card with 'Template Deleted' header and green badge for deleted", async () => {
     const { store, aliases } = setup();
     await registerOutputTemplates(store);
 
@@ -259,7 +300,24 @@ describe("Simple value HTML output", () => {
       "@ocas/output/template-delete",
       { deleted: true },
     );
-    expect(html).toContain("true");
+    expect(html).toContain('class="ocas-card"');
+    expect(html).toContain("Template Deleted");
+    expect(html).toContain("ocas-badge-ok");
+    expect(html).toContain("deleted");
+  });
+
+  test("template-delete: red badge when not found", async () => {
+    const { store, aliases } = setup();
+    await registerOutputTemplates(store);
+
+    const html = await renderOutput(
+      store,
+      aliases,
+      "@ocas/output/template-delete",
+      { deleted: false },
+    );
+    expect(html).toContain("ocas-badge-error");
+    expect(html).toContain("not found");
   });
 });
 
@@ -629,6 +687,71 @@ describe("Shared CSS via static templates", () => {
         expect(typeof parsed.css).toBe("string");
       }
     }
+  });
+
+  test("CSS includes design-guide tokens as custom properties", async () => {
+    const { store, aliases, stringHash } = setup();
+    await registerOutputTemplates(store);
+
+    const putHash = aliases["@ocas/output/put"];
+    if (!putHash) throw new Error("@ocas/output/put not found");
+
+    const staticVar = store.var.get(
+      `@ocas/template-static/html/${putHash}`,
+      stringHash,
+    );
+    if (!staticVar) throw new Error("Static var not found");
+
+    const node = store.cas.get(staticVar.value);
+    if (!node) throw new Error("Static node not found");
+
+    const parsed = JSON.parse(node.payload as string);
+    const css: string = parsed.css;
+
+    // Design tokens from guide
+    expect(css).toContain("--ocas-font");
+    expect(css).toContain("--ocas-mono");
+    expect(css).toContain("--ocas-card-bg");
+    expect(css).toContain("--ocas-card-border");
+    expect(css).toContain("--ocas-card-shadow");
+    expect(css).toContain("--ocas-card-radius");
+    expect(css).toContain("--ocas-text");
+    expect(css).toContain("--ocas-text-muted");
+    expect(css).toContain("--ocas-green");
+    expect(css).toContain("--ocas-red");
+    expect(css).toContain("--ocas-yellow");
+    expect(css).toContain("--ocas-hash-bg");
+    expect(css).toContain("--ocas-hash-text");
+  });
+
+  test("CSS includes card, hash, badge, and template-content styles", async () => {
+    const { store, aliases, stringHash } = setup();
+    await registerOutputTemplates(store);
+
+    const putHash = aliases["@ocas/output/put"];
+    if (!putHash) throw new Error("@ocas/output/put not found");
+
+    const staticVar = store.var.get(
+      `@ocas/template-static/html/${putHash}`,
+      stringHash,
+    );
+    if (!staticVar) throw new Error("Static var not found");
+
+    const node = store.cas.get(staticVar.value);
+    if (!node) throw new Error("Static node not found");
+
+    const parsed = JSON.parse(node.payload as string);
+    const css: string = parsed.css;
+
+    // Component styles
+    expect(css).toContain(".ocas-card");
+    expect(css).toContain(".ocas-card-header");
+    expect(css).toContain(".ocas-hash");
+    expect(css).toContain(".ocas-badge");
+    expect(css).toContain(".ocas-badge-ok");
+    expect(css).toContain(".ocas-badge-error");
+    expect(css).toContain(".ocas-badge-warn");
+    expect(css).toContain(".ocas-template-content");
   });
 
   test("CSS is injected into <style> blocks in the rendered document", async () => {

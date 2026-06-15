@@ -82,30 +82,55 @@ const TEXT_TEMPLATES: ReadonlyArray<
 const HTML_TEMPLATES: ReadonlyArray<
   readonly [alias: string, template: string]
 > = [
-  // Simple value templates
+  // Simple value templates (card layout)
   [
     "@ocas/output/put",
-    '<div class="ocas-output ocas-put"><code class="ocas-hash">{{ payload }}</code></div>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Stored</div>' +
+      '<div class="ocas-card-body"><code class="ocas-hash">{{ payload }}</code></div>' +
+      "</div>",
   ],
   [
     "@ocas/output/has",
-    '<div class="ocas-output ocas-has"><span class="ocas-bool">{{ payload }}</span></div>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Exists</div>' +
+      '<div class="ocas-card-body">' +
+      '{% if payload %}<span class="ocas-badge ocas-badge-ok">✓ yes</span>' +
+      '{% else %}<span class="ocas-badge ocas-badge-error">✗ no</span>{% endif %}' +
+      "</div></div>",
   ],
   [
     "@ocas/output/hash",
-    '<div class="ocas-output ocas-hash-result"><code class="ocas-hash">{{ payload }}</code></div>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Hash</div>' +
+      '<div class="ocas-card-body"><code class="ocas-hash">{{ payload }}</code></div>' +
+      "</div>",
   ],
   [
     "@ocas/output/verify",
-    '<div class="ocas-output ocas-verify ocas-verify-{{ payload }}"><span class="ocas-status">{{ payload }}</span></div>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Verify</div>' +
+      '<div class="ocas-card-body">' +
+      '{% if payload == "ok" %}<span class="ocas-badge ocas-badge-ok">✓ ok</span>' +
+      '{% elsif payload == "corrupted" %}<span class="ocas-badge ocas-badge-error">✗ corrupted</span>' +
+      '{% else %}<span class="ocas-badge ocas-badge-warn">⚠ invalid</span>{% endif %}' +
+      "</div></div>",
   ],
   [
     "@ocas/output/template-get",
-    '<div class="ocas-output ocas-template-get"><pre class="ocas-template-content">{{ payload }}</pre></div>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Template</div>' +
+      '<div class="ocas-card-body"><pre class="ocas-template-content">{{ payload }}</pre></div>' +
+      "</div>",
   ],
   [
     "@ocas/output/template-delete",
-    '<div class="ocas-output ocas-template-delete"><span class="ocas-label">deleted:</span> <span class="ocas-bool">{{ payload.deleted }}</span></div>',
+    '<div class="ocas-card">' +
+      '<div class="ocas-card-header">Template Deleted</div>' +
+      '<div class="ocas-card-body">' +
+      '{% if payload.deleted %}<span class="ocas-badge ocas-badge-ok">✓ deleted</span>' +
+      '{% else %}<span class="ocas-badge ocas-badge-error">✗ not found</span>{% endif %}' +
+      "</div></div>",
   ],
 
   // Structured templates (key-value)
@@ -239,24 +264,67 @@ const HTML_TEMPLATES: ReadonlyArray<
 
 /**
  * Shared CSS for output HTML templates.
- * Uses `.ocas-` scoped class names to avoid conflicts.
+ * Uses `.ocas-` scoped class names and CSS custom properties per the design guide.
  */
 const OUTPUT_CSS = [
-  ".ocas-output { font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; max-width: 48rem; }",
-  ".ocas-hash { font-family: ui-monospace, monospace; font-size: 0.9em; background: #f3f4f6; padding: 0.1em 0.3em; border-radius: 3px; }",
+  // Design tokens
+  ":root {" +
+    " --ocas-font: system-ui, -apple-system, 'Segoe UI', sans-serif;" +
+    " --ocas-mono: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;" +
+    " --ocas-bg: #fafafa;" +
+    " --ocas-card-bg: #fff;" +
+    " --ocas-card-border: #e5e7eb;" +
+    " --ocas-card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);" +
+    " --ocas-card-radius: 8px;" +
+    " --ocas-text: #1f2937;" +
+    " --ocas-text-muted: #6b7280;" +
+    " --ocas-green: #16a34a;" +
+    " --ocas-red: #dc2626;" +
+    " --ocas-yellow: #d97706;" +
+    " --ocas-hash-bg: #f3f4f6;" +
+    " --ocas-hash-text: #374151;" +
+    " --ocas-metric-size: 1.75rem;" +
+    " }",
+
+  // Card container
+  ".ocas-card { background: var(--ocas-card-bg); border: 1px solid var(--ocas-card-border);" +
+    " box-shadow: var(--ocas-card-shadow); border-radius: var(--ocas-card-radius);" +
+    " font-family: var(--ocas-font); color: var(--ocas-text); line-height: 1.5; max-width: 48rem; }",
+  ".ocas-card-header { font-weight: 600; padding: 0.75rem 1rem;" +
+    " border-bottom: 1px solid var(--ocas-card-border); }",
+  ".ocas-card-body { padding: 1rem; }",
+
+  // Hash pill
+  ".ocas-hash { font-family: var(--ocas-mono); font-size: 0.9em;" +
+    " background: var(--ocas-hash-bg); color: var(--ocas-hash-text);" +
+    " padding: 0.15em 0.4em; border-radius: 4px; word-break: break-all; }",
+
+  // Status badges
+  ".ocas-badge { display: inline-block; padding: 0.25em 0.75em; border-radius: 9999px;" +
+    " font-weight: 500; font-size: 0.9em; }",
+  ".ocas-badge-ok { background: #dcfce7; color: var(--ocas-green); }",
+  ".ocas-badge-error { background: #fee2e2; color: var(--ocas-red); }",
+  ".ocas-badge-warn { background: #fef3c7; color: var(--ocas-yellow); }",
+
+  // Template content code block
+  ".ocas-template-content { white-space: pre-wrap; background: var(--ocas-hash-bg);" +
+    " font-family: var(--ocas-mono); padding: 0.75rem; border-radius: 4px;" +
+    " overflow-x: auto; margin: 0; }",
+
+  // Legacy .ocas-output support (structured/list/stats templates)
+  ".ocas-output { font-family: var(--ocas-font); line-height: 1.5; max-width: 48rem; }",
   ".ocas-output dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin: 0; }",
-  ".ocas-output dt { font-weight: 600; color: #4b5563; }",
+  ".ocas-output dt { font-weight: 600; color: var(--ocas-text-muted); }",
   ".ocas-output dd { margin: 0; }",
   ".ocas-output table { border-collapse: collapse; width: 100%; }",
-  ".ocas-output th, .ocas-output td { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid #e5e7eb; }",
-  ".ocas-output th { font-weight: 600; color: #4b5563; background: #f9fafb; }",
+  ".ocas-output th, .ocas-output td { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--ocas-card-border); }",
+  ".ocas-output th { font-weight: 600; color: var(--ocas-text-muted); background: #f9fafb; }",
   ".ocas-output ul { list-style: none; padding: 0; margin: 0; }",
   ".ocas-output li { padding: 0.2rem 0; }",
   ".ocas-stats .ocas-metric { font-size: 1.25em; font-weight: 600; }",
-  ".ocas-verify-ok .ocas-status { color: #16a34a; }",
-  ".ocas-verify-corrupted .ocas-status { color: #dc2626; }",
-  ".ocas-verify-invalid .ocas-status { color: #d97706; }",
-  ".ocas-template-content { white-space: pre-wrap; background: #f3f4f6; padding: 0.75rem; border-radius: 4px; overflow-x: auto; }",
+  ".ocas-verify-ok .ocas-status { color: var(--ocas-green); }",
+  ".ocas-verify-corrupted .ocas-status { color: var(--ocas-red); }",
+  ".ocas-verify-invalid .ocas-status { color: var(--ocas-yellow); }",
 ].join(" ");
 
 /**
