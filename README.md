@@ -151,6 +151,24 @@ ocas render <hash> --decay 0.5       # depth decay factor
 ocas render <hash> --epsilon 0.01    # cutoff threshold
 ```
 
+#### HTML Format
+
+Render nodes as self-contained HTML5 documents:
+
+```bash
+# Render as HTML (produces a complete <!DOCTYPE html> document)
+ocas render <hash> --format html
+
+# HTML templates use a separate namespace from text templates
+ocas var set @ocas/template/html/<type-hash> <template-node-hash>
+```
+
+HTML template discovery uses the `@ocas/template/html/<type-hash>` namespace.
+When no HTML template is registered for a type, the node's payload is rendered
+as YAML inside `<pre><code>` tags. A builtin HTML document shell wraps the
+output in a minimal `<!DOCTYPE html>` page. To customize the document shell,
+register a compose template at `@ocas/template/html/_compose`.
+
 ### Garbage Collection
 
 ```bash

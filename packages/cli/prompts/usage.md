@@ -120,11 +120,14 @@ ocas template get <schema-hash>
 ocas template list
 ocas template delete <schema-hash>
 ocas render <hash>                     # render with template (or YAML fallback)
+ocas render <hash> --format html       # render as self-contained HTML5 document
 ocas render --pipe/-p                  # render from piped envelope
 ocas get <hash> -r                     # inline render shorthand
 ```
 
-Render options: `--resolution N` (max depth), `--decay N` (depth decay), `--epsilon N` (cutoff).
+Render options: `--resolution N` (max depth), `--decay N` (depth decay), `--epsilon N` (cutoff), `--format <text|html>` (output format, default: text).
+
+HTML templates use the `@ocas/template/html/<type-hash>` namespace. Types without an HTML template fall back to YAML in `<pre><code>` tags. A builtin HTML document shell wraps output; override it with `@ocas/template/html/_compose`.
 
 ### Garbage Collection
 
