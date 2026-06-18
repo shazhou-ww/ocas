@@ -632,7 +632,7 @@ describe("bootstrap meta-schema self-reference", () => {
     const hash = putSchema(store, {
       allOf: [
         { type: "object", properties: { name: { type: "string" } } },
-        { required: ["name"] },
+        { type: "object", required: ["name"] },
       ],
     });
     expect(hash).toHaveLength(13);

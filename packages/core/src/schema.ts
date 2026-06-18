@@ -4,9 +4,13 @@ import * as AjvModule from "ajv";
 // but tsc with verbatimModuleSyntax sees the namespace wrapper.
 // biome-ignore lint/suspicious/noExplicitAny: CJS interop
 const Ajv = ((AjvModule as any).default ?? AjvModule) as {
-  new (): {
+  new (opts?: {
+    strict?: boolean;
+    strictSchema?: boolean;
+  }): {
     addFormat(name: string, re: RegExp): void;
     validate(schema: unknown, data: unknown): boolean;
+    compile(schema: unknown): unknown;
   };
 };
 
@@ -21,6 +25,36 @@ export class SchemaValidationError extends Error {
 
 const ajv = new Ajv();
 ajv.addFormat("ocas_ref", /^[0-9A-HJKMNP-TV-Z]{13}$/);
+
+// Strict instance used ONLY to vet schemas at registration time (putSchema).
+// `strict: true` promotes AJV's strictTypes check from "log" to "throw", so a
+// schema that uses object-only keywords (properties/required/…) inside an
+// independent applicator scope (oneOf/anyOf/allOf branch, or a top-level
+// schema) without declaring `type` is rejected up front instead of silently
+// no-oping and spamming strictTypes warnings on every later validate.
+// `strictSchema: false` keeps the gate from rejecting JSON Schema 2020-12
+// keywords AJV's draft-07 core doesn't recognise (e.g. prefixItems), which the
+// ocas meta-schema explicitly supports — we only want the strictTypes contract,
+// not AJV's unknown-keyword policing. Mirrors AJV's own context rules exactly:
+// if/then/else children that inherit type from a parent are still accepted. The
+// lenient `ajv` above continues to validate stored payloads so pre-existing
+// data is unaffected.
+const ajvStrict = new Ajv({ strict: true, strictSchema: false });
+ajvStrict.addFormat("ocas_ref", /^[0-9A-HJKMNP-TV-Z]{13}$/);
+
+/**
+ * Compile a schema under AJV strict mode. Returns null on success, or the
+ * strict-mode error message when the schema is rejected (e.g. an object-only
+ * keyword used in an applicator branch without a declared type).
+ */
+function strictCompileError(schema: JSONSchema): string | null {
+  try {
+    ajvStrict.compile(schema);
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
 
 const ALLOWED_SCHEMA_KEYS = new Set([
   "type",
@@ -258,6 +292,10 @@ export function putSchema(store: Store, jsonSchema: JSONSchema): Hash {
     throw new SchemaValidationError(
       "Invalid schema: input does not conform to the ocas JSON Schema meta-schema",
     );
+  }
+  const strictErr = strictCompileError(jsonSchema);
+  if (strictErr !== null) {
+    throw new SchemaValidationError(`Invalid schema: ${strictErr}`);
   }
   return store.cas.put(metaHash, jsonSchema);
 }

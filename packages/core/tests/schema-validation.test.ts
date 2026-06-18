@@ -177,8 +177,16 @@ describe("Test Suite 2: putSchema Validation - Valid Schemas", () => {
     bootstrap(store);
     const hash = putSchema(store, {
       oneOf: [
-        { properties: { status: { const: "ready" } }, required: ["status"] },
-        { properties: { status: { const: "failed" } }, required: ["status"] },
+        {
+          type: "object",
+          properties: { status: { const: "ready" } },
+          required: ["status"],
+        },
+        {
+          type: "object",
+          properties: { status: { const: "failed" } },
+          required: ["status"],
+        },
       ],
     });
     expect(hash).toBeTruthy();
@@ -423,6 +431,94 @@ describe("Test Suite 3: putSchema Validation - Invalid Schemas", () => {
         },
       } as unknown as JSONSchema),
     ).rejects.toThrow();
+  });
+
+  // ── strict-type gate (AJV strict mode at registration time) ──────────────
+  // Object-only keywords (properties/required/…) used in an independent
+  // applicator branch without a declared `type` are rejected: they would
+  // silently no-op on non-object instances and spam strictTypes warnings on
+  // every later validate. See the oneOf multi-exit frontmatter schemas that
+  // workflows rely on — each branch must carry `type: "object"`.
+
+  test("3.18: Reject oneOf branch missing type: object", async () => {
+    const store = new MemStore();
+    bootstrap(store);
+    await expect(async () =>
+      putSchema(store, {
+        oneOf: [
+          { properties: { status: { const: "ready" } }, required: ["status"] },
+          { properties: { status: { const: "failed" } }, required: ["status"] },
+        ],
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("3.19: Reject anyOf branch missing type: object", async () => {
+    const store = new MemStore();
+    bootstrap(store);
+    await expect(async () =>
+      putSchema(store, {
+        anyOf: [
+          { properties: { a: { type: "string" } }, required: ["a"] },
+          { type: "null" },
+        ],
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("3.20: Reject allOf branch missing type: object", async () => {
+    const store = new MemStore();
+    bootstrap(store);
+    await expect(async () =>
+      putSchema(store, {
+        allOf: [
+          { type: "object", properties: { n: { type: "string" } } },
+          { required: ["n"] },
+        ],
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("3.21: Reject top-level object-only keywords without type", async () => {
+    const store = new MemStore();
+    bootstrap(store);
+    await expect(async () =>
+      putSchema(store, {
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("3.22: Accept if/then/else children that inherit type from parent", async () => {
+    const store = new MemStore();
+    bootstrap(store);
+    // if/then/else apply to the same instance whose type the parent declares,
+    // so their children legitimately omit `type` — AJV does not warn, and
+    // neither do we.
+    const hash = putSchema(store, {
+      type: "object",
+      properties: { kind: { type: "string" }, value: {} },
+      if: { properties: { kind: { const: "number" } } },
+      // biome-ignore lint/suspicious/noThenProperty: JSON Schema keyword
+      then: { properties: { value: { type: "number" } } },
+      else: { properties: { value: { type: "string" } } },
+    });
+    expect(hash).toHaveLength(13);
+  });
+
+  test("3.23: Accept JSON Schema 2020-12 keywords the strict gate must not police", async () => {
+    const store = new MemStore();
+    bootstrap(store);
+    // The registration gate uses `strictSchema: false` so AJV's draft-07 core
+    // does not reject 2020-12 keywords (e.g. prefixItems) that the ocas
+    // meta-schema explicitly supports. We only want the strictTypes contract,
+    // not unknown-keyword policing.
+    const hash = putSchema(store, {
+      type: "array",
+      prefixItems: [{ type: "string" }, { type: "number" }],
+    });
+    expect(hash).toHaveLength(13);
   });
 });
 
