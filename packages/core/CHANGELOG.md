@@ -1,5 +1,77 @@
 # @ocas/core
 
+## 0.6.0 — 2026-06-18
+
+- Beautify 6 remaining HTML output templates (refs, walk, var-history, gc, export, import) to use card layout with design system tokens. Add stats-grid CSS for gc/export/import, hash-list for refs/walk, and current marker for var-history. Add ocas-success and ocas-zero semantic CSS classes.
+- Beautify 5 struct-type HTML output templates (get, var-set, var-get, var-delete, template-set) with card layout, design-guide tokens, hash pills, and tag badges
+- Add HTML render format support: `ocas render <hash> --format html` produces a self-contained HTML5 document. Includes LiquidJS template discovery via `@ocas/template/html/<type-hash>`, YAML-in-`<pre><code>` fallback for unregistered types, builtin HTML document shell, and custom compose template override via `@ocas/template/html/_compose`.
+- Add HTML output templates for all 24 @ocas/output/* schemas. Each schema now has both a text and HTML template registered during `registerOutputTemplates()`. HTML templates use semantic markup (dl, table, ul) with scoped `.ocas-` CSS classes injected via static templates. Also fills 4 missing text templates (list-meta, list-schema, export, import).
+- Fix pipe render to use templates and respect --format for object-valued envelopes
+  
+  `ocas render -p` and the `-r` inline render flag now route object-valued
+  envelopes through `renderDirectAsync`, which runs the full template lookup +
+  map-reduce-compose pipeline. Previously these values were rendered via the
+  synchronous `renderDirect` which ignored templates and the `--format` flag.
+- Refactor render pipeline to map-reduce-compose architecture
+  
+  This internal refactor adds infrastructure for future HTML rendering while maintaining backward compatibility for existing text format workflows.
+  
+  **Changes:**
+  
+  - Added `format` option to `RenderOptions` (defaults to `'text'`)
+  - Refactored `renderAsync()` into three phases:
+    1. **Map phase**: DFS rendering with type collection via `__encountered_types` context
+    2. **Reduce phase**: Collect `TypeStatics` from static templates (`@ocas/template/{format}/{typeHash}/static`)
+    3. **Compose phase**: Apply compose template (`@ocas/template/{format}/_compose`) or identity transformation
+  - Added `TypeStatics` type: `Record<string, string>` for slot-based static content
+  - Template discovery now uses format-namespaced variables: `@ocas/template/{format}/...`
+  - When no compose template exists, content is returned as-is (identity compose)
+  - All existing tests pass unchanged (zero behavior change for text format)
+  
+  **Testing:**
+  
+  - All existing render and liquid-render tests pass unchanged
+  - Added 4 new tests for compose template invocation, identity compose, format defaulting, and multi-type collection
+  - Static templates output JSON-parsed slot structures accessible in compose templates
+- Beautify 6 simple-value HTML output templates (put, has, hash, verify, template-get, template-delete) with card layout, semantic badges, and design-guide-compliant CSS custom properties.
+- putSchema now vets schemas under AJV strict mode at registration time, rejecting
+  object-only keywords (properties/required/…) used in an independent applicator
+  branch (oneOf/anyOf/allOf) or at the top level without a declared `type`. This
+  eliminates the strictTypes warnings AJV otherwise logs on every validate, and
+  turns a latent runtime footgun into an eager, actionable rejection.
+  
+  The gate uses `strict: true, strictSchema: false`, so it enforces only the
+  strictTypes contract — JSON Schema 2020-12 keywords the ocas meta-schema already
+  supports (e.g. prefixItems) and if/then/else children that inherit type from a
+  parent are still accepted. Runtime validation of stored payloads is unchanged,
+  so pre-existing data is unaffected.
+- Replace HTML fallback `<pre><code>` YAML wrapping with structured, browsable HTML
+  
+  When no HTML instance template is registered for a type, `renderAsync()` now
+  produces structured HTML instead of dumping YAML inside `<pre><code>` tags:
+  
+  - **Objects** → `<ul>` with `<li>` per key-value pair
+  - **Arrays** → `<ul>` with `<li>` per item
+  - **Primitives** → `<span>` / `<code>` inline elements
+  - **CAS refs** → collapsible `<details><summary>` with recursive child rendering
+  - **Epsilon threshold** → opaque `cas:XXXXX` text (not expandable)
+  
+  Nested structures render recursively. Text format fallback is unchanged (still YAML).
+- Beautify 7 table-type HTML output templates (list, list-meta, list-schema, var-list, tag, untag, template-list) with card layout, styled tables, uppercase headers, count badges, em-dash for null values, and design-guide-compliant CSS
+- Unify template variable namespaces — static and compose templates now have independent namespaces instead of being nested under `@ocas/template/`:
+  
+  - Static: `@ocas/template/{format}/{hash}/static` → `@ocas/template-static/{format}/{hash}`
+  - Compose: `@ocas/template/{format}/_compose` → `@ocas/template-compose/{format}`
+  - Instance templates unchanged: `@ocas/template/{format}/{hash}`
+- Type statics Phase 2b: CSS/JS dedup + compose injection
+  
+  - Builtin HTML shell now injects type statics CSS as `<style>` in `<head>` and JS as `<script>` at end of `<body>`
+  - `type_statics` passed to compose templates is now a LiquidJS-iterable array of `{ type_hash, css?, js?, ...slots }` objects (breaking change from Record format)
+  - Deduplication at the type level: each type's statics appear exactly once regardless of instance count
+  - Types without static templates are silently excluded (no errors, no empty entries)
+  - Custom compose templates can iterate `type_statics` with `{% for ts in type_statics %}`
+  - New exported type: `TypeStaticsEntry`
+
 ## 0.5.0 — 2026-06-10
 
 - fix: `walk()` now enqueues each node's `type` hash so the schema chain is part of normal BFS traversal. This makes refs embedded inside a schema node's payload (via a custom meta-schema that declares an `ocas_ref` field) reachable via `walk`, `gc`, and `computeClosure` instead of being silently invisible. The visited-set dedup naturally terminates on the self-referencing bootstrap meta-schema. Fixes #130.

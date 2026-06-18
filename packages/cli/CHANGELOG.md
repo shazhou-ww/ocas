@@ -1,5 +1,22 @@
 # @ocas/cli
 
+## 0.6.0 — 2026-06-18
+
+- Add HTML render format support: `ocas render <hash> --format html` produces a self-contained HTML5 document. Includes LiquidJS template discovery via `@ocas/template/html/<type-hash>`, YAML-in-`<pre><code>` fallback for unregistered types, builtin HTML document shell, and custom compose template override via `@ocas/template/html/_compose`.
+- Fix pipe render to use templates and respect --format for object-valued envelopes
+  
+  `ocas render -p` and the `-r` inline render flag now route object-valued
+  envelopes through `renderDirectAsync`, which runs the full template lookup +
+  map-reduce-compose pipeline. Previously these values were rendered via the
+  synchronous `renderDirect` which ignored templates and the `--format` flag.
+- feat: add FsCasStore.reindex() for proactive index repair and `ocas reindex` CLI command
+- Add `--format html` and `--static` flags to all template subcommands (set/get/list/delete). HTML templates are stored at `@ocas/template/html/<schema-hash>` and static templates at `@ocas/template/html/<schema-hash>/static`. Default format remains `text` for backward compatibility.
+- Unify template variable namespaces — static and compose templates now have independent namespaces instead of being nested under `@ocas/template/`:
+  
+  - Static: `@ocas/template/{format}/{hash}/static` → `@ocas/template-static/{format}/{hash}`
+  - Compose: `@ocas/template/{format}/_compose` → `@ocas/template-compose/{format}`
+  - Instance templates unchanged: `@ocas/template/{format}/{hash}`
+
 ## 0.5.0 — 2026-06-10
 
 - Fix `ocas has` to return `{ value: false }` for unresolvable inputs instead of dying. Variable names that don't exist in the store no longer crash the predicate; they are simply reported as not present. Also rename the shared resolver error from `Schema not found:` to `Name not found:` since the lookup is by variable name, not schema (affects `get`, `verify`, `refs`, `walk`, etc. when given an unknown name).
