@@ -45,7 +45,7 @@ describe("Phase 7: Edge Cases", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
-  const finalArgs = args.includes("--json") ? args : [...args, "--json"];
+    const finalArgs = args.includes("--json") ? args : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
@@ -172,7 +172,7 @@ describe("Phase 3: Variable System", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
-  const finalArgs = args.includes("--json") ? args : [...args, "--json"];
+    const finalArgs = args.includes("--json") ? args : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
@@ -376,7 +376,7 @@ describe("Phase 4: Template System", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
-  const finalArgs = args.includes("--json") ? args : [...args, "--json"];
+    const finalArgs = args.includes("--json") ? args : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",

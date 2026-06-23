@@ -131,7 +131,10 @@ function normalizeArgv(positionals: string[], parsedFlags: Flags): string[] {
   for (const [key, value] of Object.entries(parsedFlags)) {
     if (key === "version") continue;
     if (key === "json" && value === true) {
-      normalized.push("--format", "json", "--compact");
+      // Pass --json directly so cli-kit handles the output format natively.
+      // This preserves any explicit --format flag (e.g. --format html) instead
+      // of overriding it with "json".
+      normalized.push("--json", "--compact");
       continue;
     }
     const cliKey = key === "r" ? "render" : key;
@@ -1383,9 +1386,14 @@ function setRuntimeFlags(runtimeFlags: Record<string, unknown>): void {
   if (runtimeFlags.render === true || flags.r === true) {
     flags.render = true;
   }
-  // Map --json to --format=json for backward compat with tests
+  // Map --json to compact JSON output for backward compat.
+  // But only set format to "json" if the user didn't explicitly request a
+  // different format like "html" or "text" (used by template namespace selection).
   if (flags.json === true) {
-    flags.format = "json";
+    const explicitFormat = runtimeFlags.format;
+    if (explicitFormat !== "html" && explicitFormat !== "text") {
+      flags.format = "json";
+    }
     flags.compact = true;
   }
 }

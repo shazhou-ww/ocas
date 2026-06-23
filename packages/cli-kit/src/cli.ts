@@ -226,8 +226,9 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         command.returnBinding.name ??
         defaultReturnSchemaName(options.name, command.path);
       // --json implies compact JSON output unless --format was explicitly set
-      const outputFormat =
-        parsed.flags.json ? "json" : (parsed.flags.format as OutputFormat);
+      const outputFormat = parsed.flags.json
+        ? "json"
+        : (parsed.flags.format as OutputFormat);
       const outputCompact = parsed.flags.json || parsed.flags.compact;
       stdout.write(
         renderFinalOutput(

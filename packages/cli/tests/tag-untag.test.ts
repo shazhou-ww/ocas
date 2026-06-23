@@ -199,20 +199,14 @@ describe("ocas tag", () => {
 
   test("Test 11: envelope schema name is @ocas/output/tag and @ocas/output/untag", async () => {
     const hash = await createTestNode();
-    const store = await openFsStore(storePath);
-    const aliases = bootstrap(store);
-    const tagSchemaHash = aliases["@ocas/output/tag"];
-    const untagSchemaHash = aliases["@ocas/output/untag"];
-    expect(tagSchemaHash).toBeDefined();
-    expect(untagSchemaHash).toBeDefined();
 
     const r1 = await runCli("tag", hash, "stable");
     const env1 = JSON.parse(r1.stdout);
-    expect(env1.type).toBe(tagSchemaHash);
+    expect(env1.type).toBe("@ocas/output/tag");
 
     const r2 = await runCli("untag", hash, "stable");
     const env2 = JSON.parse(r2.stdout);
-    expect(env2.type).toBe(untagSchemaHash);
+    expect(env2.type).toBe("@ocas/output/untag");
   });
 
   test("Test 12: idempotent re-tag updates existing key value", async () => {

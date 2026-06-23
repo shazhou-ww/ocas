@@ -2,7 +2,7 @@
 
 exports[`Phase 1: CAS Core > 1.6 get returns node JSON (snapshot) 1`] = `
 {
-  "type": "7V5G8E2VW8B2G",
+  "type": "@ocas/output/get",
   "value": {
     "payload": {
       "age": 30,

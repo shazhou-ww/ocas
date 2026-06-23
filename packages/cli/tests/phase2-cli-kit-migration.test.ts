@@ -47,7 +47,10 @@ describe("phase 2 cli-kit migration", () => {
 
     const asJson = runCliRaw(["has", "@ocas/schema", "--format", "json"]);
     expect(asJson.exitCode).toBe(0);
-    const parsed = JSON.parse(asJson.stdout) as { type: string; value: boolean };
+    const parsed = JSON.parse(asJson.stdout) as {
+      type: string;
+      value: boolean;
+    };
     expect(parsed.type).toBe("@ocas/output/has");
     expect(parsed.value).toBe(true);
 

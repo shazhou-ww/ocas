@@ -58,7 +58,7 @@ function putString(value: string): string {
   try {
     const out = execFileSync(
       "node",
-      [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe"],
+      [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe", "--json"],
       {
         input: JSON.stringify(value),
         encoding: "utf-8",
