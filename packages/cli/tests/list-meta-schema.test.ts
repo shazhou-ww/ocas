@@ -122,11 +122,14 @@ describe("E4. list-schema vs list --type with multiple meta-schema versions", ()
   test("list-schema includes schemas typed by older meta-schemas; list --type @ocas/schema does not", async () => {
     // Set up two distinct meta-schemas via the library
     const store = await openFsStore(storePath);
-    const m1 = await store.cas[BOOTSTRAP_STORE]({
+    const casWithBootstrap = store.cas as typeof store.cas & {
+      [BOOTSTRAP_STORE]: (payload: unknown) => Promise<string>;
+    };
+    const m1 = await casWithBootstrap[BOOTSTRAP_STORE]({
       type: "object",
       title: "meta-v1",
     });
-    const m2 = await store.cas[BOOTSTRAP_STORE]({
+    const m2 = await casWithBootstrap[BOOTSTRAP_STORE]({
       type: "object",
       title: "meta-v2",
     });

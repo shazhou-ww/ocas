@@ -1447,7 +1447,6 @@ switch (cmd) {
     const [sub] = rest;
     switch (sub) {
       case "list": {
-        // biome-ignore lint/suspicious/noConsole: CLI user-facing output
         console.log("usage\nbootstrap");
         break;
       }
@@ -1460,7 +1459,6 @@ switch (cmd) {
         break;
       }
       case "bootstrap": {
-        // biome-ignore lint/suspicious/noConsole: CLI user-facing output
         console.log(cmdPromptBootstrap());
         break;
       }

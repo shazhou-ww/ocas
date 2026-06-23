@@ -12,7 +12,8 @@
     "skipLibCheck": true,
     "paths": {
       "@ocas/core": ["./packages/core/src/index.ts"],
-      "@ocas/fs": ["./packages/fs/src/index.ts"]
+      "@ocas/fs": ["./packages/fs/src/index.ts"],
+      "@ocas/cli-kit": ["./packages/cli-kit/src/index.ts"]
     },
     "composite": true,
     "declaration": true,

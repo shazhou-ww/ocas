@@ -11,6 +11,17 @@ import { createMemoryStore } from "./store.js";
 import type { Hash } from "./types.js";
 import { isValidName, validateName } from "./validation.js";
 
+const BOOTSTRAP_STORE = Symbol.for("@ocas/core/bootstrap-store");
+
+function bootstrapStore(cas: {
+  put: (type: Hash, payload: unknown) => Hash;
+}): Hash {
+  const withBootstrap = cas as typeof cas & {
+    [BOOTSTRAP_STORE]: (payload: unknown) => Hash;
+  };
+  return withBootstrap[BOOTSTRAP_STORE]({ type: "object" });
+}
+
 function makeStoreWithSchema(): {
   store: ReturnType<typeof createMemoryStore>;
   schema: Hash;
@@ -18,9 +29,7 @@ function makeStoreWithSchema(): {
   put: (payload: unknown) => Hash;
 } {
   const store = createMemoryStore();
-  const meta = store.cas[Symbol.for("@ocas/core/bootstrap-store")]({
-    type: "object",
-  }) as Hash;
+  const meta = bootstrapStore(store.cas);
   const schema = store.cas.put(meta, { type: "string" });
   return {
     store,
@@ -154,9 +163,7 @@ describe("In-memory VarStore", () => {
     store.var.set("@app/x", h);
 
     // Different schema for new value
-    const meta = store.cas[Symbol.for("@ocas/core/bootstrap-store")]({
-      type: "object",
-    }) as Hash;
+    const meta = bootstrapStore(store.cas);
     const otherSchema = store.cas.put(meta, { type: "number" });
     const h2 = store.cas.put(otherSchema, 42);
     expect(() => store.var.update("@app/x", h2)).toThrow(SchemaMismatchError);

@@ -443,6 +443,7 @@ describe("Suite 6: CLI Integration with Templates", () => {
       const store = await openFsStore(tmpStore);
       const types = bootstrap(store);
       const stringType = types["@ocas/string"];
+      if (!stringType) throw new Error("Missing @ocas/string bootstrap type");
 
       // Create and store a simple string node
       const nodeFile = join(tmpStore, "test.json");

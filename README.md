@@ -234,6 +234,10 @@ ocas var list --store myapp.tar
   ┌────────────┐
   │ @ocas/core │   Hashing, schemas, validation, bootstrap
   └────────────┘
+        │
+  ┌───────────────┐
+  │ @ocas/cli-kit │ Schema-driven CLI framework core
+  └───────────────┘
 ```
 
 ## Using as a Library
@@ -271,7 +275,8 @@ const store = await openStore("/path/to/store");
 See individual package READMEs for full API docs:
 [`@ocas/core`](packages/core/README.md) ·
 [`@ocas/fs`](packages/fs/README.md) ·
-[`@ocas/cli`](packages/cli/README.md)
+[`@ocas/cli`](packages/cli/README.md) ·
+[`@ocas/cli-kit`](packages/cli-kit/README.md)
 
 ## Development
 

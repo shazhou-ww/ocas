@@ -252,7 +252,9 @@ describe("ocas list --tag", () => {
       hash: string;
     }>;
     expect(schemaEntries.length).toBeGreaterThan(0);
-    const otherTypeHash = schemaEntries[0]!.hash;
+    const firstEntry = schemaEntries[0];
+    if (!firstEntry) throw new Error("Expected at least one schema entry");
+    const otherTypeHash = firstEntry.hash;
     await tag(otherTypeHash, "env:prod");
 
     const { stdout, exitCode } = await runCli(

@@ -301,12 +301,6 @@ export function createSqliteVarStore(
   const stmtGetTagsByTarget = db.prepare(
     "SELECT * FROM tags WHERE target = ? ORDER BY key",
   );
-  const stmtGetTagsByKey = db.prepare(
-    "SELECT target, key, value, created FROM tags WHERE key = ? ORDER BY created ASC",
-  );
-  const stmtGetTagsByKeyValue = db.prepare(
-    "SELECT target, key, value, created FROM tags WHERE key = ? AND value = ? ORDER BY created ASC",
-  );
 
   // ── Transactional helpers ──
 
@@ -441,7 +435,9 @@ export function createSqliteVarStore(
       }
       const rows = stmtGetByName.all(name) as Record<string, unknown>[];
       if (rows.length !== 1) return null;
-      return toVariable(rows[0]!);
+      const row = rows[0];
+      if (!row) return null;
+      return toVariable(row);
     },
 
     remove(name: string, schema?: Hash): Variable[] {
@@ -471,7 +467,9 @@ export function createSqliteVarStore(
         | Record<string, unknown>
         | undefined;
       if (!existing) {
-        const first = toVariable(rows[0]!);
+        const firstRow = rows[0];
+        if (!firstRow) throw new VariableNotFoundError(name, newSchema);
+        const first = toVariable(firstRow);
         throw new SchemaMismatchError(first.schema, newSchema);
       }
 
@@ -606,7 +604,8 @@ export function createSqliteVarStore(
       }
       const vars = stmtGetByName.all(name) as Record<string, unknown>[];
       if (vars.length !== 1) return [];
-      const v = vars[0]!;
+      const v = vars[0];
+      if (!v) return [];
       return (
         stmtGetHistory.all(v.name as string, v.schema as string) as Record<
           string,
