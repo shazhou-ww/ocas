@@ -11,16 +11,18 @@ export function parseArgv(
   allowRenderFlag: boolean,
 ): ParseResult {
   const definitions: Record<string, FlagDefinition> = {
-    ...knownFlags,
     format: { type: "string", default: "yaml" },
     compact: { type: "boolean", default: false },
     quiet: { type: "boolean", default: false },
+    json: { type: "boolean", default: false },
+    ...knownFlags,
     ...(allowRenderFlag ? { render: { type: "boolean", default: false } } : {}),
   };
   const flags: ParsedFlags = {
     format: "yaml",
     compact: false,
     quiet: false,
+    json: false,
   };
   if (allowRenderFlag) {
     flags.render = false;
@@ -111,6 +113,10 @@ export function parseArgv(
 
     flags[key] = value;
   }
+
+  // --json implies compact JSON output, but does NOT override --format
+  // (which may be used for command-specific purposes like --format html).
+  // The json→format mapping is handled in cli.ts's run() instead.
 
   return { positionals, flags };
 }

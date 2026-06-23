@@ -14,6 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 import type { Hash, ListEntry, ListOptions, Store, TagOp } from "@ocas/core";
 import {
   applyListOptions,
+  bootstrap,
   CasNodeNotFoundError,
   computeHash,
   exportBundle,
@@ -589,7 +590,11 @@ async function cmdRender(args: string[]): Promise<void> {
     typeof flags.epsilon === "string"
       ? Number.parseFloat(flags.epsilon)
       : undefined;
-  const format = typeof flags.format === "string" ? flags.format : undefined;
+  // Only pass format to renderAsync if it's a render format (text/html),
+  // not a cli-kit envelope format (yaml/json) that happens to be the default.
+  const rawFormat = typeof flags.format === "string" ? flags.format : undefined;
+  const format =
+    rawFormat === "text" || rawFormat === "html" ? rawFormat : undefined;
 
   // Validate numeric values
   if (resolution !== undefined && Number.isNaN(resolution)) {
@@ -631,10 +636,13 @@ async function cmdRender(args: string[]): Promise<void> {
         die("Invalid envelope. Expected { type: string, value: unknown }.");
       }
 
-      // Validate type hash format: 13-char uppercase Crockford Base32
-      if (!isHash(envelope.type)) {
+      // Resolve type: accept both hash and readable alias (e.g. @ocas/output/put)
+      const typeHash = isHash(envelope.type)
+        ? (envelope.type as Hash)
+        : (bootstrap(store)[envelope.type] ?? null);
+      if (typeHash === null) {
         die(
-          `Invalid type hash: "${envelope.type}". Expected 13-character uppercase Crockford Base32 string.`,
+          `Unknown type: "${envelope.type}". Expected a hash or a known schema alias.`,
         );
       }
 
@@ -652,7 +660,7 @@ async function cmdRender(args: string[]): Promise<void> {
         await out(output);
       } else {
         const output = await renderDirectAsync(
-          envelope.type as Hash,
+          typeHash,
           envelope.value,
           store,
           {
@@ -948,7 +956,11 @@ async function cmdVarList(args: string[]): Promise<void> {
 async function cmdTemplateSet(args: string[]): Promise<void> {
   const schemaInput = args[0];
   const inlineFlag = flags.inline;
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
   const isStatic = flags.static === true;
 
   if (!schemaInput) {
@@ -1031,7 +1043,11 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
 
 async function cmdTemplateGet(args: string[]): Promise<void> {
   const schemaInput = args[0];
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
 
   if (!schemaInput) {
     die("Usage: ocas template get <schema-hash-or-name> [--format html]");
@@ -1064,7 +1080,11 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
 }
 
 async function cmdTemplateList(_args: string[]): Promise<void> {
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
   const store = await openStore();
   const stringHash = resolveHash("@ocas/string", store);
   const instancePrefix = `@ocas/template/${formatFlag}/`;
@@ -1097,7 +1117,11 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
 
 async function cmdTemplateDelete(args: string[]): Promise<void> {
   const schemaInput = args[0];
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
 
   if (!schemaInput) {
     die("Usage: ocas template delete <schema-hash-or-name> [--format html]");
@@ -1349,10 +1373,19 @@ function isEnvelope(value: unknown): value is Envelope {
 
 function setRuntimeFlags(runtimeFlags: Record<string, unknown>): void {
   flags = { ...(parsedInput.flags as Flags) };
+  // Merge cli-kit parsed flags into the legacy flags object
+  for (const [key, value] of Object.entries(runtimeFlags)) {
+    if (key === "_positionals") continue;
+    if (value !== undefined && value !== false) {
+      flags[key] = value as string | boolean | number | string[];
+    }
+  }
   if (runtimeFlags.render === true || flags.r === true) {
     flags.render = true;
   }
+  // Map --json to --format=json for backward compat with tests
   if (flags.json === true) {
+    flags.format = "json";
     flags.compact = true;
   }
 }
@@ -1408,7 +1441,6 @@ function addCommonFlags(command: {
     },
   ) => unknown;
 }): void {
-  command.flag("json", { type: "boolean", default: false });
   command.flag("p", { type: "boolean", default: false });
   command.flag("pipe", { type: "boolean", default: false });
   command.flag("desc", { type: "boolean", default: false });
@@ -1544,7 +1576,12 @@ const render = cli
     ensureWritable("render");
     commandOutput = undefined;
     await cmdRender(getPositionals(runtimeFlags));
-    return commandOutput;
+    // Render outputs raw content — write directly to stdout and return undefined
+    // so cli-kit skips its envelope wrapping.
+    if (commandOutput !== undefined) {
+      process.stdout.write(`${String(commandOutput)}\n`);
+    }
+    return undefined;
   });
 addCommonFlags(render);
 
