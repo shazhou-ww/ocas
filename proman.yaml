@@ -7,6 +7,9 @@ packages:
   - name: "@ocas/fs"
     path: packages/fs
     type: lib
+  - name: "@ocas/cli-kit"
+    path: packages/cli-kit
+    type: lib
   - name: "@ocas/cli"
     path: packages/cli
     type: cli

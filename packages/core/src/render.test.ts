@@ -797,6 +797,7 @@ describe("Suite 6: Schema Integration", () => {
     const store = createMemoryStore();
     const types = bootstrap(store);
     const schemaHash = types["@ocas/schema"];
+    if (!schemaHash) throw new Error("Missing @ocas/schema bootstrap type");
 
     const output = render(store, schemaHash);
 

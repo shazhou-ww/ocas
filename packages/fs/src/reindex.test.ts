@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Hash } from "@ocas/core";
+import type { Hash, TagStore, VarStore } from "@ocas/core";
 import { bootstrap, putSchema } from "@ocas/core";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createFsStore } from "./store.js";
@@ -26,22 +26,35 @@ function createBootstrappedStore(dir: string) {
 }
 
 /** Minimal no-op VarStore for bootstrap (store-level var not needed for CAS). */
-function dummyVar() {
+function dummyVar(): VarStore {
   const vars = new Map<
     string,
-    { value: Hash; tags: Record<string, string>; labels: string[] }
+    {
+      value: Hash;
+      tags: Record<string, string>;
+      labels: string[];
+      created: number;
+      updated: number;
+    }
   >();
   return {
     set(name: string, hash: Hash) {
-      vars.set(name, { value: hash, tags: {}, labels: [] });
+      const now = Date.now();
+      vars.set(name, {
+        value: hash,
+        tags: {},
+        labels: [],
+        created: now,
+        updated: now,
+      });
       return {
         name,
         value: hash,
-        schema: null,
+        schema: "0000000000000",
+        created: now,
+        updated: now,
         tags: {},
         labels: [],
-        position: 0,
-        setAt: Date.now(),
       };
     },
     get(name: string) {
@@ -50,15 +63,18 @@ function dummyVar() {
       return {
         name,
         value: v.value,
-        schema: null,
+        schema: "0000000000000",
+        created: v.created,
+        updated: v.updated,
         tags: v.tags,
         labels: v.labels,
-        position: 0,
-        setAt: Date.now(),
       };
     },
     remove() {
       return [];
+    },
+    update(name: string, hash: Hash) {
+      return this.set(name, hash);
     },
     list() {
       return [];
@@ -66,19 +82,72 @@ function dummyVar() {
     history() {
       return [];
     },
+    close() {},
   };
 }
 
-function dummyTag() {
+function dummyTag(): TagStore {
+  const byTarget = new Map<
+    Hash,
+    Array<{ key: string; value: string | null; created: number }>
+  >();
   return {
-    tag() {
-      return true;
+    tag(target: Hash, operations) {
+      const now = Date.now();
+      const current = [...(byTarget.get(target) ?? [])];
+      for (const op of operations) {
+        if (op.op === "delete") {
+          const next = current.filter((t) => t.key !== op.key);
+          byTarget.set(target, next);
+          continue;
+        }
+        const existingIndex = current.findIndex((t) => t.key === op.key);
+        const nextTag = {
+          key: op.key,
+          value: op.value ?? null,
+          created: now,
+        };
+        if (existingIndex >= 0) {
+          current[existingIndex] = nextTag;
+        } else {
+          current.push(nextTag);
+        }
+      }
+      byTarget.set(target, current);
+      return current.map((t) => ({
+        key: t.key,
+        value: t.value,
+        created: t.created,
+        target,
+      }));
     },
-    untag() {
-      return true;
+    untag(target: Hash, keys: string[]) {
+      const current = byTarget.get(target) ?? [];
+      byTarget.set(
+        target,
+        current.filter((t) => !keys.includes(t.key)),
+      );
     },
-    list() {
-      return [];
+    tags(target: Hash) {
+      return (byTarget.get(target) ?? []).map((t) => ({
+        key: t.key,
+        value: t.value,
+        created: t.created,
+        target,
+      }));
+    },
+    listByTag(tag: string) {
+      const [key, value] = tag.includes(":")
+        ? (tag.split(":", 2) as [string, string])
+        : [tag, null];
+      const result: Hash[] = [];
+      for (const [target, tags] of byTarget.entries()) {
+        const has = tags.some(
+          (t) => t.key === key && (value === null || t.value === value),
+        );
+        if (has) result.push(target);
+      }
+      return result;
     },
   };
 }

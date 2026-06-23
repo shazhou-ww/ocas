@@ -205,7 +205,7 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
       }
       // No schema: if exactly one variant, return it; otherwise null
       const set = byName.get(name);
-      if (!set || set.size !== 1) return null;
+      if (set?.size !== 1) return null;
       const onlyKey = set.values().next().value;
       if (onlyKey === undefined) return null;
       const rec = records.get(onlyKey);
@@ -335,7 +335,7 @@ export function createMemoryVarStoreFor(cas: CasStore): VarStore {
         return rec ? rec.history.map((e) => ({ ...e })) : [];
       }
       const set = byName.get(name);
-      if (!set || set.size !== 1) return [];
+      if (set?.size !== 1) return [];
       const onlyKey = set.values().next().value;
       if (onlyKey === undefined) return [];
       const rec = records.get(onlyKey);
@@ -376,7 +376,7 @@ export function createMemoryTagStoreImpl(): TagStore {
     if (!set) return;
     // only remove if this target no longer has that key in any tag
     const tmap = byTarget.get(target);
-    if (tmap && tmap.has(key)) return;
+    if (tmap?.has(key)) return;
     set.delete(target);
     if (set.size === 0) byKey.delete(key);
   }

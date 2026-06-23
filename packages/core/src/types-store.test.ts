@@ -28,6 +28,7 @@ describe("CasStore type", () => {
       listByType: (_t: Hash, _o?: ListOptions): ListEntry[] => [],
       listMeta: (_o?: ListOptions): ListEntry[] => [],
       listSchemas: (_o?: ListOptions): ListEntry[] => [],
+      listAll: (): Hash[] => [],
     };
     expect(typeof stub.get).toBe("function");
     expect(typeof stub.put).toBe("function");
