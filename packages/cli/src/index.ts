@@ -166,7 +166,7 @@ if (process.argv.includes("--version")) {
 
 const defaultStorePath = join(homedir(), ".ocas");
 let flags: Flags = {};
-let commandOutput: unknown = undefined;
+let commandOutput: unknown;
 const parsedInput = parseArgs(process.argv.slice(2));
 const normalizedArgv = normalizeArgv(parsedInput.positional, parsedInput.flags);
 

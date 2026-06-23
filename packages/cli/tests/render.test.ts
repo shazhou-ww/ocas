@@ -64,9 +64,10 @@ describe("Phase 5: Render", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
-    const finalArgs = args[0] === "render" || args.includes("--json")
-      ? args
-      : [...args, "--json"];
+    const finalArgs =
+      args[0] === "render" || args.includes("--json")
+        ? args
+        : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
@@ -557,7 +558,13 @@ describe("Phase 7: --render flag", () => {
 
       // Register template
       await runCli(
-        ["template", "set", schemaHash.trim(), "--inline", "Hello {{ payload.name }}!"],
+        [
+          "template",
+          "set",
+          schemaHash.trim(),
+          "--inline",
+          "Hello {{ payload.name }}!",
+        ],
         tmpStore,
       );
 
@@ -601,15 +608,18 @@ describe("Phase 7: --render flag", () => {
       const nodeHash = envValue(nodeOut) as string;
 
       await runCli(
-        ["template", "set", schemaHash.trim(), "--inline", "Hello {{ payload.name }}!"],
+        [
+          "template",
+          "set",
+          schemaHash.trim(),
+          "--inline",
+          "Hello {{ payload.name }}!",
+        ],
         tmpStore,
       );
 
       // Without -r, should get envelope, not rendered output
-      const { stdout, exitCode } = await runCli(
-        ["get", nodeHash],
-        tmpStore,
-      );
+      const { stdout, exitCode } = await runCli(["get", nodeHash], tmpStore);
       expect(exitCode).toBe(0);
       // Should contain envelope structure
       const parsed = JSON.parse(stdout);
