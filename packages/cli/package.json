@@ -19,8 +19,10 @@
     "prompts"
   ],
   "dependencies": {
+    "@ocas/cli-kit": "workspace:*",
     "@ocas/core": "workspace:*",
-    "@ocas/fs": "workspace:*"
+    "@ocas/fs": "workspace:*",
+    "zod": "^4.1.12"
   },
   "repository": {
     "type": "git",

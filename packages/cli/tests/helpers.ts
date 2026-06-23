@@ -49,6 +49,13 @@ export async function putSchemaFile(
 
 const quietEnv = { ...process.env, NODE_NO_WARNINGS: "1" };
 
+function withJsonFormat(args: string[]): string[] {
+  if (args.includes("--json") || args[0] === "render") {
+    return args;
+  }
+  return [...args, "--json"];
+}
+
 /**
  * Run CLI command. Accepts either a string[] or ...string[] (rest args).
  * If first arg is an array, uses that as args. Otherwise treats all args as the command.
@@ -57,9 +64,10 @@ export function runCli(
   args: string[],
   storePath?: string,
 ): { stdout: string; stderr: string; exitCode: number } {
+  const normalizedArgs = withJsonFormat(args);
   const finalArgs = storePath
-    ? [entrypoint, "--home", storePath, ...args]
-    : [entrypoint, ...args];
+    ? [entrypoint, "--home", storePath, ...normalizedArgs]
+    : [entrypoint, ...normalizedArgs];
   try {
     const stdout = execFileSync("node", finalArgs, {
       encoding: "utf-8",
@@ -82,7 +90,7 @@ export function runCliWithStdin(
   storePath: string,
   stdin: string,
 ): { stdout: string; stderr: string; exitCode: number } {
-  const finalArgs = [entrypoint, "--home", storePath, ...args];
+  const finalArgs = [entrypoint, "--home", storePath, ...withJsonFormat(args)];
   try {
     const stdout = execFileSync("node", finalArgs, {
       input: stdin,

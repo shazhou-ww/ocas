@@ -44,7 +44,7 @@ describe("list-meta CLI command", () => {
       type: string;
       value: Array<{ hash: string; created: number; updated: number }>;
     };
-    expect(parsed.type).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    expect(parsed.type).toBe("@ocas/output/list-meta");
     expect(Array.isArray(parsed.value)).toBe(true);
     expect(parsed.value).toHaveLength(1);
     const first = parsed.value[0] as { hash: string };
@@ -72,7 +72,7 @@ describe("list-schema CLI command", () => {
     expect(stderr).toBe("");
 
     const parsed = JSON.parse(stdout) as { type: string; value: string[] };
-    expect(parsed.type).toMatch(/^[0-9A-HJKMNP-TV-Z]{13}$/);
+    expect(parsed.type).toBe("@ocas/output/list-schema");
     expect(Array.isArray(parsed.value)).toBe(true);
     // meta + 5 primitive + 20 output = 26
     expect(parsed.value.length).toBeGreaterThanOrEqual(6);

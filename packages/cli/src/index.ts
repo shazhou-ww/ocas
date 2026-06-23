@@ -4,6 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createCLI, ocasRenderPlugin } from "@ocas/cli-kit";
+import { z } from "zod";
 
 import { cmdPromptBootstrap } from "./prompt-bootstrap.js";
 
@@ -12,6 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 import type { Hash, ListEntry, ListOptions, Store, TagOp } from "@ocas/core";
 import {
   applyListOptions,
+  bootstrap,
   CasNodeNotFoundError,
   computeHash,
   exportBundle,
@@ -38,9 +41,7 @@ import {
   prepareStore,
 } from "@ocas/fs";
 
-// ---- Argument parsing ----
-
-type Flags = Record<string, string | boolean | string[]>;
+type Flags = Record<string, string | boolean | number | string[]>;
 
 /** Flags that consume the next token as their value. All others are boolean. */
 const VALUE_FLAGS = new Set([
@@ -62,7 +63,7 @@ const VALUE_FLAGS = new Set([
 ]);
 
 function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
-  const flags: Flags = {};
+  const parsed: Flags = {};
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -72,50 +73,91 @@ function parseArgs(argv: string[]): { flags: Flags; positional: string[] } {
       if (VALUE_FLAGS.has(key)) {
         const next = argv[i + 1];
         if (next !== undefined && !next.startsWith("--")) {
-          // Handle repeatable flags (like --tag)
           if (key === "tag") {
-            const existing = flags[key];
+            const existing = parsed[key];
             if (Array.isArray(existing)) {
               existing.push(next);
             } else if (typeof existing === "string") {
-              flags[key] = [existing, next];
+              parsed[key] = [existing, next];
             } else {
-              flags[key] = [next];
+              parsed[key] = [next];
             }
           } else {
-            flags[key] = next;
+            parsed[key] = next;
           }
           i++;
         } else {
-          flags[key] = true;
+          parsed[key] = true;
         }
       } else {
-        flags[key] = true;
+        parsed[key] = true;
       }
-    } else if (arg === "-p") {
-      flags.p = true;
-    } else if (arg === "-r") {
-      flags.r = true;
-    } else if (arg === "-o") {
+      continue;
+    }
+    if (arg === "-p") {
+      parsed.p = true;
+      continue;
+    }
+    if (arg === "-r") {
+      parsed.r = true;
+      continue;
+    }
+    if (arg === "-o") {
       const next = argv[i + 1];
       if (next !== undefined && !next.startsWith("--")) {
-        flags.o = next;
+        parsed.o = next;
         i++;
       } else {
-        flags.o = true;
+        parsed.o = true;
       }
-    } else {
-      positional.push(arg);
+      continue;
     }
+    positional.push(arg);
   }
 
-  return { flags, positional };
+  return { flags: parsed, positional };
 }
 
-const { flags, positional } = parseArgs(process.argv.slice(2));
+function normalizeArgv(positionals: string[], parsedFlags: Flags): string[] {
+  const normalized = [...positionals];
+  const commandName = positionals[0];
+  if (
+    commandName === "render" &&
+    parsedFlags.format === undefined &&
+    parsedFlags.json !== true
+  ) {
+    normalized.push("--format", "text");
+  }
+  for (const [key, value] of Object.entries(parsedFlags)) {
+    if (key === "version") continue;
+    if (key === "json" && value === true) {
+      // Pass --json directly so cli-kit handles the output format natively.
+      // This preserves any explicit --format flag (e.g. --format html) instead
+      // of overriding it with "json".
+      normalized.push("--json", "--compact");
+      continue;
+    }
+    const cliKey = key === "r" ? "render" : key;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        normalized.push(`--${cliKey}`, item);
+      }
+      continue;
+    }
+    if (value === true) {
+      normalized.push(`--${cliKey}`);
+      continue;
+    }
+    if (value === false) {
+      continue;
+    }
+    normalized.push(`--${cliKey}`, String(value));
+  }
+  return normalized;
+}
 
 // --- Handle --version early ---
-if (flags.version === true) {
+if (process.argv.includes("--version")) {
   const pkgPath = join(__dirname, "..", "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
   process.stdout.write(`${pkg.version}\n`);
@@ -123,42 +165,20 @@ if (flags.version === true) {
 }
 
 const defaultStorePath = join(homedir(), ".ocas");
-const storePath =
-  typeof flags.home === "string"
-    ? flags.home
-    : (process.env.OCAS_HOME ?? defaultStorePath);
-const compact = flags.json === true;
+let flags: Flags = {};
+let commandOutput: unknown = undefined;
+const parsedInput = parseArgs(process.argv.slice(2));
+const normalizedArgv = normalizeArgv(parsedInput.positional, parsedInput.flags);
 
 // ---- Helpers ----
 
-const inlineRender = flags.render === true || flags.r === true;
-
 async function out(data: unknown, store?: Store): Promise<void> {
-  if (
-    inlineRender &&
-    typeof data === "object" &&
-    data !== null &&
-    "type" in data &&
-    "value" in data
-  ) {
-    const envelope = data as { type: string; value: unknown };
-    const s = store ?? (await openStore());
-    const format = typeof flags.format === "string" ? flags.format : undefined;
-    const output = await renderDirectAsync(
-      envelope.type as Hash,
-      envelope.value,
-      s,
-      { ...(format !== undefined && { format }) },
-    );
-    process.stdout.write(`${output}\n`);
-    return;
-  }
-  console.log(compact ? JSON.stringify(data) : JSON.stringify(data, null, 2));
+  void store;
+  commandOutput = data;
 }
 
 function die(msg: string): never {
-  console.error(msg);
-  process.exit(1);
+  throw new Error(msg);
 }
 
 function readJsonFile(file: string): unknown {
@@ -211,6 +231,10 @@ async function openStore(): Promise<Store> {
   if (typeof flags.store === "string") {
     return await loadBundleStore(flags.store);
   }
+  const storePath =
+    typeof flags.home === "string"
+      ? flags.home
+      : (process.env.OCAS_HOME ?? defaultStorePath);
   const fullPath = resolve(storePath);
   return await openFsStore(fullPath);
 }
@@ -386,10 +410,9 @@ async function cmdPut(args: string[]): Promise<void> {
       const hash = putSchema(store, payload as Record<string, unknown>);
       await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
     } catch (_e) {
-      console.error(
-        `Validation failed: payload in ${file} does not match schema ${typeHash}`,
+      die(
+        `Validation failed: payload in ${file ?? "<stdin>"} does not match schema ${typeHash}`,
       );
-      process.exit(1);
     }
     return;
   }
@@ -397,17 +420,15 @@ async function cmdPut(args: string[]): Promise<void> {
   // Check if schema exists
   const schema = getSchema(store, typeHash);
   if (schema === null) {
-    console.error(`Schema not found: ${typeHash}`);
-    process.exit(1);
+    die(`Schema not found: ${typeHash}`);
   }
 
   // Validate payload against schema before storing
   const tempNode = { type: typeHash, payload, timestamp: Date.now() };
   if (!validate(store, tempNode)) {
-    console.error(
-      `Validation failed: payload in ${file} does not match schema ${typeHash}`,
+    die(
+      `Validation failed: payload in ${file ?? "<stdin>"} does not match schema ${typeHash}`,
     );
-    process.exit(1);
   }
 
   const hash = store.cas.put(typeHash, payload);
@@ -572,7 +593,11 @@ async function cmdRender(args: string[]): Promise<void> {
     typeof flags.epsilon === "string"
       ? Number.parseFloat(flags.epsilon)
       : undefined;
-  const format = typeof flags.format === "string" ? flags.format : undefined;
+  // Only pass format to renderAsync if it's a render format (text/html),
+  // not a cli-kit envelope format (yaml/json) that happens to be the default.
+  const rawFormat = typeof flags.format === "string" ? flags.format : undefined;
+  const format =
+    rawFormat === "text" || rawFormat === "html" ? rawFormat : undefined;
 
   // Validate numeric values
   if (resolution !== undefined && Number.isNaN(resolution)) {
@@ -614,10 +639,13 @@ async function cmdRender(args: string[]): Promise<void> {
         die("Invalid envelope. Expected { type: string, value: unknown }.");
       }
 
-      // Validate type hash format: 13-char uppercase Crockford Base32
-      if (!isHash(envelope.type)) {
+      // Resolve type: accept both hash and readable alias (e.g. @ocas/output/put)
+      const typeHash = isHash(envelope.type)
+        ? (envelope.type as Hash)
+        : (bootstrap(store)[envelope.type] ?? null);
+      if (typeHash === null) {
         die(
-          `Invalid type hash: "${envelope.type}". Expected 13-character uppercase Crockford Base32 string.`,
+          `Unknown type: "${envelope.type}". Expected a hash or a known schema alias.`,
         );
       }
 
@@ -632,10 +660,10 @@ async function cmdRender(args: string[]): Promise<void> {
           ...(epsilon !== undefined && { epsilon }),
           ...(format !== undefined && { format }),
         });
-        process.stdout.write(`${output}\n`);
+        await out(output);
       } else {
         const output = await renderDirectAsync(
-          envelope.type as Hash,
+          typeHash,
           envelope.value,
           store,
           {
@@ -645,7 +673,7 @@ async function cmdRender(args: string[]): Promise<void> {
             ...(format !== undefined && { format }),
           },
         );
-        process.stdout.write(`${output}\n`);
+        await out(output);
       }
     } else {
       const hash = resolveHash(input as string, store);
@@ -655,8 +683,7 @@ async function cmdRender(args: string[]): Promise<void> {
         ...(epsilon !== undefined && { epsilon }),
         ...(format !== undefined && { format }),
       });
-      // Output to stdout without JSON wrapping (raw output)
-      process.stdout.write(`${output}\n`);
+      await out(output);
     }
   } catch (error) {
     if (error instanceof CasNodeNotFoundError) {
@@ -932,7 +959,11 @@ async function cmdVarList(args: string[]): Promise<void> {
 async function cmdTemplateSet(args: string[]): Promise<void> {
   const schemaInput = args[0];
   const inlineFlag = flags.inline;
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
   const isStatic = flags.static === true;
 
   if (!schemaInput) {
@@ -1015,7 +1046,11 @@ async function cmdTemplateSet(args: string[]): Promise<void> {
 
 async function cmdTemplateGet(args: string[]): Promise<void> {
   const schemaInput = args[0];
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
 
   if (!schemaInput) {
     die("Usage: ocas template get <schema-hash-or-name> [--format html]");
@@ -1048,7 +1083,11 @@ async function cmdTemplateGet(args: string[]): Promise<void> {
 }
 
 async function cmdTemplateList(_args: string[]): Promise<void> {
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
   const store = await openStore();
   const stringHash = resolveHash("@ocas/string", store);
   const instancePrefix = `@ocas/template/${formatFlag}/`;
@@ -1081,7 +1120,11 @@ async function cmdTemplateList(_args: string[]): Promise<void> {
 
 async function cmdTemplateDelete(args: string[]): Promise<void> {
   const schemaInput = args[0];
-  const formatFlag = typeof flags.format === "string" ? flags.format : "text";
+  const formatFlag =
+    typeof flags.format === "string" &&
+    (flags.format === "text" || flags.format === "html")
+      ? flags.format
+      : "text";
 
   if (!schemaInput) {
     die("Usage: ocas template delete <schema-hash-or-name> [--format html]");
@@ -1119,10 +1162,14 @@ async function cmdGc(_args: string[]): Promise<void> {
 }
 
 async function cmdReindex(_args: string[]): Promise<void> {
+  const storePath =
+    typeof flags.home === "string"
+      ? flags.home
+      : (process.env.OCAS_HOME ?? defaultStorePath);
   const fullPath = resolve(storePath);
   const cas = (await prepareStore(fullPath)) as FsCasStore;
   const result = cas.reindex();
-  console.log(
+  await out(
     `Reindexed: ${result.nodes} nodes, ${result.types} type indexes, ${result.removed} stale entries removed.`,
   );
 }
@@ -1250,10 +1297,10 @@ async function cmdListSchema(_args: string[]): Promise<void> {
   );
 }
 
-function printUsage(): void {
+function printUsage(): string {
   const pkgPath = join(__dirname, "..", "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-  console.log(`\
+  return `\
 Usage: ocas [--home <path>] [--json] <command> [args]
 
 All JSON commands emit a { type, value } envelope. The type is the hash of the
@@ -1309,167 +1356,578 @@ Flags:
   --scope <name>      Variable name remap target for import (e.g. --scope @imported)
   -o <file>           Output path for export
 
-Agent: If you have not installed the ocas skill for this version (${pkg.version}), run \`ocas prompt bootstrap\` and follow the instructions.`);
+Agent: If you have not installed the ocas skill for this version (${pkg.version}), run \`ocas prompt bootstrap\` and follow the instructions.`;
 }
 
 // ---- Dispatch ----
+interface Envelope {
+  type: string;
+  value: unknown;
+}
 
-const [cmd, ...rest] = positional;
+function isEnvelope(value: unknown): value is Envelope {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    "value" in value
+  );
+}
 
-if (!cmd) {
-  printUsage();
+function setRuntimeFlags(runtimeFlags: Record<string, unknown>): void {
+  flags = { ...(parsedInput.flags as Flags) };
+  // Merge cli-kit parsed flags into the legacy flags object
+  for (const [key, value] of Object.entries(runtimeFlags)) {
+    if (key === "_positionals") continue;
+    if (value !== undefined && value !== false) {
+      flags[key] = value as string | boolean | number | string[];
+    }
+  }
+  if (runtimeFlags.render === true || flags.r === true) {
+    flags.render = true;
+  }
+  // Map --json to compact JSON output for backward compat.
+  // But only set format to "json" if the user didn't explicitly request a
+  // different format like "html" or "text" (used by template namespace selection).
+  if (flags.json === true) {
+    const explicitFormat = runtimeFlags.format;
+    if (explicitFormat !== "html" && explicitFormat !== "text") {
+      flags.format = "json";
+    }
+    flags.compact = true;
+  }
+}
+
+function getPositionals(runtimeFlags: Record<string, unknown>): string[] {
+  const positionals = runtimeFlags._positionals;
+  return Array.isArray(positionals)
+    ? positionals.filter((v): v is string => typeof v === "string")
+    : [];
+}
+
+async function invokeLegacy(
+  commandKey: string,
+  fn: (args: string[]) => Promise<void>,
+  args: string[],
+  _expectedType: string,
+): Promise<unknown> {
+  ensureWritable(commandKey);
+  commandOutput = undefined;
+  await fn(args);
+  const output = commandOutput;
+  if (!isEnvelope(output)) {
+    return output;
+  }
+
+  // If --render flag is set, render the output through the ocas render pipeline
+  if (flags.render === true) {
+    const store = await openStore();
+    const renderOpts = {
+      ...(typeof flags.resolution === "string"
+        ? { resolution: Number.parseFloat(flags.resolution) }
+        : {}),
+      ...(typeof flags.decay === "string"
+        ? { decay: Number.parseFloat(flags.decay) }
+        : {}),
+      ...(typeof flags.epsilon === "string"
+        ? { epsilon: Number.parseFloat(flags.epsilon) }
+        : {}),
+    };
+    let rendered: string;
+    if (typeof output.value === "string" && isHash(output.value)) {
+      rendered = await renderAsync(store, output.value as Hash, renderOpts);
+    } else {
+      rendered = await renderDirectAsync(
+        output.type as Hash,
+        output.value,
+        store,
+        renderOpts,
+      );
+    }
+    process.stdout.write(`${rendered}\n`);
+    return undefined; // cli-kit skips output
+  }
+
+  return output.value;
+}
+
+const genericTemplate = "{{value}}";
+const returnSchema = z.unknown();
+const commonStringFlags = [
+  "home",
+  "store",
+  "schema",
+  "type",
+  "sort",
+  "limit",
+  "offset",
+  "resolution",
+  "decay",
+  "epsilon",
+  "inline",
+  "scope",
+  "o",
+  "tag",
+] as const;
+
+function addCommonFlags(command: {
+  flag: (
+    name: string,
+    definition: {
+      type: "string" | "number" | "boolean";
+      default?: string | number | boolean;
+    },
+  ) => unknown;
+}): void {
+  command.flag("p", { type: "boolean", default: false });
+  command.flag("pipe", { type: "boolean", default: false });
+  command.flag("desc", { type: "boolean", default: false });
+  command.flag("static", { type: "boolean", default: false });
+  command.flag("follow-type", { type: "boolean", default: false });
+  for (const name of commonStringFlags) {
+    command.flag(name, { type: "string" });
+  }
+}
+
+const pkgPath = join(__dirname, "..", "package.json");
+const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string };
+const cli = createCLI({
+  name: "ocas",
+  version: pkg.version,
+  plugins: [ocasRenderPlugin(() => openStore())],
+  homeDir: defaultStorePath,
+});
+
+const init = cli
+  .command("init")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/init" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    await openStore();
+    return { ok: true };
+  });
+addCommonFlags(init);
+
+const put = cli
+  .command("put")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/put" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "put",
+      cmdPut,
+      getPositionals(runtimeFlags),
+      "@ocas/output/put",
+    );
+  });
+addCommonFlags(put);
+
+const get = cli
+  .command("get")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/get" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "get",
+      cmdGet,
+      getPositionals(runtimeFlags),
+      "@ocas/output/get",
+    );
+  });
+addCommonFlags(get);
+
+const has = cli
+  .command("has")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/has" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "has",
+      cmdHas,
+      getPositionals(runtimeFlags),
+      "@ocas/output/has",
+    );
+  });
+addCommonFlags(has);
+
+const verifyCommand = cli
+  .command("verify")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/verify" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "verify",
+      cmdVerify,
+      getPositionals(runtimeFlags),
+      "@ocas/output/verify",
+    );
+  });
+addCommonFlags(verifyCommand);
+
+const refsCommand = cli
+  .command("refs")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/refs" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "refs",
+      cmdRefs,
+      getPositionals(runtimeFlags),
+      "@ocas/output/refs",
+    );
+  });
+addCommonFlags(refsCommand);
+
+const walkCommand = cli
+  .command("walk")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/walk" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "walk",
+      cmdWalk,
+      getPositionals(runtimeFlags),
+      "@ocas/output/walk",
+    );
+  });
+addCommonFlags(walkCommand);
+
+const hash = cli
+  .command("hash")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/hash" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "hash",
+      cmdHash,
+      getPositionals(runtimeFlags),
+      "@ocas/output/hash",
+    );
+  });
+addCommonFlags(hash);
+
+const render = cli
+  .command("render")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/render" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    ensureWritable("render");
+    commandOutput = undefined;
+    await cmdRender(getPositionals(runtimeFlags));
+    // Render outputs raw content — write directly to stdout and return undefined
+    // so cli-kit skips its envelope wrapping.
+    if (commandOutput !== undefined) {
+      process.stdout.write(`${String(commandOutput)}\n`);
+    }
+    return undefined;
+  });
+addCommonFlags(render);
+
+const list = cli
+  .command("list")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/list" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "list",
+      cmdList,
+      getPositionals(runtimeFlags),
+      "@ocas/output/list",
+    );
+  });
+addCommonFlags(list);
+
+const listMeta = cli
+  .command("list-meta")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/list-meta" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "list-meta",
+      cmdListMeta,
+      getPositionals(runtimeFlags),
+      "@ocas/output/list-meta",
+    );
+  });
+addCommonFlags(listMeta);
+
+const listSchema = cli
+  .command("list-schema")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/list-schema" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "list-schema",
+      cmdListSchema,
+      getPositionals(runtimeFlags),
+      "@ocas/output/list-schema",
+    );
+  });
+addCommonFlags(listSchema);
+
+const tag = cli
+  .command("tag")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/tag" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "tag",
+      cmdTag,
+      getPositionals(runtimeFlags),
+      "@ocas/output/tag",
+    );
+  });
+addCommonFlags(tag);
+
+const untag = cli
+  .command("untag")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/untag" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "untag",
+      cmdUntag,
+      getPositionals(runtimeFlags),
+      "@ocas/output/untag",
+    );
+  });
+addCommonFlags(untag);
+
+const varSet = cli
+  .command("var")
+  .command("set")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-set" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "var:set",
+      cmdVarSet,
+      getPositionals(runtimeFlags),
+      "@ocas/output/var-set",
+    );
+  });
+addCommonFlags(varSet);
+
+const varGet = cli
+  .command("var")
+  .command("get")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-get" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "var:get",
+      cmdVarGet,
+      getPositionals(runtimeFlags),
+      "@ocas/output/var-get",
+    );
+  });
+addCommonFlags(varGet);
+
+const varDelete = cli
+  .command("var")
+  .command("delete")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-delete" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "var:delete",
+      cmdVarDelete,
+      getPositionals(runtimeFlags),
+      "@ocas/output/var-delete",
+    );
+  });
+addCommonFlags(varDelete);
+
+const varList = cli
+  .command("var")
+  .command("list")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-list" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "var:list",
+      cmdVarList,
+      getPositionals(runtimeFlags),
+      "@ocas/output/var-list",
+    );
+  });
+addCommonFlags(varList);
+
+const varHistory = cli
+  .command("var")
+  .command("history")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-history" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "var:history",
+      cmdVarHistory,
+      getPositionals(runtimeFlags),
+      "@ocas/output/var-history",
+    );
+  });
+addCommonFlags(varHistory);
+
+const templateSet = cli
+  .command("template")
+  .command("set")
+  .returns(returnSchema, genericTemplate, {
+    name: "@ocas/output/template-set",
+  })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "template:set",
+      cmdTemplateSet,
+      getPositionals(runtimeFlags),
+      "@ocas/output/template-set",
+    );
+  });
+addCommonFlags(templateSet);
+
+const templateGet = cli
+  .command("template")
+  .command("get")
+  .returns(returnSchema, genericTemplate, {
+    name: "@ocas/output/template-get",
+  })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "template:get",
+      cmdTemplateGet,
+      getPositionals(runtimeFlags),
+      "@ocas/output/template-get",
+    );
+  });
+addCommonFlags(templateGet);
+
+const templateList = cli
+  .command("template")
+  .command("list")
+  .returns(returnSchema, genericTemplate, {
+    name: "@ocas/output/template-list",
+  })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "template:list",
+      cmdTemplateList,
+      getPositionals(runtimeFlags),
+      "@ocas/output/template-list",
+    );
+  });
+addCommonFlags(templateList);
+
+const templateDelete = cli
+  .command("template")
+  .command("delete")
+  .returns(returnSchema, genericTemplate, {
+    name: "@ocas/output/template-delete",
+  })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "template:delete",
+      cmdTemplateDelete,
+      getPositionals(runtimeFlags),
+      "@ocas/output/template-delete",
+    );
+  });
+addCommonFlags(templateDelete);
+
+const gcCommand = cli
+  .command("gc")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/gc" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "gc",
+      cmdGc,
+      getPositionals(runtimeFlags),
+      "@ocas/output/gc",
+    );
+  });
+addCommonFlags(gcCommand);
+
+const reindex = cli
+  .command("reindex")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/reindex" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    ensureWritable("reindex");
+    commandOutput = undefined;
+    await cmdReindex(getPositionals(runtimeFlags));
+    return commandOutput;
+  });
+addCommonFlags(reindex);
+
+const exportCommand = cli
+  .command("export")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/export" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "export",
+      cmdExport,
+      getPositionals(runtimeFlags),
+      "@ocas/output/export",
+    );
+  });
+addCommonFlags(exportCommand);
+
+const importCommand = cli
+  .command("import")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/import" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return await invokeLegacy(
+      "import",
+      cmdImport,
+      getPositionals(runtimeFlags),
+      "@ocas/output/import",
+    );
+  });
+addCommonFlags(importCommand);
+
+const promptList = cli
+  .command("prompt")
+  .command("list")
+  .returns(returnSchema, genericTemplate, { name: "@ocas/output/prompt-list" })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return "usage\nbootstrap";
+  });
+addCommonFlags(promptList);
+
+const promptUsage = cli
+  .command("prompt")
+  .command("usage")
+  .returns(returnSchema, genericTemplate, {
+    name: "@ocas/output/prompt-usage",
+  })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return readFileSync(join(__dirname, "..", "prompts", "usage.md"), "utf-8");
+  });
+addCommonFlags(promptUsage);
+
+const promptBootstrap = cli
+  .command("prompt")
+  .command("bootstrap")
+  .returns(returnSchema, genericTemplate, {
+    name: "@ocas/output/prompt-bootstrap",
+  })
+  .action(async (_args, runtimeFlags) => {
+    setRuntimeFlags(runtimeFlags);
+    return cmdPromptBootstrap();
+  });
+addCommonFlags(promptBootstrap);
+
+if (parsedInput.flags.help === true || parsedInput.positional.length === 0) {
+  process.stdout.write(`${printUsage()}\n`);
   process.exit(0);
 }
 
-// Build the command key (cmd or cmd:sub) used by the read-only guard.
-const subCmd = rest[0];
-const writeKey =
-  cmd === "var" || cmd === "template"
-    ? `${cmd}:${subCmd ?? ""}`
-    : (cmd as string);
-ensureWritable(writeKey);
-
-switch (cmd) {
-  case "put":
-    await cmdPut(rest);
-    break;
-
-  case "get":
-    await cmdGet(rest);
-    break;
-
-  case "has":
-    await cmdHas(rest);
-    break;
-
-  case "verify":
-    await cmdVerify(rest);
-    break;
-
-  case "refs":
-    await cmdRefs(rest);
-    break;
-
-  case "walk":
-    await cmdWalk(rest);
-    break;
-
-  case "hash":
-    await cmdHash(rest);
-    break;
-
-  case "render":
-    await cmdRender(rest);
-    break;
-
-  case "list":
-    await cmdList(rest);
-    break;
-
-  case "list-meta":
-    await cmdListMeta(rest);
-    break;
-
-  case "list-schema":
-    await cmdListSchema(rest);
-    break;
-
-  case "tag":
-    await cmdTag(rest);
-    break;
-
-  case "untag":
-    await cmdUntag(rest);
-    break;
-
-  case "var": {
-    const [sub, ...subRest] = rest;
-    switch (sub) {
-      case "set":
-        await cmdVarSet(subRest);
-        break;
-      case "get":
-        await cmdVarGet(subRest);
-        break;
-      case "delete":
-        await cmdVarDelete(subRest);
-        break;
-      case "list":
-        await cmdVarList(subRest);
-        break;
-      case "history":
-        await cmdVarHistory(subRest);
-        break;
-      default:
-        die(`Unknown var subcommand: ${sub ?? "(none)"}`);
-    }
-    break;
-  }
-
-  case "template": {
-    const [sub, ...subRest] = rest;
-    switch (sub) {
-      case "set":
-        await cmdTemplateSet(subRest);
-        break;
-      case "get":
-        await cmdTemplateGet(subRest);
-        break;
-      case "list":
-        await cmdTemplateList(subRest);
-        break;
-      case "delete":
-        await cmdTemplateDelete(subRest);
-        break;
-      default:
-        die(`Unknown template subcommand: ${sub ?? "(none)"}`);
-    }
-    break;
-  }
-
-  case "gc":
-    await cmdGc(rest);
-    break;
-
-  case "reindex":
-    await cmdReindex(rest);
-    break;
-
-  case "export":
-    await cmdExport(rest);
-    break;
-
-  case "import":
-    await cmdImport(rest);
-    break;
-
-  case "prompt": {
-    const [sub] = rest;
-    switch (sub) {
-      case "list": {
-        console.log("usage\nbootstrap");
-        break;
-      }
-      case "usage": {
-        const content = readFileSync(
-          join(__dirname, "..", "prompts", "usage.md"),
-          "utf-8",
-        );
-        process.stdout.write(content);
-        break;
-      }
-      case "bootstrap": {
-        console.log(cmdPromptBootstrap());
-        break;
-      }
-      default:
-        die(
-          `Unknown prompt subcommand: ${sub ?? "(none)"}. Available: list, usage, bootstrap`,
-        );
-    }
-    break;
-  }
-
-  default:
-    die(`Unknown command: ${cmd}`);
-}
+const exitCode = await cli.run({ argv: normalizedArgv });
+process.exit(exitCode);

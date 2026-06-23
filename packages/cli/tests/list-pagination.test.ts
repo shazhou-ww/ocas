@@ -22,7 +22,15 @@ async function putString(text: string): Promise<string> {
   const entrypoint = join(import.meta.dirname, "../dist/index.js");
   const out = execFileSync(
     "node",
-    [entrypoint, "--home", storePath, "put", "@ocas/string", "--pipe"],
+    [
+      entrypoint,
+      "--home",
+      storePath,
+      "put",
+      "@ocas/string",
+      "--pipe",
+      "--json",
+    ],
     {
       input: JSON.stringify(text),
       encoding: "utf-8",

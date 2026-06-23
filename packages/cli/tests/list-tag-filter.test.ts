@@ -33,10 +33,11 @@ function runCli(...rawArgs: (string | string[])[]): {
   exitCode: number;
 } {
   const args = rawArgs.flat();
+  const finalArgs = args.includes("--json") ? args : [...args, "--json"];
   try {
     const stdout = execFileSync(
       "node",
-      [cliPath, "--home", storePath, ...args],
+      [cliPath, "--home", storePath, ...finalArgs],
       {
         encoding: "utf-8",
         timeout: 10000,
@@ -57,7 +58,7 @@ function putString(value: string): string {
   try {
     const out = execFileSync(
       "node",
-      [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe"],
+      [cliPath, "--home", storePath, "put", "@ocas/string", "--pipe", "--json"],
       {
         input: JSON.stringify(value),
         encoding: "utf-8",

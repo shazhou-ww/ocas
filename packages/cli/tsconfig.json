@@ -6,5 +6,9 @@
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../core" }, { "path": "../fs" }]
+  "references": [
+    { "path": "../core" },
+    { "path": "../fs" },
+    { "path": "../cli-kit" }
+  ]
 }

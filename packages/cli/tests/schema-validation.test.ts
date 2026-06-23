@@ -584,7 +584,7 @@ describe("Phase 2: Schema Validation", () => {
     writeFileSync(nodeFile, JSON.stringify({ name: "Alice", age: 30 }));
     const stdout = execFileSync(
       "node",
-      [entrypoint, "--home", tmpStore, "put", typeHash, nodeFile],
+      [entrypoint, "--home", tmpStore, "put", typeHash, nodeFile, "--json"],
       {
         encoding: "utf-8",
         timeout: 10000,

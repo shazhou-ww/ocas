@@ -11,16 +11,18 @@ export function parseArgv(
   allowRenderFlag: boolean,
 ): ParseResult {
   const definitions: Record<string, FlagDefinition> = {
-    ...knownFlags,
     format: { type: "string", default: "yaml" },
     compact: { type: "boolean", default: false },
     quiet: { type: "boolean", default: false },
+    json: { type: "boolean", default: false },
+    ...knownFlags,
     ...(allowRenderFlag ? { render: { type: "boolean", default: false } } : {}),
   };
   const flags: ParsedFlags = {
     format: "yaml",
     compact: false,
     quiet: false,
+    json: false,
   };
   if (allowRenderFlag) {
     flags.render = false;
@@ -60,7 +62,11 @@ export function parseArgv(
         key = body;
       }
     } else {
-      throw new Error(`Unknown option: ${token}`);
+      const body = token.slice(1);
+      if (body.length !== 1) {
+        throw new Error(`Unknown option: ${token}`);
+      }
+      key = body;
     }
 
     const definition = definitions[key];
@@ -90,18 +96,27 @@ export function parseArgv(
       continue;
     }
 
+    const existing = flags[key];
+    if (
+      key === "tag" &&
+      definition.type === "string" &&
+      existing !== undefined &&
+      existing !== definition.default
+    ) {
+      if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        flags[key] = [String(existing), value];
+      }
+      continue;
+    }
+
     flags[key] = value;
   }
 
-  const format = flags.format;
-  if (
-    format !== "yaml" &&
-    format !== "json" &&
-    format !== "text" &&
-    format !== "html"
-  ) {
-    throw new Error(`Invalid --format: ${String(format)}`);
-  }
+  // --json implies compact JSON output, but does NOT override --format
+  // (which may be used for command-specific purposes like --format html).
+  // The json→format mapping is handled in cli.ts's run() instead.
 
   return { positionals, flags };
 }

@@ -5,6 +5,9 @@ function lookupPath(value: unknown, key: string): unknown {
   let current: unknown = value;
   for (const part of parts) {
     if (current === null || typeof current !== "object") {
+      if (part === "value" && parts.length === 1) {
+        return current;
+      }
       return "";
     }
     current = (current as Record<string, unknown>)[part];

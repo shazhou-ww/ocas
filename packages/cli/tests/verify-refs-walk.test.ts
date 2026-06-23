@@ -45,9 +45,10 @@ function runCli(args: string[]): {
   exitCode: number;
 } {
   try {
+    const finalArgs = args.includes("--json") ? args : [...args, "--json"];
     const stdout = execFileSync(
       "node",
-      [entrypoint, "--home", tmpStore, ...args],
+      [entrypoint, "--home", tmpStore, ...finalArgs],
       {
         encoding: "utf-8",
         timeout: 10000,

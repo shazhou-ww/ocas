@@ -45,10 +45,11 @@ describe("Phase 7: Edge Cases", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
+    const finalArgs = args.includes("--json") ? args : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
-        [entrypoint, "--home", tmpStore, ...args],
+        [entrypoint, "--home", tmpStore, ...finalArgs],
         {
           encoding: "utf-8",
           timeout: 10000,
@@ -171,10 +172,11 @@ describe("Phase 3: Variable System", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
+    const finalArgs = args.includes("--json") ? args : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
-        [entrypoint, "--home", tmpStore, ...args],
+        [entrypoint, "--home", tmpStore, ...finalArgs],
         {
           encoding: "utf-8",
           timeout: 10000,
@@ -374,10 +376,11 @@ describe("Phase 4: Template System", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
+    const finalArgs = args.includes("--json") ? args : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
-        [entrypoint, "--home", tmpStore, ...args],
+        [entrypoint, "--home", tmpStore, ...finalArgs],
         {
           encoding: "utf-8",
           timeout: 10000,

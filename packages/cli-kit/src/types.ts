@@ -12,6 +12,7 @@ export interface ParsedFlags extends Record<string, unknown> {
   format: OutputFormat;
   compact: boolean;
   quiet: boolean;
+  json: boolean;
   render?: boolean;
 }
 

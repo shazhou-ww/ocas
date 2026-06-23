@@ -2,7 +2,7 @@
 
 exports[`Phase 3: Variable System > 3.1 var set creates variable 1`] = `
 {
-  "type": "0Q5EMYK4SYSS9",
+  "type": "@ocas/output/var-set",
   "value": {
     "labels": [],
     "name": "@myapp/config",
@@ -15,7 +15,7 @@ exports[`Phase 3: Variable System > 3.1 var set creates variable 1`] = `
 
 exports[`Phase 3: Variable System > 3.2 var get returns variable 1`] = `
 {
-  "type": "F5RRJTXP8Z99D",
+  "type": "@ocas/output/var-get",
   "value": {
     "labels": [],
     "name": "@myapp/config",
@@ -28,7 +28,7 @@ exports[`Phase 3: Variable System > 3.2 var get returns variable 1`] = `
 
 exports[`Phase 3: Variable System > 3.3 var list shows all variables 1`] = `
 {
-  "type": "AF0XACGXHPMC1",
+  "type": "@ocas/output/var-list",
   "value": [
     {
       "labels": [],
@@ -274,7 +274,7 @@ exports[`Phase 3: Variable System > 3.3 var list shows all variables 1`] = `
 
 exports[`Phase 3: Variable System > 3.4 var list prefix filters by prefix 1`] = `
 {
-  "type": "AF0XACGXHPMC1",
+  "type": "@ocas/output/var-list",
   "value": [
     {
       "labels": [],
@@ -289,7 +289,7 @@ exports[`Phase 3: Variable System > 3.4 var list prefix filters by prefix 1`] = 
 
 exports[`Phase 3: Variable System > 3.5 var set upsert updates existing variable 1`] = `
 {
-  "type": "0Q5EMYK4SYSS9",
+  "type": "@ocas/output/var-set",
   "value": {
     "labels": [],
     "name": "@myapp/config",
@@ -302,7 +302,7 @@ exports[`Phase 3: Variable System > 3.5 var set upsert updates existing variable
 
 exports[`Phase 3: Variable System > 3.6 var set with tag and label adds them 1`] = `
 {
-  "type": "0Q5EMYK4SYSS9",
+  "type": "@ocas/output/var-set",
   "value": {
     "labels": [
       "important",
@@ -319,7 +319,7 @@ exports[`Phase 3: Variable System > 3.6 var set with tag and label adds them 1`]
 
 exports[`Phase 3: Variable System > 3.7 var list --tag env:prod filters by kv tag 1`] = `
 {
-  "type": "AF0XACGXHPMC1",
+  "type": "@ocas/output/var-list",
   "value": [
     {
       "labels": [
@@ -338,7 +338,7 @@ exports[`Phase 3: Variable System > 3.7 var list --tag env:prod filters by kv ta
 
 exports[`Phase 3: Variable System > 3.8 var list --tag important filters by label 1`] = `
 {
-  "type": "AF0XACGXHPMC1",
+  "type": "@ocas/output/var-list",
   "value": [
     {
       "labels": [
@@ -357,7 +357,7 @@ exports[`Phase 3: Variable System > 3.8 var list --tag important filters by labe
 
 exports[`Phase 3: Variable System > 3.9 var set without label removes it 1`] = `
 {
-  "type": "0Q5EMYK4SYSS9",
+  "type": "@ocas/output/var-set",
   "value": {
     "labels": [],
     "name": "@myapp/config",
@@ -372,7 +372,7 @@ exports[`Phase 3: Variable System > 3.9 var set without label removes it 1`] = `
 
 exports[`Phase 3: Variable System > 3.10 var delete removes variable 1`] = `
 {
-  "type": "C3MYPR5RGQFZT",
+  "type": "@ocas/output/var-delete",
   "value": [
     {
       "labels": [],
@@ -387,11 +387,11 @@ exports[`Phase 3: Variable System > 3.10 var delete removes variable 1`] = `
 }
 `;
 
-exports[`Phase 3: Variable System > 3.11 var get deleted variable returns not found 1`] = `"Error: Variable not found: name=@myapp/config, schema=FRBAB1BF0ZBCS"`;
+exports[`Phase 3: Variable System > 3.11 var get deleted variable returns not found 1`] = `"{"type":"@ocas/error","value":{"message":"Error: Variable not found: name=@myapp/config, schema=FRBAB1BF0ZBCS","command":"var get"}}"`;
 
 exports[`Phase 4: Template System > 4.1 template set registers template 1`] = `
 {
-  "type": "BJDHPAE4Q8TXM",
+  "type": "@ocas/output/template-set",
   "value": {
     "contentHash": "6WW8WNB38GTTP",
     "schemaHash": "FRBAB1BF0ZBCS",
@@ -401,14 +401,14 @@ exports[`Phase 4: Template System > 4.1 template set registers template 1`] = `
 
 exports[`Phase 4: Template System > 4.2 template get returns template text 1`] = `
 {
-  "type": "0B0HBHZGYHR84",
+  "type": "@ocas/output/template-get",
   "value": "Name: {{ payload.name }}, Age: {{ payload.age }}",
 }
 `;
 
 exports[`Phase 4: Template System > 4.3 template list shows registered templates 1`] = `
 {
-  "type": "8917JQTD1R5JF",
+  "type": "@ocas/output/template-list",
   "value": [
     {
       "contentHash": "6WW8WNB38GTTP",
@@ -420,20 +420,20 @@ exports[`Phase 4: Template System > 4.3 template list shows registered templates
 
 exports[`Phase 4: Template System > 4.4 template delete removes template 1`] = `
 {
-  "type": "BY7BGZJND3N7R",
+  "type": "@ocas/output/template-delete",
   "value": {
     "deleted": true,
   },
 }
 `;
 
-exports[`Phase 4: Template System > 4.5 template get deleted template returns not found 1`] = `"Error: Template not found for schema: FRBAB1BF0ZBCS"`;
+exports[`Phase 4: Template System > 4.5 template get deleted template returns not found 1`] = `"{"type":"@ocas/error","value":{"message":"Error: Template not found for schema: FRBAB1BF0ZBCS","command":"template get"}}"`;
 
-exports[`Phase 7: Edge Cases > 7.1 get non-existent hash errors gracefully 1`] = `"Node not found: AAAAAAAAAAAAA"`;
+exports[`Phase 7: Edge Cases > 7.1 get non-existent hash errors gracefully 1`] = `"{"type":"@ocas/error","value":{"message":"Node not found: AAAAAAAAAAAAA","command":"get"}}"`;
 
-exports[`Phase 7: Edge Cases > 7.3 var set empty name errors 1`] = `"Usage: ocas var set <name> <hash> [--tag <tag>...]"`;
+exports[`Phase 7: Edge Cases > 7.3 var set empty name errors 1`] = `"{"type":"@ocas/error","value":{"message":"Usage: ocas var set <name> <hash> [--tag <tag>...]","command":"var set"}}"`;
 
-exports[`Phase 7: Edge Cases > 7.4 var set name with invalid chars errors 1`] = `"Error: Invalid variable name "invalid name!": Name must follow @scope/name format (e.g. @myapp/config)"`;
+exports[`Phase 7: Edge Cases > 7.4 var set name with invalid chars errors 1`] = `"{"type":"@ocas/error","value":{"message":"Error: Invalid variable name \\"invalid name!\\": Name must follow @scope/name format (e.g. @myapp/config)","command":"var set"}}"`;
 
 exports[`Phase 7: Edge Cases > 7.5 no subcommand shows help text 1`] = `
 "Usage: ocas [--home <path>] [--json] <command> [args]
