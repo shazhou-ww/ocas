@@ -64,10 +64,14 @@ describe("Phase 5: Render", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
+    const isRender = args[0] === "render";
+    const finalArgs = isRender || args.includes("--json")
+      ? args
+      : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
-        [entrypoint, "--home", tmpStore, ...args],
+        [entrypoint, "--home", tmpStore, ...finalArgs],
         {
           encoding: "utf-8",
           timeout: 10000,
@@ -88,10 +92,14 @@ describe("Phase 5: Render", () => {
     args: string[],
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    const isRender = args[0] === "render";
+    const finalArgs = isRender || args.includes("--json")
+      ? args
+      : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
-        [entrypoint, "--home", tmpStore, ...args],
+        [entrypoint, "--home", tmpStore, ...finalArgs],
         {
           input: stdin,
           encoding: "utf-8",

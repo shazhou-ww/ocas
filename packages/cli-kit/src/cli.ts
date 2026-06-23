@@ -129,9 +129,20 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
     try {
       const { command, rest } = resolveCommand(root, argv);
       if (command === root) {
+        const token = argv.find((part) => !part.startsWith("-"));
+        if (token !== undefined) {
+          throw new CliError(`Unknown command: ${token}`, "E_USAGE");
+        }
         throw new CliError("No command selected", "E_USAGE");
       }
       if (command.children.size > 0) {
+        const nextToken = rest.find((part) => !part.startsWith("-"));
+        if (nextToken !== undefined) {
+          throw new CliError(
+            `Unknown ${command.path.join(" ")} subcommand: ${nextToken}`,
+            "E_USAGE",
+          );
+        }
         throw new CliError("Command is not executable", "E_USAGE");
       }
       if (!command.action) {
@@ -145,9 +156,6 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       }
 
       const parsed = parseArgv(rest, command.flags, allowRenderFlag);
-      if (parsed.positionals.length > command.args.length) {
-        throw new CliError("Too many positional arguments", "E_USAGE");
-      }
       if (parsed.positionals.length < command.args.length) {
         throw new CliError("Missing positional arguments", "E_USAGE");
       }
@@ -166,7 +174,14 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         log: logger,
       };
 
-      const actionResult = command.action(args, parsed.flags, ctx);
+      const actionResult = command.action(
+        args,
+        {
+          ...parsed.flags,
+          _positionals: parsed.positionals,
+        } as typeof parsed.flags,
+        ctx,
+      );
       let finalValue: unknown;
       if (isAsyncGenerator(actionResult)) {
         const iterator = actionResult[Symbol.asyncIterator]();

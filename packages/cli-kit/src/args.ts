@@ -60,7 +60,11 @@ export function parseArgv(
         key = body;
       }
     } else {
-      throw new Error(`Unknown option: ${token}`);
+      const body = token.slice(1);
+      if (body.length !== 1) {
+        throw new Error(`Unknown option: ${token}`);
+      }
+      key = body;
     }
 
     const definition = definitions[key];
@@ -90,17 +94,22 @@ export function parseArgv(
       continue;
     }
 
-    flags[key] = value;
-  }
+    const existing = flags[key];
+    if (
+      key === "tag" &&
+      definition.type === "string" &&
+      existing !== undefined &&
+      existing !== definition.default
+    ) {
+      if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        flags[key] = [String(existing), value];
+      }
+      continue;
+    }
 
-  const format = flags.format;
-  if (
-    format !== "yaml" &&
-    format !== "json" &&
-    format !== "text" &&
-    format !== "html"
-  ) {
-    throw new Error(`Invalid --format: ${String(format)}`);
+    flags[key] = value;
   }
 
   return { positionals, flags };

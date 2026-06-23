@@ -48,10 +48,14 @@ function runCli(...rawArgs: (string | string[])[]): {
   exitCode: number;
 } {
   const args = rawArgs.flat();
+  const isRender = args[0] === "render";
+  const finalArgs = isRender || args.includes("--json")
+    ? args
+    : [...args, "--json"];
   try {
     const stdout = execFileSync(
       "node",
-      [entrypoint, "--home", tmpStore, ...args],
+      [entrypoint, "--home", tmpStore, ...finalArgs],
       {
         encoding: "utf-8",
         timeout: 10000,
@@ -150,10 +154,14 @@ describe("GC #93 - oneOf step chain CLI integration", () => {
       const runCliSub = (
         args: string[],
       ): { stdout: string; stderr: string; exitCode: number } => {
+        const isRender = args[0] === "render";
+        const finalArgs = isRender || args.includes("--json")
+          ? args
+          : [...args, "--json"];
         try {
           const stdout = execFileSync(
             "node",
-            [entrypoint, "--home", subStore, ...args],
+            [entrypoint, "--home", subStore, ...finalArgs],
             { encoding: "utf-8", timeout: 10000 },
           );
           return { stdout: stdout.trim(), stderr: "", exitCode: 0 };
