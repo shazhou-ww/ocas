@@ -1418,6 +1418,36 @@ async function invokeLegacy(
   if (!isEnvelope(output)) {
     return output;
   }
+
+  // If --render flag is set, render the output through the ocas render pipeline
+  if (flags.render === true) {
+    const store = await openStore();
+    const renderOpts = {
+      ...(typeof flags.resolution === "string"
+        ? { resolution: Number.parseFloat(flags.resolution) }
+        : {}),
+      ...(typeof flags.decay === "string"
+        ? { decay: Number.parseFloat(flags.decay) }
+        : {}),
+      ...(typeof flags.epsilon === "string"
+        ? { epsilon: Number.parseFloat(flags.epsilon) }
+        : {}),
+    };
+    let rendered: string;
+    if (typeof output.value === "string" && isHash(output.value)) {
+      rendered = await renderAsync(store, output.value as Hash, renderOpts);
+    } else {
+      rendered = await renderDirectAsync(
+        output.type as Hash,
+        output.value,
+        store,
+        renderOpts,
+      );
+    }
+    process.stdout.write(`${rendered}\n`);
+    return undefined; // cli-kit skips output
+  }
+
   return output.value;
 }
 
