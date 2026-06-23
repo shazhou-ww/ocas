@@ -64,9 +64,10 @@ describe("Phase 5: Render", () => {
     exitCode: number;
   } {
     const args = rawArgs.flat();
-    const isRender = args[0] === "render";
     const finalArgs =
-      isRender || args.includes("--json") ? args : [...args, "--json"];
+      args[0] === "render" || args.includes("--json")
+        ? args
+        : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
@@ -91,13 +92,10 @@ describe("Phase 5: Render", () => {
     args: string[],
     stdin: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const isRender = args[0] === "render";
-    const finalArgs =
-      isRender || args.includes("--json") ? args : [...args, "--json"];
     try {
       const stdout = execFileSync(
         "node",
-        [entrypoint, "--home", tmpStore, ...finalArgs],
+        [entrypoint, "--home", tmpStore, ...args],
         {
           input: stdin,
           encoding: "utf-8",
@@ -530,3 +528,144 @@ describe("Suite 6: CLI Integration with Templates", () => {
 // Store validation tests removed - with auto-bootstrap in Phase 1a,
 // stores are automatically created and bootstrapped when opened.
 // Issue #55 validation is no longer applicable.
+
+// --- Phase 7: --render flag (inline rendering) ---
+
+describe("Phase 7: --render flag", () => {
+  test("7.1 get -r renders node with template", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "ocas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        }),
+      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
+
+      const nodeFile = join(tmpStore, "node.json");
+      writeFileSync(nodeFile, JSON.stringify({ name: "Alice" }));
+      const { stdout: nodeOut } = await runCli(
+        ["put", schemaHash.trim(), nodeFile],
+        tmpStore,
+      );
+      const nodeHash = envValue(nodeOut) as string;
+
+      // Register template
+      await runCli(
+        [
+          "template",
+          "set",
+          schemaHash.trim(),
+          "--inline",
+          "Hello {{ payload.name }}!",
+        ],
+        tmpStore,
+      );
+
+      // get -r should render inline
+      const { stdout, exitCode } = await runCli(
+        ["get", nodeHash, "-r"],
+        tmpStore,
+      );
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("Hello Alice!");
+      // Should NOT contain envelope JSON
+      expect(stdout).not.toContain('"type"');
+      expect(stdout).not.toContain('"value"');
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("7.2 get without -r returns envelope (not rendered)", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "ocas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        }),
+      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
+
+      const nodeFile = join(tmpStore, "node.json");
+      writeFileSync(nodeFile, JSON.stringify({ name: "Alice" }));
+      const { stdout: nodeOut } = await runCli(
+        ["put", schemaHash.trim(), nodeFile],
+        tmpStore,
+      );
+      const nodeHash = envValue(nodeOut) as string;
+
+      await runCli(
+        [
+          "template",
+          "set",
+          schemaHash.trim(),
+          "--inline",
+          "Hello {{ payload.name }}!",
+        ],
+        tmpStore,
+      );
+
+      // Without -r, should get envelope, not rendered output
+      const { stdout, exitCode } = await runCli(["get", nodeHash], tmpStore);
+      expect(exitCode).toBe(0);
+      // Should contain envelope structure
+      const parsed = JSON.parse(stdout);
+      expect(parsed.type).toBeDefined();
+      expect(parsed.value).toBeDefined();
+      // Should NOT be rendered
+      expect(stdout).not.toContain("Hello Alice!");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+
+  test("7.3 get -r on non-templated node falls back to YAML", async () => {
+    const tmpStore = mkdtempSync(join(tmpdir(), "ocas-test-"));
+    try {
+      await runCli(["init"], tmpStore);
+
+      const schemaFile = join(tmpStore, "schema.json");
+      writeFileSync(
+        schemaFile,
+        JSON.stringify({
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        }),
+      );
+      const schemaHash = await putSchemaFile(tmpStore, schemaFile);
+
+      const nodeFile = join(tmpStore, "node.json");
+      writeFileSync(nodeFile, JSON.stringify({ name: "Bob" }));
+      const { stdout: nodeOut } = await runCli(
+        ["put", schemaHash.trim(), nodeFile],
+        tmpStore,
+      );
+      const nodeHash = envValue(nodeOut) as string;
+
+      // No template registered - should fall back to YAML
+      const { stdout, exitCode } = await runCli(
+        ["get", nodeHash, "-r"],
+        tmpStore,
+      );
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("name:");
+      expect(stdout).toContain("Bob");
+    } finally {
+      rmSync(tmpStore, { recursive: true, force: true });
+    }
+  });
+});

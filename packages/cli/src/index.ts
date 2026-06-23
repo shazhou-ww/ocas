@@ -166,7 +166,7 @@ if (process.argv.includes("--version")) {
 
 const defaultStorePath = join(homedir(), ".ocas");
 let flags: Flags = {};
-let commandOutput: unknown = undefined;
+let commandOutput: unknown;
 const parsedInput = parseArgs(process.argv.slice(2));
 const normalizedArgv = normalizeArgv(parsedInput.positional, parsedInput.flags);
 
@@ -1435,8 +1435,24 @@ async function invokeLegacy(
     };
     let rendered: string;
     if (typeof output.value === "string" && isHash(output.value)) {
+      // Value is a hash (e.g. from `put`) — render the node at that hash
       rendered = await renderAsync(store, output.value as Hash, renderOpts);
+    } else if (
+      output.value !== null &&
+      typeof output.value === "object" &&
+      "type" in output.value &&
+      "payload" in output.value
+    ) {
+      // Value is a CAS node (e.g. from `get`) — render using the node's own type
+      const node = output.value as { type: Hash; payload: unknown };
+      rendered = await renderDirectAsync(
+        node.type,
+        node.payload,
+        store,
+        renderOpts,
+      );
     } else {
+      // Fallback: render the envelope value as-is
       rendered = await renderDirectAsync(
         output.type as Hash,
         output.value,
