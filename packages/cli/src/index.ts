@@ -1011,8 +1011,13 @@ const list = cli
     }
 
     if (runtimeFlags.render === true) {
-      const typeHash = store.var.get("@ocas/output/list")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, entries, store, {});
+      const outputTypeHash = store.var.get("@ocas/output/list")?.value as Hash;
+      const rendered = await renderDirectAsync(
+        outputTypeHash,
+        entries,
+        store,
+        {},
+      );
       process.stdout.write(`${rendered}\n`);
       return undefined;
     }
@@ -1200,15 +1205,15 @@ const varGet = cli
         `Error: Variable not found: name=${name}, schema=${schema}`,
       );
     const valueTags = store.tag.tags(variable.value);
-    const out_value =
+    const outValue =
       valueTags.length === 0 ? variable : { ...variable, valueTags };
     if (runtimeFlags.render === true) {
       const typeHash = store.var.get("@ocas/output/var-get")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, out_value, store, {});
+      const rendered = await renderDirectAsync(typeHash, outValue, store, {});
       process.stdout.write(`${rendered}\n`);
       return undefined;
     }
-    return out_value;
+    return outValue;
   });
 addCommonFlags(varGet);
 
@@ -1232,36 +1237,29 @@ const varDelete = cli
       );
     const store = await openStore();
     try {
+      let result: unknown;
       if (schemaInput !== undefined) {
         const schema = resolveHash(schemaInput, store);
         const variables = store.var.remove(name, schema);
         if (variables.length === 0)
           throw new VariableNotFoundError(name, schema);
-        const result = variables[0] as unknown;
-        if (runtimeFlags.render === true) {
-          const typeHash = store.var.get("@ocas/output/var-delete")
-            ?.value as Hash;
-          const rendered = await renderDirectAsync(typeHash, result, store, {});
-          process.stdout.write(`${rendered}\n`);
-          return undefined;
-        }
-        return result;
+        result = variables[0] as unknown;
       } else {
-        const variables = store.var.remove(name);
-        if (runtimeFlags.render === true) {
-          const typeHash = store.var.get("@ocas/output/var-delete")
-            ?.value as Hash;
-          const rendered = await renderDirectAsync(
-            typeHash,
-            variables,
-            store,
-            {},
-          );
-          process.stdout.write(`${rendered}\n`);
-          return undefined;
-        }
-        return variables;
+        result = store.var.remove(name);
       }
+      if (runtimeFlags.render === true) {
+        const outputTypeHash = store.var.get("@ocas/output/var-delete")
+          ?.value as Hash;
+        const rendered = await renderDirectAsync(
+          outputTypeHash,
+          result,
+          store,
+          {},
+        );
+        process.stdout.write(`${rendered}\n`);
+        return undefined;
+      }
+      return result;
     } catch (e) {
       if (e instanceof VariableNotFoundError) {
         return ctx.error(`Error: ${(e as Error).message}`);
@@ -1528,7 +1526,7 @@ const templateList = cli
       schema: stringHash,
     });
 
-    return [
+    const templates = [
       ...instanceVars.map((v) => ({
         schemaHash: v.name.replace(instancePrefix, ""),
         contentHash: v.value,
@@ -1538,6 +1536,20 @@ const templateList = cli
         contentHash: v.value,
       })),
     ];
+
+    if (runtimeFlags.render === true) {
+      const outputTypeHash = store.var.get("@ocas/output/template-list")
+        ?.value as Hash;
+      const rendered = await renderDirectAsync(
+        outputTypeHash,
+        templates,
+        store,
+        {},
+      );
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return templates;
   });
 addCommonFlags(templateList);
 

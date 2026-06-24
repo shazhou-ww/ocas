@@ -420,6 +420,27 @@ describe("template list", () => {
     const envelope = JSON.parse(stdout);
     expect(Array.isArray(envelope.value)).toBe(true);
   });
+
+  test("--render outputs rendered content instead of envelope", async () => {
+    const store = await openFsStore(storePath);
+    const stringHash = await getStringHash(store);
+
+    await runCli("template", "set", stringHash, "--inline", "Test");
+
+    // Run without --json so -r is handled by cli-kit render path
+    const stdout = execFileSync(
+      "node",
+      [cliPath, "--home", storePath, "template", "list", "-r"],
+      { encoding: "utf-8", timeout: 10000 },
+    ).trim();
+
+    // Rendered output should NOT be JSON envelope
+    expect(stdout).not.toContain('"type"');
+    expect(stdout).not.toContain('"value"');
+    // Should contain rendered template entries (hashes get expanded by render pipeline)
+    expect(stdout).toContain("schemaHash");
+    expect(stdout).toContain("contentHash");
+  });
 });
 
 describe("template delete", () => {
