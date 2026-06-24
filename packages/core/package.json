@@ -1,6 +1,6 @@
 {
   "name": "@ocas/core",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Core CAS engine — hashing, schema, store, verify, bootstrap",
   "keywords": [
     "cas",

@@ -1,5 +1,15 @@
 # @ocas/core
 
+## 0.6.1 — 2026-06-24
+
+- Fix non-deterministic tar mtime in `packTar` — replace `Date.now()` with
+  per-node `node.timestamp`. This restores bit-for-bit reproducibility: the
+  same content now produces identical tar bytes across exports.
+  
+  Merkle DAG invariant guarantees `parent.timestamp >= child.timestamp`,
+  so the root node's timestamp is naturally the max — no extra computation
+  needed. Derived files (`vars.jsonl`, `tags.jsonl`) use mtime=0.
+
 ## 0.6.0 — 2026-06-18
 
 - Beautify 6 remaining HTML output templates (refs, walk, var-history, gc, export, import) to use card layout with design system tokens. Add stats-grid CSS for gc/export/import, hash-list for refs/walk, and current marker for var-history. Add ocas-success and ocas-zero semantic CSS classes.
