@@ -85,7 +85,7 @@ export async function exportBundle(
       payload: node.payload,
       timestamp: node.timestamp,
     });
-    entries.push({ name: `cas/${hash}.bin`, content });
+    entries.push({ name: `cas/${hash}.bin`, content, mtime: node.timestamp });
   }
 
   // Variables — JSON-lines.
@@ -110,6 +110,7 @@ export async function exportBundle(
     content: new TextEncoder().encode(
       varLines + (varLines.length > 0 ? "\n" : ""),
     ),
+    mtime: 0,
   });
 
   // Tags — JSON-lines, one per tag.
@@ -136,6 +137,7 @@ export async function exportBundle(
     content: new TextEncoder().encode(
       tagText + (tagText.length > 0 ? "\n" : ""),
     ),
+    mtime: 0,
   });
 
   // Pack into tar and write to disk.
@@ -307,7 +309,7 @@ export async function loadBundleStore(bundlePath: string): Promise<Store> {
 // Minimal tar pack/unpack — POSIX ustar format, regular files only.
 // ---------------------------------------------------------------------------
 
-type TarEntry = { name: string; content: Uint8Array };
+type TarEntry = { name: string; content: Uint8Array; mtime: number };
 
 function packTar(entries: TarEntry[]): Buffer {
   const blocks: Buffer[] = [];
@@ -318,7 +320,7 @@ function packTar(entries: TarEntry[]): Buffer {
     writeOctal(header, 0, 108, 8);
     writeOctal(header, 0, 116, 8);
     writeOctal(header, entry.content.length, 124, 12);
-    writeOctal(header, Math.floor(Date.now() / 1000), 136, 12);
+    writeOctal(header, Math.floor(entry.mtime / 1000), 136, 12); // mtime → per-entry
     // checksum placeholder — 8 spaces, then computed.
     for (let i = 0; i < 8; i++) header[148 + i] = 0x20;
     header[156] = 0x30; // typeflag '0' (regular file)
@@ -352,7 +354,7 @@ function unpackTar(buf: Buffer): TarEntry[] {
     const size = sizeStr === "" ? 0 : parseInt(sizeStr, 8);
     offset += 512;
     const content = new Uint8Array(buf.subarray(offset, offset + size));
-    entries.push({ name, content });
+    entries.push({ name, content, mtime: 0 });
     offset += Math.ceil(size / 512) * 512;
   }
   return entries;

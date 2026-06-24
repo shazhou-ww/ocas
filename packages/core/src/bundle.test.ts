@@ -376,6 +376,28 @@ describe("exportBundle / importBundle / loadBundleStore", () => {
     expect(visited).toContain(aHash);
     expect(visited).toContain(bHash);
   });
+
+  test("2.10 export: deterministic — same content produces identical bytes", async () => {
+    const store = createMemoryStore();
+    bootstrap(store);
+    const schemaHash = putSchema(store, {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    });
+    const nodeHash = store.cas.put(schemaHash, { name: "Alice" });
+    store.var.set("@test/det", nodeHash);
+    store.tag.tag(nodeHash, [{ op: "set", key: "env", value: "test" }]);
+
+    const out1 = join(tmpDir, "det1.tar");
+    const out2 = join(tmpDir, "det2.tar");
+    await exportBundle(store, ["@test/det"], out1);
+    await exportBundle(store, ["@test/det"], out2);
+
+    const bytes1 = readFileSync(out1);
+    const bytes2 = readFileSync(out2);
+    expect(bytes1.equals(bytes2)).toBe(true);
+  });
 });
 
 // ---- Tar parser (minimal POSIX/ustar reader) used by tests ----
