@@ -1,5 +1,25 @@
 # @ocas/cli
 
+## 0.7.0 — 2026-06-24
+
+- ## Phase 3: eliminate invokeLegacy, migrate all commands to native cli-kit
+  
+  Complete migration of all 25+ CLI commands from the `invokeLegacy` bridge
+  pattern to native cli-kit actions:
+  
+  - Read flags from `runtimeFlags` parameter (not global)
+  - Return values directly (no `out()`/`wrapEnvelope()`)
+  - Use `ctx.error()` instead of `die()` in action handlers
+  - Handle `--render` flag inline
+  
+  Dead code purged: `invokeLegacy`, `commandOutput`, `wrapEnvelope`, `out()`,
+  all `cmd*` standalone functions. Net -275 lines.
+  
+  Also fixes: list variable shadow, template list missing --render,
+  var delete duplicate render blocks, snake_case naming.
+- Fix `-r/--render` flag: use node's own type hash for `renderDirectAsync`
+  instead of envelope type hash. Add test coverage for the render flag path.
+
 ## 0.6.0 — 2026-06-18
 
 - Add HTML render format support: `ocas render <hash> --format html` produces a self-contained HTML5 document. Includes LiquidJS template discovery via `@ocas/template/html/<type-hash>`, YAML-in-`<pre><code>` fallback for unregistered types, builtin HTML document shell, and custom compose template override via `@ocas/template/html/_compose`.
