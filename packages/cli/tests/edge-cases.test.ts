@@ -134,7 +134,10 @@ describe("Phase 7: Edge Cases", () => {
     const { stdout, stderr, exitCode: _exitCode } = await runCli([]);
     const combined = stdout + stderr;
     expect(combined.length).toBeGreaterThan(0);
-    expect(combined).toMatchSnapshot();
+    // Normalize version to keep snapshot stable across releases
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    const normalized = combined.replaceAll(pkg.version, "<version>");
+    expect(normalized).toMatchSnapshot();
     expect(combined.toLowerCase()).toContain("usage");
   });
 

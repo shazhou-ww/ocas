@@ -491,5 +491,5 @@ Flags:
   --scope <name>      Variable name remap target for import (e.g. --scope @imported)
   -o <file>           Output path for export
 
-Agent: If you have not installed the ocas skill for this version (0.6.0), run \`ocas prompt bootstrap\` and follow the instructions."
+Agent: If you have not installed the ocas skill for this version (<version>), run \`ocas prompt bootstrap\` and follow the instructions."
 `;
