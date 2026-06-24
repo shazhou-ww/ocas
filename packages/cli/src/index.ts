@@ -33,7 +33,6 @@ import {
   validate,
   verify,
   walk,
-  wrapEnvelope,
 } from "@ocas/core";
 import {
   type FsCasStore,
@@ -166,16 +165,10 @@ if (process.argv.includes("--version")) {
 
 const defaultStorePath = join(homedir(), ".ocas");
 let flags: Flags = {};
-let commandOutput: unknown;
 const parsedInput = parseArgs(process.argv.slice(2));
 const normalizedArgv = normalizeArgv(parsedInput.positional, parsedInput.flags);
 
 // ---- Helpers ----
-
-async function out(data: unknown, store?: Store): Promise<void> {
-  void store;
-  commandOutput = data;
-}
 
 function die(msg: string): never {
   throw new Error(msg);
@@ -388,915 +381,6 @@ function parseListOptions(): ListOptions {
 
 // ---- Commands ----
 
-async function cmdPut(args: string[]): Promise<void> {
-  const isPipe = flags.pipe === true || flags.p === true;
-  const typeHashOrName = args[0];
-  const file = isPipe ? undefined : args[1];
-  if (!typeHashOrName || (!isPipe && !file))
-    die(
-      "Usage: ocas put <type-hash> <file.json>\n       ocas put <type-hash> --pipe/-p",
-    );
-  if (isPipe && args[1])
-    die("Cannot use --pipe/-p with a file argument. Use one or the other.");
-  const store = await openStore();
-  const typeHash = resolveHash(typeHashOrName, store);
-  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
-
-  // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
-  // instead of ajv against meta-schema (which can't express recursive constraints)
-  const metaHash = resolveHash("@ocas/schema", store);
-  if (typeHash === metaHash) {
-    try {
-      const hash = putSchema(store, payload as Record<string, unknown>);
-      await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
-    } catch (_e) {
-      die(
-        `Validation failed: payload in ${file ?? "<stdin>"} does not match schema ${typeHash}`,
-      );
-    }
-    return;
-  }
-
-  // Check if schema exists
-  const schema = getSchema(store, typeHash);
-  if (schema === null) {
-    die(`Schema not found: ${typeHash}`);
-  }
-
-  // Validate payload against schema before storing
-  const tempNode = { type: typeHash, payload, timestamp: Date.now() };
-  if (!validate(store, tempNode)) {
-    die(
-      `Validation failed: payload in ${file ?? "<stdin>"} does not match schema ${typeHash}`,
-    );
-  }
-
-  const hash = store.cas.put(typeHash, payload);
-  await out(await wrapEnvelope(store, "@ocas/output/put", hash), store);
-}
-
-async function cmdGet(args: string[]): Promise<void> {
-  const input = args[0];
-  if (!input) die("Usage: ocas get <hash-or-name>");
-  const store = await openStore();
-  const hash = resolveHash(input, store);
-  const node = store.cas.get(hash);
-  if (node === null) die(`Node not found: ${hash}`);
-  const tags = store.tag.tags(hash);
-  const value = tags.length === 0 ? node : { ...node, tags };
-  await out(await wrapEnvelope(store, "@ocas/output/get", value), store);
-}
-
-async function cmdHas(args: string[]): Promise<void> {
-  const input = args[0];
-  if (!input) die("Usage: ocas has <hash-or-name>");
-  const store = await openStore();
-  const hash = tryResolveHash(input, store);
-  const present = hash !== null && store.cas.has(hash);
-  await out(await wrapEnvelope(store, "@ocas/output/has", present), store);
-}
-
-async function cmdVerify(args: string[]): Promise<void> {
-  const input = args[0];
-  if (!input) die("Usage: ocas verify <hash-or-name>");
-  const store = await openStore();
-  const hash = resolveHash(input, store);
-  const node = store.cas.get(hash);
-  if (node === null) die(`Node not found: ${hash}`);
-  const ok = await verify(hash, node);
-  let status: string;
-  if (!ok) {
-    status = "corrupted";
-  } else {
-    status = validate(store, node) ? "ok" : "invalid";
-  }
-  await out(await wrapEnvelope(store, "@ocas/output/verify", status), store);
-}
-
-async function cmdRefs(args: string[]): Promise<void> {
-  const input = args[0];
-  if (!input) die("Usage: ocas refs <hash-or-name>");
-  const store = await openStore();
-  const hash = resolveHash(input, store);
-  const node = store.cas.get(hash);
-  if (node === null) die(`Node not found: ${hash}`);
-  const refHashes = refs(store, node);
-  await out(await wrapEnvelope(store, "@ocas/output/refs", refHashes), store);
-}
-
-async function cmdWalk(args: string[]): Promise<void> {
-  const input = args[0];
-  if (!input)
-    die("Usage: ocas walk <hash-or-name> [--format tree] [--follow-type]");
-  const store = await openStore();
-  const hash = resolveHash(input, store);
-  const format = flags.format;
-  const followType = flags["follow-type"] === true;
-
-  if (format === "tree") {
-    const childMap = new Map<Hash, Hash[]>();
-    walk(
-      store,
-      hash,
-      (h, node) => {
-        const children = refs(store, node);
-        if (followType) {
-          children.push(node.type);
-        }
-        childMap.set(h, children);
-      },
-      { followType },
-    );
-
-    const printed = new Set<Hash>();
-    const lines: string[] = [];
-
-    function printNode(h: Hash, prefix: string, isLast: boolean): void {
-      const connector = prefix === "" ? "" : isLast ? "└── " : "├── ";
-      if (printed.has(h)) {
-        lines.push(`${prefix}${connector}${h} (seen)`);
-        return;
-      }
-      printed.add(h);
-      lines.push(`${prefix}${connector}${h}`);
-
-      const kids = childMap.get(h) ?? [];
-      const childPrefix =
-        prefix === "" ? "" : prefix + (isLast ? "    " : "│   ");
-      for (let i = 0; i < kids.length; i++) {
-        printNode(kids[i] as Hash, childPrefix, i === kids.length - 1);
-      }
-    }
-
-    printNode(hash, "", true);
-    await out(
-      await wrapEnvelope(store, "@ocas/output/walk", lines.join("\n")),
-      store,
-    );
-  } else {
-    const hashes: Hash[] = [];
-    walk(
-      store,
-      hash,
-      (h) => {
-        hashes.push(h);
-      },
-      { followType },
-    );
-    await out(await wrapEnvelope(store, "@ocas/output/walk", hashes), store);
-  }
-}
-
-async function cmdHash(args: string[]): Promise<void> {
-  const isPipe = flags.pipe === true || flags.p === true;
-  const typeHashOrName = args[0];
-  const file = isPipe ? undefined : args[1];
-  if (!typeHashOrName || (!isPipe && !file))
-    die(
-      "Usage: ocas hash <type-hash> <file.json>\n       ocas hash <type-hash> --pipe/-p",
-    );
-  if (isPipe && args[1])
-    die("Cannot use --pipe/-p with a file argument. Use one or the other.");
-  const store = await openStore();
-  const typeHash = resolveHash(typeHashOrName, store);
-  const payload = isPipe ? await readStdinJson() : readJsonFile(file as string);
-  const hash = await computeHash(typeHash, payload);
-  await out(await wrapEnvelope(store, "@ocas/output/hash", hash), store);
-}
-
-async function cmdRender(args: string[]): Promise<void> {
-  const isPipe = flags.pipe === true || flags.p === true;
-  const input = args[0];
-
-  if (isPipe && input) {
-    die("Cannot use --pipe/-p with a hash argument. Use one or the other.");
-  }
-
-  if (!isPipe && !input) {
-    die(
-      "Usage: ocas render <hash-or-name> [--resolution <n>] [--decay <n>] [--epsilon <n>]\n       ocas render --pipe/-p [--resolution <n>] [--decay <n>] [--epsilon <n>]",
-    );
-  }
-
-  const store = await openStore();
-
-  // Parse numeric options
-  const resolution =
-    typeof flags.resolution === "string"
-      ? Number.parseFloat(flags.resolution)
-      : undefined;
-  const decay =
-    typeof flags.decay === "string"
-      ? Number.parseFloat(flags.decay)
-      : undefined;
-  const epsilon =
-    typeof flags.epsilon === "string"
-      ? Number.parseFloat(flags.epsilon)
-      : undefined;
-  // Only pass format to renderAsync if it's a render format (text/html),
-  // not a cli-kit envelope format (yaml/json) that happens to be the default.
-  const rawFormat = typeof flags.format === "string" ? flags.format : undefined;
-  const format =
-    rawFormat === "text" || rawFormat === "html" ? rawFormat : undefined;
-
-  // Validate numeric values
-  if (resolution !== undefined && Number.isNaN(resolution)) {
-    die("--resolution must be a valid number");
-  }
-  if (decay !== undefined && Number.isNaN(decay)) {
-    die("--decay must be a valid number");
-  }
-  if (epsilon !== undefined && Number.isNaN(epsilon)) {
-    die("--epsilon must be a valid number");
-  }
-
-  try {
-    if (isPipe) {
-      // Read { type, value } JSON from stdin
-      const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(chunk as Buffer);
-      }
-      const input = Buffer.concat(chunks).toString("utf-8").trim();
-      if (!input) {
-        die("No input on stdin. Pipe a { type, value } JSON envelope.");
-      }
-
-      let envelope: { type: string; value: unknown };
-      try {
-        envelope = JSON.parse(input) as { type: string; value: unknown };
-      } catch {
-        die("Invalid JSON on stdin. Expected { type, value } envelope.");
-        return; // unreachable, for TS
-      }
-
-      if (
-        typeof envelope !== "object" ||
-        envelope === null ||
-        typeof envelope.type !== "string" ||
-        !("value" in envelope)
-      ) {
-        die("Invalid envelope. Expected { type: string, value: unknown }.");
-      }
-
-      // Resolve type: accept both hash and readable alias (e.g. @ocas/output/put)
-      const typeHash = isHash(envelope.type)
-        ? (envelope.type as Hash)
-        : (bootstrap(store)[envelope.type] ?? null);
-      if (typeHash === null) {
-        die(
-          `Unknown type: "${envelope.type}". Expected a hash or a known schema alias.`,
-        );
-      }
-
-      // If the envelope value is a hash string (e.g. from `put` output),
-      // resolve it through renderAsync to apply templates and expand refs.
-      // Otherwise, use renderDirectAsync to run the full template + compose
-      // pipeline on the in-memory value.
-      if (typeof envelope.value === "string" && isHash(envelope.value)) {
-        const output = await renderAsync(store, envelope.value as Hash, {
-          ...(resolution !== undefined && { resolution }),
-          ...(decay !== undefined && { decay }),
-          ...(epsilon !== undefined && { epsilon }),
-          ...(format !== undefined && { format }),
-        });
-        await out(output);
-      } else {
-        const output = await renderDirectAsync(
-          typeHash,
-          envelope.value,
-          store,
-          {
-            ...(resolution !== undefined && { resolution }),
-            ...(decay !== undefined && { decay }),
-            ...(epsilon !== undefined && { epsilon }),
-            ...(format !== undefined && { format }),
-          },
-        );
-        await out(output);
-      }
-    } else {
-      const hash = resolveHash(input as string, store);
-      const output = await renderAsync(store, hash, {
-        ...(resolution !== undefined && { resolution }),
-        ...(decay !== undefined && { decay }),
-        ...(epsilon !== undefined && { epsilon }),
-        ...(format !== undefined && { format }),
-      });
-      await out(output);
-    }
-  } catch (error) {
-    if (error instanceof CasNodeNotFoundError) {
-      die(`Error: Node not found: ${error.hash}`);
-    }
-    if (error instanceof Error) {
-      die(error.message);
-    }
-    die(String(error));
-  }
-}
-
-async function cmdVarSet(args: string[]): Promise<void> {
-  const name = args[0];
-  const value = args[1];
-  const tagFlags = flags.tag;
-
-  if (!name || !value) {
-    die("Usage: ocas var set <name> <hash> [--tag <tag>...]");
-  }
-
-  if (name.startsWith("@ocas/")) {
-    die(
-      "The @ocas/ namespace is reserved and cannot be modified directly. Use a different scope, e.g. @myapp/name (variable names must follow @scope/name format).",
-    );
-  }
-
-  const store = await openStore();
-
-  try {
-    // Parse tags/labels from --tag flags
-    const tagArgs = Array.isArray(tagFlags)
-      ? tagFlags
-      : typeof tagFlags === "string"
-        ? [tagFlags]
-        : [];
-    const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
-
-    // Check for conflicts in initial tags/labels
-    if (deleteNames.length > 0) {
-      die("Error: Cannot use deletion syntax (:name) in var set");
-    }
-
-    // If --tag flags are provided at all, always pass options to replace tags/labels
-    // If no --tag flags, pass undefined to preserve existing tags/labels
-    const options =
-      tagArgs.length > 0
-        ? {
-            tags: Object.keys(tags).length > 0 ? tags : {},
-            labels: labels.length > 0 ? labels : [],
-          }
-        : undefined;
-
-    const variable = store.var.set(name, value as Hash, options);
-    await out(
-      await wrapEnvelope(store, "@ocas/output/var-set", variable),
-      store,
-    );
-  } catch (e) {
-    if (
-      e instanceof InvalidVariableNameError ||
-      e instanceof CasNodeNotFoundError ||
-      e instanceof TagLabelConflictError
-    ) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
-  }
-}
-
-async function cmdVarGet(args: string[]): Promise<void> {
-  const name = args[0];
-  const schemaInput = flags.schema as string | undefined;
-
-  if (!name || !schemaInput) {
-    die("Usage: ocas var get <name> --schema <hash-or-name>");
-  }
-
-  const store = await openStore();
-  const schema = resolveHash(schemaInput, store);
-  const variable = store.var.get(name, schema);
-  if (variable === null) {
-    die(`Error: Variable not found: name=${name}, schema=${schema}`);
-  }
-  const valueTags = store.tag.tags(variable.value);
-  const out_value =
-    valueTags.length === 0 ? variable : { ...variable, valueTags };
-  await out(
-    await wrapEnvelope(store, "@ocas/output/var-get", out_value),
-    store,
-  );
-}
-
-async function cmdVarDelete(args: string[]): Promise<void> {
-  const name = args[0];
-  const schemaInput = flags.schema as string | undefined;
-
-  if (!name) {
-    die("Usage: ocas var delete <name> [--schema <hash-or-name>]");
-  }
-
-  if (name.startsWith("@ocas/")) {
-    die(
-      "The @ocas/ namespace is reserved and cannot be modified directly. Use a different scope, e.g. @myapp/name (variable names must follow @scope/name format).",
-    );
-  }
-
-  const store = await openStore();
-
-  try {
-    if (schemaInput !== undefined) {
-      const schema = resolveHash(schemaInput, store);
-      // Precise deletion: remove specific (name, schema) variant
-      const variables = store.var.remove(name, schema);
-      if (variables.length === 0) {
-        throw new VariableNotFoundError(name, schema);
-      }
-      await out(
-        await wrapEnvelope(
-          store,
-          "@ocas/output/var-delete",
-          variables[0] as unknown,
-        ),
-        store,
-      );
-    } else {
-      // Batch deletion: remove all variants for this name
-      const variables = store.var.remove(name);
-      await out(
-        await wrapEnvelope(store, "@ocas/output/var-delete", variables),
-        store,
-      );
-    }
-  } catch (e) {
-    if (e instanceof VariableNotFoundError) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
-  }
-}
-
-async function cmdTag(args: string[]): Promise<void> {
-  const targetInput = args[0];
-  const tagArgs = args.slice(1);
-  if (!targetInput || tagArgs.length === 0) {
-    die("Usage: ocas tag <target> <tag>...");
-  }
-  const store = await openStore();
-  const target = resolveHash(targetInput, store);
-  const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
-  if (deleteNames.length > 0) {
-    die("Error: Cannot use deletion syntax (:name) in tag (use untag)");
-  }
-  const ops: TagOp[] = [
-    ...Object.entries(tags).map(
-      ([key, value]) => ({ op: "set", key, value }) as TagOp,
-    ),
-    ...labels.map((key) => ({ op: "set", key }) as TagOp),
-  ];
-  store.tag.tag(target, ops);
-  await out(
-    await wrapEnvelope(store, "@ocas/output/tag", store.tag.tags(target)),
-    store,
-  );
-}
-
-async function cmdUntag(args: string[]): Promise<void> {
-  const targetInput = args[0];
-  const tagArgs = args.slice(1);
-  if (!targetInput || tagArgs.length === 0) {
-    die("Usage: ocas untag <target> <tag>...");
-  }
-  const store = await openStore();
-  const target = resolveHash(targetInput, store);
-  const keys = tagArgs.map((a) =>
-    a.startsWith(":")
-      ? a.slice(1)
-      : a.includes(":")
-        ? a.slice(0, a.indexOf(":"))
-        : a,
-  );
-  store.tag.untag(target, keys);
-  await out(
-    await wrapEnvelope(store, "@ocas/output/untag", store.tag.tags(target)),
-    store,
-  );
-}
-
-async function cmdVarHistory(args: string[]): Promise<void> {
-  const name = args[0];
-  const schemaInput = flags.schema as string | undefined;
-
-  if (!name) {
-    die("Usage: ocas var history <name> [--schema <hash-or-name>]");
-  }
-
-  const store = await openStore();
-  let schema: Hash;
-  if (schemaInput !== undefined) {
-    schema = resolveHash(schemaInput, store);
-  } else {
-    const variants = store.var.list({ exactName: name });
-    if (variants.length === 0) {
-      die(`Error: Variable not found: ${name}`);
-    }
-    if (variants.length > 1) {
-      die(
-        `Error: Multiple schema variants for "${name}"; use --schema to disambiguate`,
-      );
-    }
-    schema = (variants[0] as { schema: string }).schema as Hash;
-  }
-
-  const entries = store.var.history(name, schema);
-  if (entries.length === 0) {
-    die(`Error: Variable not found: name=${name}, schema=${schema}`);
-  }
-
-  const values = entries.map((e) => e.value);
-  await out(
-    await wrapEnvelope(store, "@ocas/output/var-history", {
-      name,
-      schema,
-      values,
-    }),
-    store,
-  );
-}
-
-async function cmdVarList(args: string[]): Promise<void> {
-  const namePrefix = args[0] ?? "";
-  const schemaInput = flags.schema as string | undefined;
-  const tagFlags = flags.tag;
-  const listOpts = parseListOptions();
-
-  const store = await openStore();
-
-  try {
-    const schema =
-      schemaInput !== undefined ? resolveHash(schemaInput, store) : undefined;
-    // Parse tags/labels from --tag flags
-    const tagArgs = Array.isArray(tagFlags)
-      ? tagFlags
-      : typeof tagFlags === "string"
-        ? [tagFlags]
-        : [];
-    const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
-
-    // Check for invalid deletion syntax in filters
-    if (deleteNames.length > 0) {
-      die("Error: Cannot use deletion syntax (:name) in var list filters");
-    }
-
-    const variables = store.var.list({
-      namePrefix,
-      ...(schema !== undefined ? { schema } : {}),
-      ...(Object.keys(tags).length > 0 ? { tags } : {}),
-      ...(labels.length > 0 ? { labels } : {}),
-      ...listOpts,
-    });
-    await out(
-      await wrapEnvelope(store, "@ocas/output/var-list", variables),
-      store,
-    );
-  } catch (e) {
-    if (e instanceof InvalidVariableNameError) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
-  }
-}
-
-async function cmdTemplateSet(args: string[]): Promise<void> {
-  const schemaInput = args[0];
-  const inlineFlag = flags.inline;
-  const formatFlag =
-    typeof flags.format === "string" &&
-    (flags.format === "text" || flags.format === "html")
-      ? flags.format
-      : "text";
-  const isStatic = flags.static === true;
-
-  if (!schemaInput) {
-    die(
-      "Usage: ocas template set <schema-hash-or-name> <file> | --inline <text> [--format html] [--static]",
-    );
-  }
-
-  // --static requires --format html
-  if (isStatic && formatFlag !== "html") {
-    die("Error: --static is only valid with --format html");
-  }
-
-  const store = await openStore();
-
-  try {
-    const schemaHash = resolveHash(schemaInput, store);
-    // Validate schema hash exists in CAS
-    if (!store.cas.has(schemaHash)) {
-      die(`Error: Schema hash not found in CAS: ${schemaHash}`);
-    }
-
-    // Determine content source
-    let content: string;
-
-    if (typeof inlineFlag === "string") {
-      // --inline mode
-      const fileArg = args[1];
-      if (fileArg !== undefined && !fileArg.startsWith("--")) {
-        die("Error: Cannot specify both file and --inline");
-      }
-      content = inlineFlag;
-    } else if (inlineFlag === true) {
-      // --inline flag present but no value
-      const contentArg = args[1];
-      if (!contentArg) {
-        die(
-          "Usage: ocas template set <schema-hash> <file> | --inline <text> [--format html] [--static]",
-        );
-      }
-      content = contentArg;
-    } else {
-      // File mode
-      const file = args[1];
-      if (!file) {
-        die(
-          "Usage: ocas template set <schema-hash> <file> | --inline <text> [--format html] [--static]",
-        );
-      }
-      if (!existsSync(file)) {
-        die(`Error: File not found: ${file}`);
-      }
-      content = readFileSync(file, "utf-8");
-    }
-
-    // Store content in CAS under @string schema
-    const stringHash = resolveHash("@ocas/string", store);
-    const contentHash = store.cas.put(stringHash, content);
-
-    // Create variable binding based on format and static flag
-    const varName = isStatic
-      ? `@ocas/template-static/html/${schemaHash}`
-      : `@ocas/template/${formatFlag}/${schemaHash}`;
-    store.var.set(varName, contentHash);
-
-    await out(
-      await wrapEnvelope(store, "@ocas/output/template-set", {
-        schemaHash,
-        contentHash,
-      }),
-      store,
-    );
-  } catch (e) {
-    if (e instanceof CasNodeNotFoundError) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
-  }
-}
-
-async function cmdTemplateGet(args: string[]): Promise<void> {
-  const schemaInput = args[0];
-  const formatFlag =
-    typeof flags.format === "string" &&
-    (flags.format === "text" || flags.format === "html")
-      ? flags.format
-      : "text";
-
-  if (!schemaInput) {
-    die("Usage: ocas template get <schema-hash-or-name> [--format html]");
-  }
-
-  const store = await openStore();
-  const schemaHash = resolveHash(schemaInput, store);
-  const varName = `@ocas/template/${formatFlag}/${schemaHash}`;
-  const stringHash = resolveHash("@ocas/string", store);
-  const variable = store.var.get(varName, stringHash);
-
-  if (variable === null) {
-    die(`Error: Template not found for schema: ${schemaHash}`);
-  }
-
-  // Get the content from CAS
-  const node = store.cas.get(variable.value);
-  if (node === null) {
-    die(`Error: Content not found in CAS: ${variable.value}`);
-  }
-
-  await out(
-    await wrapEnvelope(
-      store,
-      "@ocas/output/template-get",
-      node.payload as string,
-    ),
-    store,
-  );
-}
-
-async function cmdTemplateList(_args: string[]): Promise<void> {
-  const formatFlag =
-    typeof flags.format === "string" &&
-    (flags.format === "text" || flags.format === "html")
-      ? flags.format
-      : "text";
-  const store = await openStore();
-  const stringHash = resolveHash("@ocas/string", store);
-  const instancePrefix = `@ocas/template/${formatFlag}/`;
-  const staticPrefix = `@ocas/template-static/${formatFlag}/`;
-  const instanceVars = store.var.list({
-    namePrefix: instancePrefix,
-    schema: stringHash,
-  });
-  const staticVars = store.var.list({
-    namePrefix: staticPrefix,
-    schema: stringHash,
-  });
-
-  const templates = [
-    ...instanceVars.map((v) => ({
-      schemaHash: v.name.replace(instancePrefix, ""),
-      contentHash: v.value,
-    })),
-    ...staticVars.map((v) => ({
-      schemaHash: `${v.name.replace(staticPrefix, "")}/static`,
-      contentHash: v.value,
-    })),
-  ];
-
-  await out(
-    await wrapEnvelope(store, "@ocas/output/template-list", templates),
-    store,
-  );
-}
-
-async function cmdTemplateDelete(args: string[]): Promise<void> {
-  const schemaInput = args[0];
-  const formatFlag =
-    typeof flags.format === "string" &&
-    (flags.format === "text" || flags.format === "html")
-      ? flags.format
-      : "text";
-
-  if (!schemaInput) {
-    die("Usage: ocas template delete <schema-hash-or-name> [--format html]");
-  }
-
-  const store = await openStore();
-
-  try {
-    const schemaHash = resolveHash(schemaInput, store);
-    const varName = `@ocas/template/${formatFlag}/${schemaHash}`;
-    const stringHash = resolveHash("@ocas/string", store);
-    const removed = store.var.remove(varName, stringHash);
-    if (removed.length === 0) {
-      throw new VariableNotFoundError(varName, stringHash);
-    }
-
-    await out(
-      await wrapEnvelope(store, "@ocas/output/template-delete", {
-        deleted: true,
-      }),
-      store,
-    );
-  } catch (e) {
-    if (e instanceof VariableNotFoundError) {
-      die(`Error: Template not found for schema: ${schemaInput}`);
-    }
-    throw e;
-  }
-}
-
-async function cmdGc(_args: string[]): Promise<void> {
-  const store = await openStore();
-  const stats = gc(store);
-  await out(await wrapEnvelope(store, "@ocas/output/gc", stats), store);
-}
-
-async function cmdReindex(_args: string[]): Promise<void> {
-  const storePath =
-    typeof flags.home === "string"
-      ? flags.home
-      : (process.env.OCAS_HOME ?? defaultStorePath);
-  const fullPath = resolve(storePath);
-  const cas = (await prepareStore(fullPath)) as FsCasStore;
-  const result = cas.reindex();
-  await out(
-    `Reindexed: ${result.nodes} nodes, ${result.types} type indexes, ${result.removed} stale entries removed.`,
-  );
-}
-
-async function cmdExport(args: string[]): Promise<void> {
-  if (args.length === 0) {
-    die(
-      "Usage: ocas export <root>... -o <bundle.tar>\n       ocas export <hash>... -o <bundle.tar>",
-    );
-  }
-  const output = flags.o;
-  if (typeof output !== "string") {
-    die(
-      "Error: -o <output-path> is required.\nUsage: ocas export <root>... -o <bundle.tar>",
-    );
-  }
-
-  const store = await openStore();
-  try {
-    const stats = await exportBundle(store, args, output);
-    await out(await wrapEnvelope(store, "@ocas/output/export", stats), store);
-  } catch (e) {
-    if (e instanceof Error) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
-  }
-}
-
-async function cmdImport(args: string[]): Promise<void> {
-  const bundlePath = args[0];
-  if (!bundlePath) {
-    die("Usage: ocas import <bundle.tar> [--scope @newscope]");
-  }
-  const scope = typeof flags.scope === "string" ? flags.scope : undefined;
-
-  const store = await openStore();
-  try {
-    const opts = scope !== undefined ? { scope } : undefined;
-    const stats = await importBundle(bundlePath, store, opts);
-    await out(await wrapEnvelope(store, "@ocas/output/import", stats), store);
-  } catch (e) {
-    if (e instanceof Error) {
-      die(`Error: ${e.message}`);
-    }
-    throw e;
-  }
-}
-
-async function cmdList(_args: string[]): Promise<void> {
-  const typeFlag = flags.type;
-  if (typeof typeFlag !== "string")
-    die("Usage: ocas list --type <hash-or-name> [--tag <tag>...]");
-  const opts = parseListOptions();
-  const tagFlags = flags.tag;
-  const tagArgs = Array.isArray(tagFlags)
-    ? tagFlags
-    : typeof tagFlags === "string"
-      ? [tagFlags]
-      : [];
-  const store = await openStore();
-  const typeHash = resolveHash(typeFlag, store);
-
-  if (tagArgs.length === 0) {
-    const entries = store.cas.listByType(typeHash, opts);
-    await out(await wrapEnvelope(store, "@ocas/output/list", entries), store);
-    return;
-  }
-
-  const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
-  if (deleteNames.length > 0) {
-    die("Error: Cannot use deletion syntax (:name) in list filters");
-  }
-
-  // Build per-tag-spec hash sets, then intersect.
-  const tagSpecs: string[] = [
-    ...Object.entries(tags).map(([k, v]) => `${k}=${v}`),
-    ...labels,
-  ];
-  let intersection: Set<Hash> | null = null;
-  for (const spec of tagSpecs) {
-    const hashes = store.tag.listByTag(spec);
-    const set = new Set<Hash>(hashes);
-    if (intersection === null) {
-      intersection = set;
-    } else {
-      const next = new Set<Hash>();
-      for (const h of intersection) {
-        if (set.has(h)) next.add(h);
-      }
-      intersection = next;
-    }
-    if (intersection.size === 0) break;
-  }
-
-  // Get all entries of the requested type (no limit/offset yet) and filter.
-  const allOfType = store.cas.listByType(typeHash, {
-    ...(opts.sort !== undefined ? { sort: opts.sort } : {}),
-    ...(opts.desc !== undefined ? { desc: opts.desc } : {}),
-  });
-  const filtered: ListEntry[] = allOfType.filter((e) =>
-    intersection?.has(e.hash),
-  );
-  const paged = applyListOptions(filtered, opts);
-  await out(await wrapEnvelope(store, "@ocas/output/list", paged), store);
-}
-
-async function cmdListMeta(_args: string[]): Promise<void> {
-  const opts = parseListOptions();
-  const store = await openStore();
-  const entries = store.cas.listMeta(opts);
-  await out(
-    await wrapEnvelope(store, "@ocas/output/list-meta", entries),
-    store,
-  );
-}
-
-async function cmdListSchema(_args: string[]): Promise<void> {
-  const opts = parseListOptions();
-  const store = await openStore();
-  const entries = store.cas.listSchemas(opts);
-  await out(
-    await wrapEnvelope(store, "@ocas/output/list-schema", entries),
-    store,
-  );
-}
-
 function printUsage(): string {
   const pkgPath = join(__dirname, "..", "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
@@ -1359,21 +443,6 @@ Flags:
 Agent: If you have not installed the ocas skill for this version (${pkg.version}), run \`ocas prompt bootstrap\` and follow the instructions.`;
 }
 
-// ---- Dispatch ----
-interface Envelope {
-  type: string;
-  value: unknown;
-}
-
-function isEnvelope(value: unknown): value is Envelope {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "type" in value &&
-    "value" in value
-  );
-}
-
 function setRuntimeFlags(runtimeFlags: Record<string, unknown>): void {
   flags = { ...(parsedInput.flags as Flags) };
   // Merge cli-kit parsed flags into the legacy flags object
@@ -1403,68 +472,6 @@ function getPositionals(runtimeFlags: Record<string, unknown>): string[] {
   return Array.isArray(positionals)
     ? positionals.filter((v): v is string => typeof v === "string")
     : [];
-}
-
-async function invokeLegacy(
-  commandKey: string,
-  fn: (args: string[]) => Promise<void>,
-  args: string[],
-  _expectedType: string,
-): Promise<unknown> {
-  ensureWritable(commandKey);
-  commandOutput = undefined;
-  await fn(args);
-  const output = commandOutput;
-  if (!isEnvelope(output)) {
-    return output;
-  }
-
-  // If --render flag is set, render the output through the ocas render pipeline
-  if (flags.render === true) {
-    const store = await openStore();
-    const renderOpts = {
-      ...(typeof flags.resolution === "string"
-        ? { resolution: Number.parseFloat(flags.resolution) }
-        : {}),
-      ...(typeof flags.decay === "string"
-        ? { decay: Number.parseFloat(flags.decay) }
-        : {}),
-      ...(typeof flags.epsilon === "string"
-        ? { epsilon: Number.parseFloat(flags.epsilon) }
-        : {}),
-    };
-    let rendered: string;
-    if (typeof output.value === "string" && isHash(output.value)) {
-      // Value is a hash (e.g. from `put`) — render the node at that hash
-      rendered = await renderAsync(store, output.value as Hash, renderOpts);
-    } else if (
-      output.value !== null &&
-      typeof output.value === "object" &&
-      "type" in output.value &&
-      "payload" in output.value
-    ) {
-      // Value is a CAS node (e.g. from `get`) — render using the node's own type
-      const node = output.value as { type: Hash; payload: unknown };
-      rendered = await renderDirectAsync(
-        node.type,
-        node.payload,
-        store,
-        renderOpts,
-      );
-    } else {
-      // Fallback: render the envelope value as-is
-      rendered = await renderDirectAsync(
-        output.type as Hash,
-        output.value,
-        store,
-        renderOpts,
-      );
-    }
-    process.stdout.write(`${rendered}\n`);
-    return undefined; // cli-kit skips output
-  }
-
-  return output.value;
 }
 
 const genericTemplate = "{{value}}";
@@ -1527,129 +534,489 @@ addCommonFlags(init);
 const put = cli
   .command("put")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/put" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "put",
-      cmdPut,
-      getPositionals(runtimeFlags),
-      "@ocas/output/put",
-    );
+    ensureWritable("put");
+    const positionals = getPositionals(runtimeFlags);
+    const isPipe = runtimeFlags.pipe === true || runtimeFlags.p === true;
+    const typeHashOrName = positionals[0];
+    const file = isPipe ? undefined : positionals[1];
+    if (!typeHashOrName)
+      return ctx.error(
+        "Usage: ocas put <type-hash> <file.json>\n       ocas put <type-hash> --pipe/-p",
+      );
+    if (!isPipe && !file)
+      return ctx.error(
+        "Usage: ocas put <type-hash> <file.json>\n       ocas put <type-hash> --pipe/-p",
+      );
+    if (isPipe && positionals[1])
+      return ctx.error(
+        "Cannot use --pipe/-p with a file argument. Use one or the other.",
+      );
+    const store = await openStore();
+    const typeHash = resolveHash(typeHashOrName, store);
+    const payload = isPipe
+      ? await readStdinJson()
+      : readJsonFile(file as string);
+
+    // Schema nodes: use putSchema() which validates via isValidSchema() (recursive)
+    const metaHash = resolveHash("@ocas/schema", store);
+    if (typeHash === metaHash) {
+      let putHash: Hash;
+      try {
+        putHash = putSchema(store, payload as Record<string, unknown>);
+      } catch (_e) {
+        return ctx.error(
+          `Validation failed: payload in ${file ?? "<stdin>"} does not match schema ${typeHash}`,
+        );
+      }
+      if (runtimeFlags.render === true) {
+        const rendered = await renderAsync(store, putHash, {});
+        process.stdout.write(`${rendered}\n`);
+        return undefined;
+      }
+      return putHash;
+    }
+
+    // Check if schema exists
+    const schema = getSchema(store, typeHash);
+    if (schema === null) return ctx.error(`Schema not found: ${typeHash}`);
+
+    // Validate payload against schema before storing
+    const tempNode = { type: typeHash, payload, timestamp: Date.now() };
+    if (!validate(store, tempNode))
+      return ctx.error(
+        `Validation failed: payload in ${file ?? "<stdin>"} does not match schema ${typeHash}`,
+      );
+
+    const hash = store.cas.put(typeHash, payload);
+    if (runtimeFlags.render === true) {
+      const rendered = await renderAsync(store, hash, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return hash;
   });
 addCommonFlags(put);
 
 const get = cli
   .command("get")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/get" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "get",
-      cmdGet,
-      getPositionals(runtimeFlags),
-      "@ocas/output/get",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const input = positionals[0];
+    if (!input) return ctx.error("Usage: ocas get <hash-or-name>");
+    const store = await openStore();
+    const hash = resolveHash(input, store);
+    const node = store.cas.get(hash);
+    if (node === null) return ctx.error(`Node not found: ${hash}`);
+    const tags = store.tag.tags(hash);
+    const value = tags.length === 0 ? node : { ...node, tags };
+
+    if (runtimeFlags.render === true) {
+      const rendered = await renderDirectAsync(
+        node.type,
+        node.payload,
+        store,
+        {},
+      );
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+
+    return value;
   });
 addCommonFlags(get);
 
 const has = cli
   .command("has")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/has" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "has",
-      cmdHas,
-      getPositionals(runtimeFlags),
-      "@ocas/output/has",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const input = positionals[0];
+    if (!input) return ctx.error("Usage: ocas has <hash-or-name>");
+    const store = await openStore();
+    const hash = tryResolveHash(input, store);
+    return hash !== null && store.cas.has(hash);
   });
 addCommonFlags(has);
 
 const verifyCommand = cli
   .command("verify")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/verify" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "verify",
-      cmdVerify,
-      getPositionals(runtimeFlags),
-      "@ocas/output/verify",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const input = positionals[0];
+    if (!input) return ctx.error("Usage: ocas verify <hash-or-name>");
+    const store = await openStore();
+    const hash = resolveHash(input, store);
+    const node = store.cas.get(hash);
+    if (node === null) return ctx.error(`Node not found: ${hash}`);
+    const ok = await verify(hash, node);
+    if (!ok) return "corrupted";
+    return validate(store, node) ? "ok" : "invalid";
   });
 addCommonFlags(verifyCommand);
 
 const refsCommand = cli
   .command("refs")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/refs" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "refs",
-      cmdRefs,
-      getPositionals(runtimeFlags),
-      "@ocas/output/refs",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const input = positionals[0];
+    if (!input) return ctx.error("Usage: ocas refs <hash-or-name>");
+    const store = await openStore();
+    const hash = resolveHash(input, store);
+    const node = store.cas.get(hash);
+    if (node === null) return ctx.error(`Node not found: ${hash}`);
+    const refHashes = refs(store, node);
+    if (runtimeFlags.render === true) {
+      const rendered = await renderAsync(store, hash, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return refHashes;
   });
 addCommonFlags(refsCommand);
 
 const walkCommand = cli
   .command("walk")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/walk" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "walk",
-      cmdWalk,
-      getPositionals(runtimeFlags),
-      "@ocas/output/walk",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const input = positionals[0];
+    if (!input)
+      return ctx.error(
+        "Usage: ocas walk <hash-or-name> [--format tree] [--follow-type]",
+      );
+    const store = await openStore();
+    const hash = resolveHash(input, store);
+    const format = flags.format;
+    const followType = flags["follow-type"] === true;
+
+    if (format === "tree") {
+      const childMap = new Map<Hash, Hash[]>();
+      walk(
+        store,
+        hash,
+        (h, node) => {
+          const children = refs(store, node);
+          if (followType) {
+            children.push(node.type);
+          }
+          childMap.set(h, children);
+        },
+        { followType },
+      );
+
+      const printed = new Set<Hash>();
+      const lines: string[] = [];
+
+      function printNode(h: Hash, prefix: string, isLast: boolean): void {
+        const connector = prefix === "" ? "" : isLast ? "└── " : "├── ";
+        if (printed.has(h)) {
+          lines.push(`${prefix}${connector}${h} (seen)`);
+          return;
+        }
+        printed.add(h);
+        lines.push(`${prefix}${connector}${h}`);
+
+        const kids = childMap.get(h) ?? [];
+        const childPrefix =
+          prefix === "" ? "" : prefix + (isLast ? "    " : "│   ");
+        for (let i = 0; i < kids.length; i++) {
+          printNode(kids[i] as Hash, childPrefix, i === kids.length - 1);
+        }
+      }
+
+      printNode(hash, "", true);
+      const treeString = lines.join("\n");
+
+      if (runtimeFlags.render === true) {
+        const rendered = await renderAsync(store, hash, {});
+        process.stdout.write(`${rendered}\n`);
+        return undefined;
+      }
+      return treeString;
+    } else {
+      const hashes: Hash[] = [];
+      walk(
+        store,
+        hash,
+        (h) => {
+          hashes.push(h);
+        },
+        { followType },
+      );
+
+      if (runtimeFlags.render === true) {
+        const rendered = await renderAsync(store, hash, {});
+        process.stdout.write(`${rendered}\n`);
+        return undefined;
+      }
+      return hashes;
+    }
   });
 addCommonFlags(walkCommand);
 
 const hash = cli
   .command("hash")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/hash" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "hash",
-      cmdHash,
-      getPositionals(runtimeFlags),
-      "@ocas/output/hash",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const isPipe = runtimeFlags.pipe === true || runtimeFlags.p === true;
+    const typeHashOrName = positionals[0];
+    const file = isPipe ? undefined : positionals[1];
+    if (!typeHashOrName)
+      return ctx.error(
+        "Usage: ocas hash <type-hash> <file.json>\n       ocas hash <type-hash> --pipe/-p",
+      );
+    if (!isPipe && !file)
+      return ctx.error(
+        "Usage: ocas hash <type-hash> <file.json>\n       ocas hash <type-hash> --pipe/-p",
+      );
+    if (isPipe && positionals[1])
+      return ctx.error(
+        "Cannot use --pipe/-p with a file argument. Use one or the other.",
+      );
+    const store = await openStore();
+    const typeHash = resolveHash(typeHashOrName, store);
+    const payload = isPipe
+      ? await readStdinJson()
+      : readJsonFile(file as string);
+    const computedHash = await computeHash(typeHash, payload);
+    if (runtimeFlags.render === true) {
+      const rendered = await renderAsync(store, computedHash, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return computedHash;
   });
 addCommonFlags(hash);
 
 const render = cli
   .command("render")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/render" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    ensureWritable("render");
-    commandOutput = undefined;
-    await cmdRender(getPositionals(runtimeFlags));
-    // Render outputs raw content — write directly to stdout and return undefined
-    // so cli-kit skips its envelope wrapping.
-    if (commandOutput !== undefined) {
-      process.stdout.write(`${String(commandOutput)}\n`);
+    const positionals = getPositionals(runtimeFlags);
+    const isPipe = flags.pipe === true || flags.p === true;
+    const input = positionals[0];
+
+    if (isPipe && input) {
+      return ctx.error(
+        "Cannot use --pipe/-p with a hash argument. Use one or the other.",
+      );
     }
-    return undefined;
+
+    if (!isPipe && !input) {
+      return ctx.error(
+        "Usage: ocas render <hash-or-name> [--resolution <n>] [--decay <n>] [--epsilon <n>]\n       ocas render --pipe/-p [--resolution <n>] [--decay <n>] [--epsilon <n>]",
+      );
+    }
+
+    const store = await openStore();
+
+    // Parse numeric options
+    const resolution =
+      typeof flags.resolution === "string"
+        ? Number.parseFloat(flags.resolution)
+        : undefined;
+    const decay =
+      typeof flags.decay === "string"
+        ? Number.parseFloat(flags.decay)
+        : undefined;
+    const epsilon =
+      typeof flags.epsilon === "string"
+        ? Number.parseFloat(flags.epsilon)
+        : undefined;
+    // Only pass format to renderAsync if it's a render format (text/html),
+    // not a cli-kit envelope format (yaml/json) that happens to be the default.
+    const rawFormat =
+      typeof flags.format === "string" ? flags.format : undefined;
+    const format =
+      rawFormat === "text" || rawFormat === "html" ? rawFormat : undefined;
+
+    // Validate numeric values
+    if (resolution !== undefined && Number.isNaN(resolution)) {
+      return ctx.error("--resolution must be a valid number");
+    }
+    if (decay !== undefined && Number.isNaN(decay)) {
+      return ctx.error("--decay must be a valid number");
+    }
+    if (epsilon !== undefined && Number.isNaN(epsilon)) {
+      return ctx.error("--epsilon must be a valid number");
+    }
+
+    const renderOpts = {
+      ...(resolution !== undefined && { resolution }),
+      ...(decay !== undefined && { decay }),
+      ...(epsilon !== undefined && { epsilon }),
+      ...(format !== undefined && { format }),
+    };
+
+    try {
+      let rendered: string;
+
+      if (isPipe) {
+        // Read { type, value } JSON from stdin
+        const chunks: Buffer[] = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(chunk as Buffer);
+        }
+        const stdinText = Buffer.concat(chunks).toString("utf-8").trim();
+        if (!stdinText) {
+          return ctx.error(
+            "No input on stdin. Pipe a { type, value } JSON envelope.",
+          );
+        }
+
+        let envelope: { type: string; value: unknown };
+        try {
+          envelope = JSON.parse(stdinText) as { type: string; value: unknown };
+        } catch {
+          return ctx.error(
+            "Invalid JSON on stdin. Expected { type, value } envelope.",
+          );
+        }
+
+        if (
+          typeof envelope !== "object" ||
+          envelope === null ||
+          typeof envelope.type !== "string" ||
+          !("value" in envelope)
+        ) {
+          return ctx.error(
+            "Invalid envelope. Expected { type: string, value: unknown }.",
+          );
+        }
+
+        // Resolve type: accept both hash and readable alias (e.g. @ocas/output/put)
+        const typeHash = isHash(envelope.type)
+          ? (envelope.type as Hash)
+          : (bootstrap(store)[envelope.type] ?? null);
+        if (typeHash === null) {
+          return ctx.error(
+            `Unknown type: "${envelope.type}". Expected a hash or a known schema alias.`,
+          );
+        }
+
+        // If the envelope value is a hash string (e.g. from `put` output),
+        // resolve it through renderAsync to apply templates and expand refs.
+        // Otherwise, use renderDirectAsync to run the full template + compose
+        // pipeline on the in-memory value.
+        if (typeof envelope.value === "string" && isHash(envelope.value)) {
+          rendered = await renderAsync(
+            store,
+            envelope.value as Hash,
+            renderOpts,
+          );
+        } else {
+          rendered = await renderDirectAsync(
+            typeHash,
+            envelope.value,
+            store,
+            renderOpts,
+          );
+        }
+      } else {
+        const resolvedHash = resolveHash(input as string, store);
+        rendered = await renderAsync(store, resolvedHash, renderOpts);
+      }
+
+      // Render outputs raw content — write directly to stdout and return
+      // undefined so cli-kit skips its envelope wrapping.
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    } catch (error) {
+      if (error instanceof CasNodeNotFoundError) {
+        return ctx.error(`Error: Node not found: ${error.hash}`);
+      }
+      if (error instanceof Error) {
+        return ctx.error(error.message);
+      }
+      return ctx.error(String(error));
+    }
   });
 addCommonFlags(render);
 
 const list = cli
   .command("list")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/list" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "list",
-      cmdList,
-      getPositionals(runtimeFlags),
-      "@ocas/output/list",
-    );
+    const typeFlag = flags.type;
+    if (typeof typeFlag !== "string")
+      return ctx.error(
+        "Usage: ocas list --type <hash-or-name> [--tag <tag>...]",
+      );
+    const opts = parseListOptions();
+    const tagFlags = flags.tag;
+    const tagArgs = Array.isArray(tagFlags)
+      ? tagFlags
+      : typeof tagFlags === "string"
+        ? [tagFlags]
+        : [];
+    const store = await openStore();
+    const typeHash = resolveHash(typeFlag, store);
+
+    let entries: ListEntry[];
+
+    if (tagArgs.length === 0) {
+      entries = store.cas.listByType(typeHash, opts);
+    } else {
+      const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+      if (deleteNames.length > 0) {
+        return ctx.error(
+          "Error: Cannot use deletion syntax (:name) in list filters",
+        );
+      }
+
+      // Build per-tag-spec hash sets, then intersect.
+      const tagSpecs: string[] = [
+        ...Object.entries(tags).map(([k, v]) => `${k}=${v}`),
+        ...labels,
+      ];
+      let intersection: Set<Hash> | null = null;
+      for (const spec of tagSpecs) {
+        const hashes = store.tag.listByTag(spec);
+        const set = new Set<Hash>(hashes);
+        if (intersection === null) {
+          intersection = set;
+        } else {
+          const next = new Set<Hash>();
+          for (const h of intersection) {
+            if (set.has(h)) next.add(h);
+          }
+          intersection = next;
+        }
+        if (intersection.size === 0) break;
+      }
+
+      // Get all entries of the requested type (no limit/offset yet) and filter.
+      const allOfType = store.cas.listByType(typeHash, {
+        ...(opts.sort !== undefined ? { sort: opts.sort } : {}),
+        ...(opts.desc !== undefined ? { desc: opts.desc } : {}),
+      });
+      const filtered: ListEntry[] = allOfType.filter((e) =>
+        intersection?.has(e.hash),
+      );
+      entries = applyListOptions(filtered, opts);
+    }
+
+    if (runtimeFlags.render === true) {
+      const typeHash = store.var.get("@ocas/output/list")?.value as Hash;
+      const rendered = await renderDirectAsync(typeHash, entries, store, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return entries;
   });
 addCommonFlags(list);
 
@@ -1658,12 +1025,16 @@ const listMeta = cli
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/list-meta" })
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "list-meta",
-      cmdListMeta,
-      getPositionals(runtimeFlags),
-      "@ocas/output/list-meta",
-    );
+    const opts = parseListOptions();
+    const store = await openStore();
+    const entries = store.cas.listMeta(opts);
+    if (runtimeFlags.render === true) {
+      const typeHash = store.var.get("@ocas/output/list-meta")?.value as Hash;
+      const rendered = await renderDirectAsync(typeHash, entries, store, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return entries;
   });
 addCommonFlags(listMeta);
 
@@ -1672,40 +1043,84 @@ const listSchema = cli
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/list-schema" })
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "list-schema",
-      cmdListSchema,
-      getPositionals(runtimeFlags),
-      "@ocas/output/list-schema",
-    );
+    const opts = parseListOptions();
+    const store = await openStore();
+    const entries = store.cas.listSchemas(opts);
+    if (runtimeFlags.render === true) {
+      const typeHash = store.var.get("@ocas/output/list-schema")?.value as Hash;
+      const rendered = await renderDirectAsync(typeHash, entries, store, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return entries;
   });
 addCommonFlags(listSchema);
 
 const tag = cli
   .command("tag")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/tag" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "tag",
-      cmdTag,
-      getPositionals(runtimeFlags),
-      "@ocas/output/tag",
-    );
+    ensureWritable("tag");
+    const positionals = getPositionals(runtimeFlags);
+    const targetInput = positionals[0];
+    const tagArgs = positionals.slice(1);
+    if (!targetInput || tagArgs.length === 0)
+      return ctx.error("Usage: ocas tag <target> <tag>...");
+    const store = await openStore();
+    const target = resolveHash(targetInput, store);
+    const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+    if (deleteNames.length > 0)
+      return ctx.error(
+        "Error: Cannot use deletion syntax (:name) in tag (use untag)",
+      );
+    const ops: TagOp[] = [
+      ...Object.entries(tags).map(
+        ([key, value]) => ({ op: "set", key, value }) as TagOp,
+      ),
+      ...labels.map((key) => ({ op: "set", key }) as TagOp),
+    ];
+    store.tag.tag(target, ops);
+    const result = store.tag.tags(target);
+    if (runtimeFlags.render === true) {
+      const typeHash = store.var.get("@ocas/output/tag")?.value as Hash;
+      const rendered = await renderDirectAsync(typeHash, result, store, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return result;
   });
 addCommonFlags(tag);
 
 const untag = cli
   .command("untag")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/untag" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "untag",
-      cmdUntag,
-      getPositionals(runtimeFlags),
-      "@ocas/output/untag",
+    ensureWritable("untag");
+    const positionals = getPositionals(runtimeFlags);
+    const targetInput = positionals[0];
+    const tagArgs = positionals.slice(1);
+    if (!targetInput || tagArgs.length === 0)
+      return ctx.error("Usage: ocas untag <target> <tag>...");
+    const store = await openStore();
+    const target = resolveHash(targetInput, store);
+    const keys = tagArgs.map((a) =>
+      a.startsWith(":")
+        ? a.slice(1)
+        : a.includes(":")
+          ? a.slice(0, a.indexOf(":"))
+          : a,
     );
+    store.tag.untag(target, keys);
+    const result = store.tag.tags(target);
+    if (runtimeFlags.render === true) {
+      const typeHash = store.var.get("@ocas/output/untag")?.value as Hash;
+      const rendered = await renderDirectAsync(typeHash, result, store, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return result;
   });
 addCommonFlags(untag);
 
@@ -1713,14 +1128,56 @@ const varSet = cli
   .command("var")
   .command("set")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-set" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "var:set",
-      cmdVarSet,
-      getPositionals(runtimeFlags),
-      "@ocas/output/var-set",
-    );
+    ensureWritable("var:set");
+    const positionals = getPositionals(runtimeFlags);
+    const name = positionals[0];
+    const value = positionals[1];
+    const tagFlags = flags.tag;
+    if (!name || !value)
+      return ctx.error("Usage: ocas var set <name> <hash> [--tag <tag>...]");
+    if (name.startsWith("@ocas/"))
+      return ctx.error(
+        "The @ocas/ namespace is reserved and cannot be modified directly. Use a different scope, e.g. @myapp/name (variable names must follow @scope/name format).",
+      );
+    const store = await openStore();
+    try {
+      const tagArgs = Array.isArray(tagFlags)
+        ? tagFlags
+        : typeof tagFlags === "string"
+          ? [tagFlags]
+          : [];
+      const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+      if (deleteNames.length > 0)
+        return ctx.error(
+          "Error: Cannot use deletion syntax (:name) in var set",
+        );
+      const options =
+        tagArgs.length > 0
+          ? {
+              tags: Object.keys(tags).length > 0 ? tags : {},
+              labels: labels.length > 0 ? labels : [],
+            }
+          : undefined;
+      const variable = store.var.set(name, value as Hash, options);
+      if (runtimeFlags.render === true) {
+        const typeHash = store.var.get("@ocas/output/var-set")?.value as Hash;
+        const rendered = await renderDirectAsync(typeHash, variable, store, {});
+        process.stdout.write(`${rendered}\n`);
+        return undefined;
+      }
+      return variable;
+    } catch (e) {
+      if (
+        e instanceof InvalidVariableNameError ||
+        e instanceof CasNodeNotFoundError ||
+        e instanceof TagLabelConflictError
+      ) {
+        return ctx.error(`Error: ${(e as Error).message}`);
+      }
+      throw e;
+    }
   });
 addCommonFlags(varSet);
 
@@ -1728,14 +1185,30 @@ const varGet = cli
   .command("var")
   .command("get")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-get" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "var:get",
-      cmdVarGet,
-      getPositionals(runtimeFlags),
-      "@ocas/output/var-get",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const name = positionals[0];
+    const schemaInput = flags.schema as string | undefined;
+    if (!name || !schemaInput)
+      return ctx.error("Usage: ocas var get <name> --schema <hash-or-name>");
+    const store = await openStore();
+    const schema = resolveHash(schemaInput, store);
+    const variable = store.var.get(name, schema);
+    if (variable === null)
+      return ctx.error(
+        `Error: Variable not found: name=${name}, schema=${schema}`,
+      );
+    const valueTags = store.tag.tags(variable.value);
+    const out_value =
+      valueTags.length === 0 ? variable : { ...variable, valueTags };
+    if (runtimeFlags.render === true) {
+      const typeHash = store.var.get("@ocas/output/var-get")?.value as Hash;
+      const rendered = await renderDirectAsync(typeHash, out_value, store, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return out_value;
   });
 addCommonFlags(varGet);
 
@@ -1743,14 +1216,58 @@ const varDelete = cli
   .command("var")
   .command("delete")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-delete" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "var:delete",
-      cmdVarDelete,
-      getPositionals(runtimeFlags),
-      "@ocas/output/var-delete",
-    );
+    ensureWritable("var:delete");
+    const positionals = getPositionals(runtimeFlags);
+    const name = positionals[0];
+    const schemaInput = flags.schema as string | undefined;
+    if (!name)
+      return ctx.error(
+        "Usage: ocas var delete <name> [--schema <hash-or-name>]",
+      );
+    if (name.startsWith("@ocas/"))
+      return ctx.error(
+        "The @ocas/ namespace is reserved and cannot be modified directly. Use a different scope, e.g. @myapp/name (variable names must follow @scope/name format).",
+      );
+    const store = await openStore();
+    try {
+      if (schemaInput !== undefined) {
+        const schema = resolveHash(schemaInput, store);
+        const variables = store.var.remove(name, schema);
+        if (variables.length === 0)
+          throw new VariableNotFoundError(name, schema);
+        const result = variables[0] as unknown;
+        if (runtimeFlags.render === true) {
+          const typeHash = store.var.get("@ocas/output/var-delete")
+            ?.value as Hash;
+          const rendered = await renderDirectAsync(typeHash, result, store, {});
+          process.stdout.write(`${rendered}\n`);
+          return undefined;
+        }
+        return result;
+      } else {
+        const variables = store.var.remove(name);
+        if (runtimeFlags.render === true) {
+          const typeHash = store.var.get("@ocas/output/var-delete")
+            ?.value as Hash;
+          const rendered = await renderDirectAsync(
+            typeHash,
+            variables,
+            store,
+            {},
+          );
+          process.stdout.write(`${rendered}\n`);
+          return undefined;
+        }
+        return variables;
+      }
+    } catch (e) {
+      if (e instanceof VariableNotFoundError) {
+        return ctx.error(`Error: ${(e as Error).message}`);
+      }
+      throw e;
+    }
   });
 addCommonFlags(varDelete);
 
@@ -1758,14 +1275,52 @@ const varList = cli
   .command("var")
   .command("list")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-list" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "var:list",
-      cmdVarList,
-      getPositionals(runtimeFlags),
-      "@ocas/output/var-list",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const namePrefix = positionals[0] ?? "";
+    const schemaInput = flags.schema as string | undefined;
+    const tagFlags = flags.tag;
+    const listOpts = parseListOptions();
+    const store = await openStore();
+    try {
+      const schema =
+        schemaInput !== undefined ? resolveHash(schemaInput, store) : undefined;
+      const tagArgs = Array.isArray(tagFlags)
+        ? tagFlags
+        : typeof tagFlags === "string"
+          ? [tagFlags]
+          : [];
+      const { tags, labels, deleteNames } = parseTagsLabels(tagArgs);
+      if (deleteNames.length > 0)
+        return ctx.error(
+          "Error: Cannot use deletion syntax (:name) in var list filters",
+        );
+      const variables = store.var.list({
+        namePrefix,
+        ...(schema !== undefined ? { schema } : {}),
+        ...(Object.keys(tags).length > 0 ? { tags } : {}),
+        ...(labels.length > 0 ? { labels } : {}),
+        ...listOpts,
+      });
+      if (runtimeFlags.render === true) {
+        const typeHash = store.var.get("@ocas/output/var-list")?.value as Hash;
+        const rendered = await renderDirectAsync(
+          typeHash,
+          variables,
+          store,
+          {},
+        );
+        process.stdout.write(`${rendered}\n`);
+        return undefined;
+      }
+      return variables;
+    } catch (e) {
+      if (e instanceof InvalidVariableNameError) {
+        return ctx.error(`Error: ${(e as Error).message}`);
+      }
+      throw e;
+    }
   });
 addCommonFlags(varList);
 
@@ -1773,14 +1328,43 @@ const varHistory = cli
   .command("var")
   .command("history")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-history" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "var:history",
-      cmdVarHistory,
-      getPositionals(runtimeFlags),
-      "@ocas/output/var-history",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const name = positionals[0];
+    const schemaInput = flags.schema as string | undefined;
+    if (!name)
+      return ctx.error(
+        "Usage: ocas var history <name> [--schema <hash-or-name>]",
+      );
+    const store = await openStore();
+    let schema: Hash;
+    if (schemaInput !== undefined) {
+      schema = resolveHash(schemaInput, store);
+    } else {
+      const variants = store.var.list({ exactName: name });
+      if (variants.length === 0)
+        return ctx.error(`Error: Variable not found: ${name}`);
+      if (variants.length > 1)
+        return ctx.error(
+          `Error: Multiple schema variants for "${name}"; use --schema to disambiguate`,
+        );
+      schema = (variants[0] as { schema: string }).schema as Hash;
+    }
+    const entries = store.var.history(name, schema);
+    if (entries.length === 0)
+      return ctx.error(
+        `Error: Variable not found: name=${name}, schema=${schema}`,
+      );
+    const values = entries.map((e) => e.value);
+    const result = { name, schema, values };
+    if (runtimeFlags.render === true) {
+      const typeHash = store.var.get("@ocas/output/var-history")?.value as Hash;
+      const rendered = await renderDirectAsync(typeHash, result, store, {});
+      process.stdout.write(`${rendered}\n`);
+      return undefined;
+    }
+    return result;
   });
 addCommonFlags(varHistory);
 
@@ -1790,14 +1374,89 @@ const templateSet = cli
   .returns(returnSchema, genericTemplate, {
     name: "@ocas/output/template-set",
   })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "template:set",
-      cmdTemplateSet,
-      getPositionals(runtimeFlags),
-      "@ocas/output/template-set",
-    );
+    ensureWritable("template:set");
+    const positionals = getPositionals(runtimeFlags);
+    const schemaInput = positionals[0];
+    const inlineFlag = flags.inline;
+    const formatFlag =
+      typeof flags.format === "string" &&
+      (flags.format === "text" || flags.format === "html")
+        ? flags.format
+        : "text";
+    const isStatic = flags.static === true;
+
+    if (!schemaInput) {
+      return ctx.error(
+        "Usage: ocas template set <schema-hash-or-name> <file> | --inline <text> [--format html] [--static]",
+      );
+    }
+
+    // --static requires --format html
+    if (isStatic && formatFlag !== "html") {
+      return ctx.error("Error: --static is only valid with --format html");
+    }
+
+    const store = await openStore();
+
+    try {
+      const schemaHash = resolveHash(schemaInput, store);
+      // Validate schema hash exists in CAS
+      if (!store.cas.has(schemaHash)) {
+        return ctx.error(`Error: Schema hash not found in CAS: ${schemaHash}`);
+      }
+
+      // Determine content source
+      let content: string;
+
+      if (typeof inlineFlag === "string") {
+        // --inline mode
+        const fileArg = positionals[1];
+        if (fileArg !== undefined && !fileArg.startsWith("--")) {
+          return ctx.error("Error: Cannot specify both file and --inline");
+        }
+        content = inlineFlag;
+      } else if (inlineFlag === true) {
+        // --inline flag present but no value
+        const contentArg = positionals[1];
+        if (!contentArg) {
+          return ctx.error(
+            "Usage: ocas template set <schema-hash> <file> | --inline <text> [--format html] [--static]",
+          );
+        }
+        content = contentArg;
+      } else {
+        // File mode
+        const file = positionals[1];
+        if (!file) {
+          return ctx.error(
+            "Usage: ocas template set <schema-hash> <file> | --inline <text> [--format html] [--static]",
+          );
+        }
+        if (!existsSync(file)) {
+          return ctx.error(`Error: File not found: ${file}`);
+        }
+        content = readFileSync(file, "utf-8");
+      }
+
+      // Store content in CAS under @string schema
+      const stringHash = resolveHash("@ocas/string", store);
+      const contentHash = store.cas.put(stringHash, content);
+
+      // Create variable binding based on format and static flag
+      const varName = isStatic
+        ? `@ocas/template-static/html/${schemaHash}`
+        : `@ocas/template/${formatFlag}/${schemaHash}`;
+      store.var.set(varName, contentHash);
+
+      return { schemaHash, contentHash };
+    } catch (e) {
+      if (e instanceof CasNodeNotFoundError) {
+        return ctx.error(`Error: ${(e as Error).message}`);
+      }
+      throw e;
+    }
   });
 addCommonFlags(templateSet);
 
@@ -1807,14 +1466,39 @@ const templateGet = cli
   .returns(returnSchema, genericTemplate, {
     name: "@ocas/output/template-get",
   })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "template:get",
-      cmdTemplateGet,
-      getPositionals(runtimeFlags),
-      "@ocas/output/template-get",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    const schemaInput = positionals[0];
+    const formatFlag =
+      typeof flags.format === "string" &&
+      (flags.format === "text" || flags.format === "html")
+        ? flags.format
+        : "text";
+
+    if (!schemaInput) {
+      return ctx.error(
+        "Usage: ocas template get <schema-hash-or-name> [--format html]",
+      );
+    }
+
+    const store = await openStore();
+    const schemaHash = resolveHash(schemaInput, store);
+    const varName = `@ocas/template/${formatFlag}/${schemaHash}`;
+    const stringHash = resolveHash("@ocas/string", store);
+    const variable = store.var.get(varName, stringHash);
+
+    if (variable === null) {
+      return ctx.error(`Error: Template not found for schema: ${schemaHash}`);
+    }
+
+    // Get the content from CAS
+    const node = store.cas.get(variable.value);
+    if (node === null) {
+      return ctx.error(`Error: Content not found in CAS: ${variable.value}`);
+    }
+
+    return node.payload as string;
   });
 addCommonFlags(templateGet);
 
@@ -1826,12 +1510,34 @@ const templateList = cli
   })
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "template:list",
-      cmdTemplateList,
-      getPositionals(runtimeFlags),
-      "@ocas/output/template-list",
-    );
+    const formatFlag =
+      typeof flags.format === "string" &&
+      (flags.format === "text" || flags.format === "html")
+        ? flags.format
+        : "text";
+    const store = await openStore();
+    const stringHash = resolveHash("@ocas/string", store);
+    const instancePrefix = `@ocas/template/${formatFlag}/`;
+    const staticPrefix = `@ocas/template-static/${formatFlag}/`;
+    const instanceVars = store.var.list({
+      namePrefix: instancePrefix,
+      schema: stringHash,
+    });
+    const staticVars = store.var.list({
+      namePrefix: staticPrefix,
+      schema: stringHash,
+    });
+
+    return [
+      ...instanceVars.map((v) => ({
+        schemaHash: v.name.replace(instancePrefix, ""),
+        contentHash: v.value,
+      })),
+      ...staticVars.map((v) => ({
+        schemaHash: `${v.name.replace(staticPrefix, "")}/static`,
+        contentHash: v.value,
+      })),
+    ];
   });
 addCommonFlags(templateList);
 
@@ -1841,14 +1547,43 @@ const templateDelete = cli
   .returns(returnSchema, genericTemplate, {
     name: "@ocas/output/template-delete",
   })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "template:delete",
-      cmdTemplateDelete,
-      getPositionals(runtimeFlags),
-      "@ocas/output/template-delete",
-    );
+    ensureWritable("template:delete");
+    const positionals = getPositionals(runtimeFlags);
+    const schemaInput = positionals[0];
+    const formatFlag =
+      typeof flags.format === "string" &&
+      (flags.format === "text" || flags.format === "html")
+        ? flags.format
+        : "text";
+
+    if (!schemaInput) {
+      return ctx.error(
+        "Usage: ocas template delete <schema-hash-or-name> [--format html]",
+      );
+    }
+
+    const store = await openStore();
+
+    try {
+      const schemaHash = resolveHash(schemaInput, store);
+      const varName = `@ocas/template/${formatFlag}/${schemaHash}`;
+      const stringHash = resolveHash("@ocas/string", store);
+      const removed = store.var.remove(varName, stringHash);
+      if (removed.length === 0) {
+        throw new VariableNotFoundError(varName, stringHash);
+      }
+
+      return { deleted: true };
+    } catch (e) {
+      if (e instanceof VariableNotFoundError) {
+        return ctx.error(
+          `Error: Template not found for schema: ${schemaInput}`,
+        );
+      }
+      throw e;
+    }
   });
 addCommonFlags(templateDelete);
 
@@ -1857,12 +1592,9 @@ const gcCommand = cli
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/gc" })
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "gc",
-      cmdGc,
-      getPositionals(runtimeFlags),
-      "@ocas/output/gc",
-    );
+    ensureWritable("gc");
+    const store = await openStore();
+    return gc(store);
   });
 addCommonFlags(gcCommand);
 
@@ -1872,37 +1604,70 @@ const reindex = cli
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
     ensureWritable("reindex");
-    commandOutput = undefined;
-    await cmdReindex(getPositionals(runtimeFlags));
-    return commandOutput;
+    const storePath =
+      typeof flags.home === "string"
+        ? flags.home
+        : (process.env.OCAS_HOME ?? defaultStorePath);
+    const fullPath = resolve(storePath);
+    const cas = (await prepareStore(fullPath)) as FsCasStore;
+    const result = cas.reindex();
+    return `Reindexed: ${result.nodes} nodes, ${result.types} type indexes, ${result.removed} stale entries removed.`;
   });
 addCommonFlags(reindex);
 
 const exportCommand = cli
   .command("export")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/export" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "export",
-      cmdExport,
-      getPositionals(runtimeFlags),
-      "@ocas/output/export",
-    );
+    const positionals = getPositionals(runtimeFlags);
+    if (positionals.length === 0) {
+      return ctx.error(
+        "Usage: ocas export <root>... -o <bundle.tar>\n       ocas export <hash>... -o <bundle.tar>",
+      );
+    }
+    const output = flags.o;
+    if (typeof output !== "string") {
+      return ctx.error(
+        "Error: -o <output-path> is required.\nUsage: ocas export <root>... -o <bundle.tar>",
+      );
+    }
+
+    const store = await openStore();
+    try {
+      return await exportBundle(store, positionals, output);
+    } catch (e) {
+      if (e instanceof Error) {
+        return ctx.error(`Error: ${e.message}`);
+      }
+      throw e;
+    }
   });
 addCommonFlags(exportCommand);
 
 const importCommand = cli
   .command("import")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/import" })
-  .action(async (_args, runtimeFlags) => {
+  .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
-    return await invokeLegacy(
-      "import",
-      cmdImport,
-      getPositionals(runtimeFlags),
-      "@ocas/output/import",
-    );
+    ensureWritable("import");
+    const positionals = getPositionals(runtimeFlags);
+    const bundlePath = positionals[0];
+    if (!bundlePath) {
+      return ctx.error("Usage: ocas import <bundle.tar> [--scope @newscope]");
+    }
+    const scope = typeof flags.scope === "string" ? flags.scope : undefined;
+
+    const store = await openStore();
+    try {
+      const opts = scope !== undefined ? { scope } : undefined;
+      return await importBundle(bundlePath, store, opts);
+    } catch (e) {
+      if (e instanceof Error) {
+        return ctx.error(`Error: ${e.message}`);
+      }
+      throw e;
+    }
   });
 addCommonFlags(importCommand);
 
