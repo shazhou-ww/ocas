@@ -36,6 +36,23 @@ export type CommandAction = (
   ctx: CliContext,
 ) => Promise<unknown> | AsyncGenerator<unknown, unknown, unknown>;
 
+/**
+ * Base handler invoked by the composed middleware chain. It receives the
+ * resolved `flags` (the same object the action sees, including `_positionals`)
+ * so middleware can inspect user intent (e.g. `flags.render`). The `args` are
+ * closed over by the base handler created in `run()`.
+ */
+export type Handler = (ctx: CliContext, flags: ParsedFlags) => Promise<unknown>;
+
+/**
+ * Middleware is a function decorator: `(handler) => wrapped_handler`.
+ * Composition is plain function composition with no `next()` — middleware
+ * always wraps, so there is no "forgot to call next" footgun. Per-command
+ * middleware (added via `.use()`) is applied innermost-first; global
+ * middleware (from `CreateCliOptions.middleware`) is applied outermost.
+ */
+export type CliMiddleware = (handler: Handler) => Handler;
+
 export interface CommandBuilder {
   arg(name: string): CommandBuilder;
   describe(text: string): CommandBuilder;
@@ -52,8 +69,16 @@ export interface CommandBuilder {
   ): CommandBuilder;
   command(name: string): CommandBuilder;
   action(fn: CommandAction): CommandBuilder;
+  /** Attach per-command middleware. May be chained; earlier calls are innermost. */
+  use(middleware: CliMiddleware): CommandBuilder;
 }
 
+/**
+ * @deprecated Kept for backward compatibility. `CliPlugin` only *declares*
+ * capabilities (e.g. `enableRenderFlag`) without providing behavior. New code
+ * should use `CliMiddleware` (via `CreateCliOptions.middleware` or
+ * `CommandBuilder.use()`) to supply behavior directly.
+ */
 export interface CliPlugin {
   name: string;
   enableRenderFlag?: boolean;
@@ -63,7 +88,10 @@ export interface CliPlugin {
 export interface CreateCliOptions {
   name: string;
   version: string;
+  /** @deprecated Use `middleware` instead. */
   plugins?: CliPlugin[];
+  /** Global middleware, applied (outermost) to every command. */
+  middleware?: CliMiddleware[];
   homeDir?: string;
 }
 

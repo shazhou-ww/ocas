@@ -1,0 +1,211 @@
+import { describe, expect, test } from "vitest";
+import { z } from "zod";
+
+import type { CliMiddleware } from "./index.js";
+import { createCLI } from "./index.js";
+
+function createBuffers() {
+  let stdout = "";
+  let stderr = "";
+  return {
+    out: {
+      stdout: { write: (text: string) => (stdout += text) },
+      stderr: { write: (text: string) => (stderr += text) },
+    },
+    read: () => ({ stdout, stderr }) as { stdout: string; stderr: string },
+  };
+}
+
+/** A middleware that records its execution phase relative to the action. */
+function trace(phase: string, log: string[]): CliMiddleware {
+  return (inner) => async (ctx, flags) => {
+    log.push(`pre:${phase}`);
+    const result = await inner(ctx, flags);
+    log.push(`post:${phase}`);
+    return result;
+  };
+}
+
+describe("middleware system", () => {
+  test("global middleware applies to every command", async () => {
+    const seen: string[] = [];
+    const globalMw: CliMiddleware = (inner) => async (ctx, flags) => {
+      seen.push(`global:${ctx.command}`);
+      return inner(ctx, flags);
+    };
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [globalMw],
+    });
+    cli
+      .command("a")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async () => ({ ok: true }));
+    cli
+      .command("b")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async () => ({ ok: true }));
+
+    const ioA = createBuffers();
+    await cli.run({ argv: ["a"], ...ioA.out });
+    const ioB = createBuffers();
+    await cli.run({ argv: ["b"], ...ioB.out });
+
+    expect(seen).toEqual(["global:a", "global:b"]);
+  });
+
+  test("per-command middleware via .use() only affects that command", async () => {
+    const seen: string[] = [];
+    const perCommandMw: CliMiddleware = (inner) => async (ctx, flags) => {
+      seen.push(`per:${ctx.command}`);
+      return inner(ctx, flags);
+    };
+    const cli = createCLI({ name: "ocas", version: "1.0.0" });
+    cli
+      .command("with-mw")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .use(perCommandMw)
+      .action(async () => ({ ok: true }));
+    cli
+      .command("without-mw")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async () => ({ ok: true }));
+
+    const io1 = createBuffers();
+    await cli.run({ argv: ["with-mw"], ...io1.out });
+    const io2 = createBuffers();
+    await cli.run({ argv: ["without-mw"], ...io2.out });
+
+    expect(seen).toEqual(["per:with-mw"]);
+  });
+
+  test("composition order: outermost wraps innermost (pre outer-first, post outer-last)", async () => {
+    const log: string[] = [];
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      // global middleware is applied outermost (runs first on entry).
+      middleware: [trace("global", log)],
+    });
+    cli
+      .command("cmd")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      // Per-command .use() order: earlier calls are innermost.
+      .use(trace("inner", log))
+      .use(trace("middle", log))
+      .action(async () => {
+        log.push("action");
+        return { ok: true };
+      });
+
+    const io = createBuffers();
+    const code = await cli.run({ argv: ["cmd"], ...io.out });
+    expect(code).toBe(0);
+    // Entry order: global (outermost) → middle → inner → action.
+    // Exit order: action → inner → middle → global.
+    expect(log).toEqual([
+      "pre:global",
+      "pre:middle",
+      "pre:inner",
+      "action",
+      "post:inner",
+      "post:middle",
+      "post:global",
+    ]);
+  });
+
+  test("middleware can transform the return value", async () => {
+    const upper: CliMiddleware = (inner) => async (ctx, flags) => {
+      const result = await inner(ctx, flags);
+      return typeof result === "string" ? result.toUpperCase() : result;
+    };
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [upper],
+    });
+    cli
+      .command("echo")
+      .returns(z.string(), "{{value}}")
+      .action(async () => "hello");
+
+    const io = createBuffers();
+    const code = await cli.run({
+      argv: ["echo", "--format", "text"],
+      ...io.out,
+    });
+    expect(code).toBe(0);
+    // The middleware upper-cased the action's return value before the
+    // envelope renderer saw it.
+    expect(io.read().stdout.trim()).toBe("HELLO");
+  });
+
+  test("middleware that returns undefined bypasses the envelope output", async () => {
+    const bypass: CliMiddleware = (inner) => async (ctx, flags) => {
+      await inner(ctx, flags);
+      // Returning undefined tells run() to skip envelope rendering entirely.
+      return undefined;
+    };
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [bypass],
+    });
+    cli
+      .command("silent")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async () => ({ ok: true }));
+
+    const io = createBuffers();
+    const code = await cli.run({ argv: ["silent"], ...io.out });
+    expect(code).toBe(0);
+    // Nothing was written because the middleware swallowed the result.
+    expect(io.read().stdout).toBe("");
+    expect(io.read().stderr).toBe("");
+  });
+
+  test("middleware can write to ctx and still bypass envelope", async () => {
+    const custom: CliMiddleware = (inner) => async (ctx, flags) => {
+      await inner(ctx, flags);
+      ctx.stdout("custom-output\n");
+      return undefined;
+    };
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [custom],
+    });
+    cli
+      .command("custom")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async () => ({ ok: true }));
+
+    const io = createBuffers();
+    const code = await cli.run({ argv: ["custom"], ...io.out });
+    expect(code).toBe(0);
+    expect(io.read().stdout).toBe("custom-output\n");
+  });
+
+  test("middleware receives the parsed flags (incl. render when enabled)", async () => {
+    let observedRender: unknown = "unset";
+    const inspector: CliMiddleware = (inner) => async (ctx, flags) => {
+      observedRender = flags.render;
+      return inner(ctx, flags);
+    };
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [inspector],
+    });
+    cli
+      .command("noop")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async () => ({ ok: true }));
+
+    const io = createBuffers();
+    await cli.run({ argv: ["noop", "--render"], ...io.out });
+    // middleware presence enables the render flag.
+    expect(observedRender).toBe(true);
+  });
+});

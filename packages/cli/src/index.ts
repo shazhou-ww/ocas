@@ -4,7 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCLI, ocasRenderPlugin } from "@ocas/cli-kit";
+import type { CliMiddleware, RenderFn } from "@ocas/cli-kit";
+import { createCLI, renderMiddleware } from "@ocas/cli-kit";
 import { z } from "zod";
 
 import { cmdPromptBootstrap } from "./prompt-bootstrap.js";
@@ -514,10 +515,85 @@ function addCommonFlags(command: {
 
 const pkgPath = join(__dirname, "..", "package.json");
 const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string };
+
+// --- Middleware (function decorator pattern, see issue #234) ---
+// The render flag is now enabled implicitly by the presence of global
+// middleware, and every `if (flags.render)` block has been replaced by a small
+// middleware below.
+
+// Global: render a *returned hash* via renderAsync. Commands whose return
+// value is not a hash (e.g. `has` → boolean, `get` → node object, `list` →
+// array) are passed through untouched here and either render via their own
+// per-command `.use()` middleware or simply produce their normal envelope.
+const renderHashFn: RenderFn = async (store, value) => {
+  if (typeof value === "string" && isHash(value)) {
+    return await renderAsync(store as Store, value as Hash, {});
+  }
+  return undefined;
+};
+
+// Per-command factory: render the return value via renderDirectAsync using the
+// `@ocas/output/<name>` type resolved from the store. Used by list / tag / var
+// / template-list style commands whose result is an in-memory value, not a hash.
+function directRenderMiddleware(outputTypeName: string): CliMiddleware {
+  return (inner) => async (ctx, flags) => {
+    const result = await inner(ctx, flags);
+    if (flags.render === true && result !== undefined) {
+      const store = await openStore();
+      const typeHash = store.var.get(outputTypeName)?.value;
+      if (typeHash !== undefined) {
+        const rendered = await renderDirectAsync(typeHash, result, store, {});
+        ctx.stdout(`${rendered}\n`);
+        return undefined;
+      }
+    }
+    return result;
+  };
+}
+
+// `get` renders the node's own type+payload (not the tagged envelope value the
+// action returns), so it has a bespoke middleware instead of the factory above.
+const getRenderMiddleware: CliMiddleware = (inner) => async (ctx, flags) => {
+  const result = await inner(ctx, flags);
+  if (flags.render === true && result !== null && typeof result === "object") {
+    const node = result as { type: Hash; payload: unknown };
+    const store = await openStore();
+    const rendered = await renderDirectAsync(
+      node.type,
+      node.payload,
+      store,
+      {},
+    );
+    ctx.stdout(`${rendered}\n`);
+    return undefined;
+  }
+  return result;
+};
+
+// `refs`/`walk` render the *input* hash (the node being inspected), not their
+// own return value (an array / tree string), so they re-resolve the first
+// positional.
+function inputHashRenderMiddleware(): CliMiddleware {
+  return (inner) => async (ctx, flags) => {
+    const result = await inner(ctx, flags);
+    if (flags.render === true) {
+      const input = getPositionals(flags)[0];
+      if (input !== undefined) {
+        const store = await openStore();
+        const hash = resolveHash(input, store);
+        const rendered = await renderAsync(store, hash, {});
+        ctx.stdout(`${rendered}\n`);
+        return undefined;
+      }
+    }
+    return result;
+  };
+}
+
 const cli = createCLI({
   name: "ocas",
   version: pkg.version,
-  plugins: [ocasRenderPlugin(() => openStore())],
+  middleware: [renderMiddleware(() => openStore(), renderHashFn)],
   homeDir: defaultStorePath,
 });
 
@@ -570,11 +646,6 @@ const put = cli
           `Validation failed: payload in ${file ?? "<stdin>"} does not match schema ${typeHash}`,
         );
       }
-      if (runtimeFlags.render === true) {
-        const rendered = await renderAsync(store, putHash, {});
-        process.stdout.write(`${rendered}\n`);
-        return undefined;
-      }
       return putHash;
     }
 
@@ -590,11 +661,6 @@ const put = cli
       );
 
     const hash = store.cas.put(typeHash, payload);
-    if (runtimeFlags.render === true) {
-      const rendered = await renderAsync(store, hash, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return hash;
   });
 addCommonFlags(put);
@@ -602,6 +668,7 @@ addCommonFlags(put);
 const get = cli
   .command("get")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/get" })
+  .use(getRenderMiddleware)
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     const positionals = getPositionals(runtimeFlags);
@@ -613,17 +680,6 @@ const get = cli
     if (node === null) return ctx.error(`Node not found: ${hash}`);
     const tags = store.tag.tags(hash);
     const value = tags.length === 0 ? node : { ...node, tags };
-
-    if (runtimeFlags.render === true) {
-      const rendered = await renderDirectAsync(
-        node.type,
-        node.payload,
-        store,
-        {},
-      );
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
 
     return value;
   });
@@ -664,6 +720,7 @@ addCommonFlags(verifyCommand);
 const refsCommand = cli
   .command("refs")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/refs" })
+  .use(inputHashRenderMiddleware())
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     const positionals = getPositionals(runtimeFlags);
@@ -674,11 +731,6 @@ const refsCommand = cli
     const node = store.cas.get(hash);
     if (node === null) return ctx.error(`Node not found: ${hash}`);
     const refHashes = refs(store, node);
-    if (runtimeFlags.render === true) {
-      const rendered = await renderAsync(store, hash, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return refHashes;
   });
 addCommonFlags(refsCommand);
@@ -686,6 +738,7 @@ addCommonFlags(refsCommand);
 const walkCommand = cli
   .command("walk")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/walk" })
+  .use(inputHashRenderMiddleware())
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     const positionals = getPositionals(runtimeFlags);
@@ -737,11 +790,6 @@ const walkCommand = cli
       printNode(hash, "", true);
       const treeString = lines.join("\n");
 
-      if (runtimeFlags.render === true) {
-        const rendered = await renderAsync(store, hash, {});
-        process.stdout.write(`${rendered}\n`);
-        return undefined;
-      }
       return treeString;
     } else {
       const hashes: Hash[] = [];
@@ -754,11 +802,6 @@ const walkCommand = cli
         { followType },
       );
 
-      if (runtimeFlags.render === true) {
-        const rendered = await renderAsync(store, hash, {});
-        process.stdout.write(`${rendered}\n`);
-        return undefined;
-      }
       return hashes;
     }
   });
@@ -791,11 +834,6 @@ const hash = cli
       ? await readStdinJson()
       : readJsonFile(file as string);
     const computedHash = await computeHash(typeHash, payload);
-    if (runtimeFlags.render === true) {
-      const rendered = await renderAsync(store, computedHash, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return computedHash;
   });
 addCommonFlags(hash);
@@ -949,6 +987,7 @@ addCommonFlags(render);
 const list = cli
   .command("list")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/list" })
+  .use(directRenderMiddleware("@ocas/output/list"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     const typeFlag = flags.type;
@@ -1010,17 +1049,6 @@ const list = cli
       entries = applyListOptions(filtered, opts);
     }
 
-    if (runtimeFlags.render === true) {
-      const outputTypeHash = store.var.get("@ocas/output/list")?.value as Hash;
-      const rendered = await renderDirectAsync(
-        outputTypeHash,
-        entries,
-        store,
-        {},
-      );
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return entries;
   });
 addCommonFlags(list);
@@ -1028,17 +1056,12 @@ addCommonFlags(list);
 const listMeta = cli
   .command("list-meta")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/list-meta" })
+  .use(directRenderMiddleware("@ocas/output/list-meta"))
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
     const opts = parseListOptions();
     const store = await openStore();
     const entries = store.cas.listMeta(opts);
-    if (runtimeFlags.render === true) {
-      const typeHash = store.var.get("@ocas/output/list-meta")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, entries, store, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return entries;
   });
 addCommonFlags(listMeta);
@@ -1046,17 +1069,12 @@ addCommonFlags(listMeta);
 const listSchema = cli
   .command("list-schema")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/list-schema" })
+  .use(directRenderMiddleware("@ocas/output/list-schema"))
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
     const opts = parseListOptions();
     const store = await openStore();
     const entries = store.cas.listSchemas(opts);
-    if (runtimeFlags.render === true) {
-      const typeHash = store.var.get("@ocas/output/list-schema")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, entries, store, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return entries;
   });
 addCommonFlags(listSchema);
@@ -1064,6 +1082,7 @@ addCommonFlags(listSchema);
 const tag = cli
   .command("tag")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/tag" })
+  .use(directRenderMiddleware("@ocas/output/tag"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     ensureWritable("tag");
@@ -1087,12 +1106,6 @@ const tag = cli
     ];
     store.tag.tag(target, ops);
     const result = store.tag.tags(target);
-    if (runtimeFlags.render === true) {
-      const typeHash = store.var.get("@ocas/output/tag")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, result, store, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return result;
   });
 addCommonFlags(tag);
@@ -1100,6 +1113,7 @@ addCommonFlags(tag);
 const untag = cli
   .command("untag")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/untag" })
+  .use(directRenderMiddleware("@ocas/output/untag"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     ensureWritable("untag");
@@ -1119,12 +1133,6 @@ const untag = cli
     );
     store.tag.untag(target, keys);
     const result = store.tag.tags(target);
-    if (runtimeFlags.render === true) {
-      const typeHash = store.var.get("@ocas/output/untag")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, result, store, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return result;
   });
 addCommonFlags(untag);
@@ -1133,6 +1141,7 @@ const varSet = cli
   .command("var")
   .command("set")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-set" })
+  .use(directRenderMiddleware("@ocas/output/var-set"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     ensureWritable("var:set");
@@ -1166,12 +1175,6 @@ const varSet = cli
             }
           : undefined;
       const variable = store.var.set(name, value as Hash, options);
-      if (runtimeFlags.render === true) {
-        const typeHash = store.var.get("@ocas/output/var-set")?.value as Hash;
-        const rendered = await renderDirectAsync(typeHash, variable, store, {});
-        process.stdout.write(`${rendered}\n`);
-        return undefined;
-      }
       return variable;
     } catch (e) {
       if (
@@ -1190,6 +1193,7 @@ const varGet = cli
   .command("var")
   .command("get")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-get" })
+  .use(directRenderMiddleware("@ocas/output/var-get"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     const positionals = getPositionals(runtimeFlags);
@@ -1207,12 +1211,6 @@ const varGet = cli
     const valueTags = store.tag.tags(variable.value);
     const outValue =
       valueTags.length === 0 ? variable : { ...variable, valueTags };
-    if (runtimeFlags.render === true) {
-      const typeHash = store.var.get("@ocas/output/var-get")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, outValue, store, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return outValue;
   });
 addCommonFlags(varGet);
@@ -1221,6 +1219,7 @@ const varDelete = cli
   .command("var")
   .command("delete")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-delete" })
+  .use(directRenderMiddleware("@ocas/output/var-delete"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     ensureWritable("var:delete");
@@ -1247,18 +1246,6 @@ const varDelete = cli
       } else {
         result = store.var.remove(name);
       }
-      if (runtimeFlags.render === true) {
-        const outputTypeHash = store.var.get("@ocas/output/var-delete")
-          ?.value as Hash;
-        const rendered = await renderDirectAsync(
-          outputTypeHash,
-          result,
-          store,
-          {},
-        );
-        process.stdout.write(`${rendered}\n`);
-        return undefined;
-      }
       return result;
     } catch (e) {
       if (e instanceof VariableNotFoundError) {
@@ -1273,6 +1260,7 @@ const varList = cli
   .command("var")
   .command("list")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-list" })
+  .use(directRenderMiddleware("@ocas/output/var-list"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     const positionals = getPositionals(runtimeFlags);
@@ -1301,17 +1289,6 @@ const varList = cli
         ...(labels.length > 0 ? { labels } : {}),
         ...listOpts,
       });
-      if (runtimeFlags.render === true) {
-        const typeHash = store.var.get("@ocas/output/var-list")?.value as Hash;
-        const rendered = await renderDirectAsync(
-          typeHash,
-          variables,
-          store,
-          {},
-        );
-        process.stdout.write(`${rendered}\n`);
-        return undefined;
-      }
       return variables;
     } catch (e) {
       if (e instanceof InvalidVariableNameError) {
@@ -1326,6 +1303,7 @@ const varHistory = cli
   .command("var")
   .command("history")
   .returns(returnSchema, genericTemplate, { name: "@ocas/output/var-history" })
+  .use(directRenderMiddleware("@ocas/output/var-history"))
   .action(async (_args, runtimeFlags, ctx) => {
     setRuntimeFlags(runtimeFlags);
     const positionals = getPositionals(runtimeFlags);
@@ -1356,12 +1334,6 @@ const varHistory = cli
       );
     const values = entries.map((e) => e.value);
     const result = { name, schema, values };
-    if (runtimeFlags.render === true) {
-      const typeHash = store.var.get("@ocas/output/var-history")?.value as Hash;
-      const rendered = await renderDirectAsync(typeHash, result, store, {});
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return result;
   });
 addCommonFlags(varHistory);
@@ -1506,6 +1478,7 @@ const templateList = cli
   .returns(returnSchema, genericTemplate, {
     name: "@ocas/output/template-list",
   })
+  .use(directRenderMiddleware("@ocas/output/template-list"))
   .action(async (_args, runtimeFlags) => {
     setRuntimeFlags(runtimeFlags);
     const formatFlag =
@@ -1537,18 +1510,6 @@ const templateList = cli
       })),
     ];
 
-    if (runtimeFlags.render === true) {
-      const outputTypeHash = store.var.get("@ocas/output/template-list")
-        ?.value as Hash;
-      const rendered = await renderDirectAsync(
-        outputTypeHash,
-        templates,
-        store,
-        {},
-      );
-      process.stdout.write(`${rendered}\n`);
-      return undefined;
-    }
     return templates;
   });
 addCommonFlags(templateList);
