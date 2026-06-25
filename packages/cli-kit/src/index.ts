@@ -12,4 +12,7 @@ export type {
   Handler,
   ParsedFlags,
   RunOptions,
+  SchemaBinding,
+  SchemaMiddleware,
+  SchemaMorphism,
 } from "./types.js";

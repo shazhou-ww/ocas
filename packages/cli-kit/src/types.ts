@@ -45,13 +45,48 @@ export type CommandAction = (
 export type Handler = (ctx: CliContext, flags: ParsedFlags) => Promise<unknown>;
 
 /**
+ * A schema morphism — transforms a zod schema. Used by the schema leg of
+ * middleware to keep the envelope's type tag honest when the value leg
+ * transforms the payload (e.g. redact removes a field → mapReturn must
+ * omit that field from the schema too). Defaults to identity when omitted.
+ */
+export type SchemaMorphism = (schema: z.ZodType<unknown>) => z.ZodType<unknown>;
+
+/**
+ * Full middleware pair: a **value leg** (`run`) plus optional **schema legs**
+ * (`mapYield`, `mapReturn`). The value leg wraps the handler exactly like a
+ * bare `CliMiddleware` function. The schema legs transform the yield/return
+ * schemas so that validation and envelope type tags reflect the *effective*
+ * schema after middleware transformation — not the static binding schema.
+ *
+ * Coherence (functor law): if middleware `f` transforms value `v` to `f(v)`,
+ * then `mapReturn(schema)` must produce a schema that `f(v)` inhabits.
+ * Side-effect middleware (logging, timing) project to identity — they don't
+ * transform the value, so they omit the schema legs entirely.
+ *
+ * See: [ocas#238](https://git.shazhou.work/shazhou/ocas/issues/238)
+ */
+export interface SchemaMiddleware {
+  /** Value leg — wraps the handler (same as bare CliMiddleware function). */
+  run: (handler: Handler) => Handler;
+  /** Schema leg for yield values. Default: identity. */
+  mapYield?: SchemaMorphism;
+  /** Schema leg for return values. Default: identity. */
+  mapReturn?: SchemaMorphism;
+}
+
+/**
  * Middleware is a function decorator: `(handler) => wrapped_handler`.
  * Composition is plain function composition with no `next()` — middleware
  * always wraps, so there is no "forgot to call next" footgun. Per-command
  * middleware (added via `.use()`) is applied innermost-first; global
  * middleware (from `CreateCliOptions.middleware`) is applied outermost.
+ *
+ * Accepts either a bare function (sugar for `{ run: fn }` — schema legs
+ * default to identity, fully backward compatible) or a full
+ * {@link SchemaMiddleware} pair with explicit schema morphisms.
  */
-export type CliMiddleware = (handler: Handler) => Handler;
+export type CliMiddleware = ((handler: Handler) => Handler) | SchemaMiddleware;
 
 export interface CommandBuilder {
   arg(name: string): CommandBuilder;
