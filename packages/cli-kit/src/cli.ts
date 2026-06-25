@@ -21,6 +21,7 @@ import type {
 interface InternalCommand {
   name: string;
   path: string[];
+  description?: string;
   args: string[];
   flags: Record<string, FlagDefinition>;
   yieldBinding?: SchemaBinding;
@@ -44,6 +45,123 @@ const errorPayloadSchema = z.object({
   command: z.string(),
 });
 
+function wantsHelp(tokens: string[]): boolean {
+  return tokens.some((token) => token === "--help" || token === "-h");
+}
+
+function stripHelp(tokens: string[]): string[] {
+  return tokens.filter((token) => token !== "--help" && token !== "-h");
+}
+
+function resolveOutputFormat(
+  flags: {
+    format?: OutputFormat;
+    _formatExplicit?: boolean;
+    json: boolean;
+  },
+  commandDefaultFormat?: OutputFormat,
+): OutputFormat {
+  // --json keeps the highest precedence for output formatting: it forces a JSON
+  // envelope regardless of any explicit --format value. This preserves the
+  // long-standing contract that consumers (e.g. the ocas CLI test harness) rely
+  // on, where --format is often a command argument (which template namespace,
+  // tree vs flat) rather than the wire output format, and --json is appended to
+  // get a machine-parseable envelope on top of it.
+  if (flags.json) {
+    return "json";
+  }
+  // An explicit --format from the user wins over a per-command default.
+  if (flags._formatExplicit && flags.format !== undefined) {
+    return flags.format;
+  }
+  // Per-command default format (gap #4): applies only when the user gave
+  // neither --json nor an explicit --format.
+  if (commandDefaultFormat !== undefined) {
+    return commandDefaultFormat;
+  }
+  return "yaml";
+}
+
+function formatFlagLine(
+  name: string,
+  definition: FlagDefinition,
+  allowRenderFlag: boolean,
+): string {
+  if (name === "render" && allowRenderFlag) {
+    return "  -r, --render";
+  }
+  const alias = definition.alias;
+  if (alias !== undefined) {
+    return `  -${alias}, --${name}`;
+  }
+  return `  --${name}`;
+}
+
+function formatHelp(
+  cliName: string,
+  command: InternalCommand,
+  allowRenderFlag: boolean,
+): string {
+  const lines: string[] = [];
+  const path =
+    command.name === "$root" ? cliName : `${cliName} ${command.path.join(" ")}`;
+
+  if (command.children.size > 0) {
+    const subcommandHint =
+      command.name === "$root" ? "<command>" : "<subcommand>";
+    lines.push(`Usage: ${path} ${subcommandHint} [options]`);
+  } else if (command.args.length > 0) {
+    const argList = command.args.map((arg) => `<${arg}>`).join(" ");
+    lines.push(`Usage: ${path} ${argList} [options]`);
+  } else {
+    lines.push(`Usage: ${path} [options]`);
+  }
+
+  if (command.description !== undefined) {
+    lines.push("");
+    lines.push(command.description);
+  }
+
+  if (command.args.length > 0) {
+    lines.push("");
+    lines.push("Arguments:");
+    for (const arg of command.args) {
+      lines.push(`  <${arg}>`);
+    }
+  }
+
+  if (command.children.size > 0) {
+    lines.push("");
+    lines.push("Commands:");
+    for (const child of command.children.values()) {
+      lines.push(`  ${child.name}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("Options:");
+  lines.push("  -h, --help         Show help");
+  lines.push("  --format <yaml|json|text|html>");
+  lines.push("  --compact");
+  lines.push("  --quiet");
+  if (allowRenderFlag) {
+    lines.push("  -r, --render");
+  }
+
+  for (const [name, definition] of Object.entries(command.flags)) {
+    const flagLine = formatFlagLine(name, definition, allowRenderFlag);
+    if (definition.type === "string") {
+      lines.push(`${flagLine} <value>`);
+    } else if (definition.type === "number") {
+      lines.push(`${flagLine} <number>`);
+    } else {
+      lines.push(flagLine);
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 export function createCLI(options: CreateCliOptions): CommandBuilder & {
   run: (options?: RunOptions) => Promise<number>;
   help: () => string;
@@ -65,6 +183,10 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         node.args.push(name);
         return this;
       },
+      describe(text: string) {
+        node.description = text;
+        return this;
+      },
       flag(name: string, definition: FlagDefinition) {
         node.flags[name] = definition;
         return this;
@@ -82,6 +204,9 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
           schema,
           template,
           ...(config?.name !== undefined ? { name: config.name } : {}),
+          ...(config?.defaultFormat !== undefined
+            ? { defaultFormat: config.defaultFormat }
+            : {}),
         };
         return this;
       },
@@ -128,6 +253,12 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
     const stderr = runOptions.stderr ?? process.stderr;
 
     try {
+      if (wantsHelp(argv)) {
+        const { command } = resolveCommand(root, stripHelp(argv));
+        stdout.write(formatHelp(options.name, command, allowRenderFlag));
+        return 0;
+      }
+
       const { command, rest } = resolveCommand(root, argv);
       if (command === root) {
         const token = argv.find((part) => !part.startsWith("-"));
@@ -161,6 +292,21 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         throw new CliError("Missing positional arguments", "E_USAGE");
       }
 
+      const outputFormat = resolveOutputFormat(
+        parsed.flags,
+        command.returnBinding.defaultFormat,
+      );
+      // NOTE: do NOT write `outputFormat` back into `parsed.flags.format`.
+      // `outputFormat` is the resolved *wire* format used only for rendering the
+      // final envelope below. The action must continue to see the user's raw
+      // `--format` value (or undefined), because consumers like the ocas CLI use
+      // `--format html|text` as a command argument (template namespace selection,
+      // tree vs flat) independently of the output encoding. Overwriting it with
+      // the wire format (e.g. "json" when --json is passed) would hide the user's
+      // intent from the action. `_formatExplicit` is an internal parse marker and
+      // is stripped before the flags reach the action.
+      delete parsed.flags._formatExplicit;
+
       const args: Record<string, string> = {};
       command.args.forEach((name, idx) => {
         args[name] = parsed.positionals[idx] as string;
@@ -173,6 +319,8 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
           throw new CliError(message, code);
         },
         log: logger,
+        stdout: (text: string) => stdout.write(text),
+        stderr: (text: string) => stderr.write(text),
       };
 
       const actionResult = command.action(
@@ -186,7 +334,6 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       let finalValue: unknown;
       if (isAsyncGenerator(actionResult)) {
         const iterator = actionResult[Symbol.asyncIterator]();
-        // Explicitly consume the generator so we can handle yield and final return separately.
         while (true) {
           const next = await iterator.next();
           if (next.done) {
@@ -213,7 +360,6 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         finalValue = await actionResult;
       }
 
-      // If the action returns undefined, it handled its own output (e.g. render).
       if (finalValue === undefined) {
         return 0;
       }
@@ -225,10 +371,6 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       const returnType =
         command.returnBinding.name ??
         defaultReturnSchemaName(options.name, command.path);
-      // --json implies compact JSON output unless --format was explicitly set
-      const outputFormat = parsed.flags.json
-        ? "json"
-        : (parsed.flags.format as OutputFormat);
       const outputCompact = parsed.flags.json || parsed.flags.compact;
       stdout.write(
         renderFinalOutput(
@@ -255,16 +397,7 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
   }
 
   function help(): string {
-    const rows = [
-      `Usage: ${options.name} <command> [options]`,
-      "",
-      "Standard flags:",
-      "  --format <yaml|json|text|html>",
-      "  --compact",
-      "  --quiet",
-      ...(allowRenderFlag ? ["  -r, --render"] : []),
-    ];
-    return rows.join("\n");
+    return formatHelp(options.name, root, allowRenderFlag);
   }
 
   return Object.assign(wrap(root), { run, help });

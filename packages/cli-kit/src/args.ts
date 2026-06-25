@@ -1,8 +1,20 @@
-import type { FlagDefinition, ParsedFlags } from "./types.js";
+import type { FlagDefinition, OutputFormat, ParsedFlags } from "./types.js";
 
 export interface ParseResult {
   positionals: string[];
   flags: ParsedFlags;
+}
+
+function buildAliasMap(
+  definitions: Record<string, FlagDefinition>,
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const [name, definition] of Object.entries(definitions)) {
+    if (definition.alias !== undefined) {
+      map[definition.alias] = name;
+    }
+  }
+  return map;
 }
 
 export function parseArgv(
@@ -11,15 +23,16 @@ export function parseArgv(
   allowRenderFlag: boolean,
 ): ParseResult {
   const definitions: Record<string, FlagDefinition> = {
-    format: { type: "string", default: "yaml" },
+    format: { type: "string" },
     compact: { type: "boolean", default: false },
     quiet: { type: "boolean", default: false },
     json: { type: "boolean", default: false },
     ...knownFlags,
     ...(allowRenderFlag ? { render: { type: "boolean", default: false } } : {}),
   };
+  const aliasMap = buildAliasMap(definitions);
+
   const flags: ParsedFlags = {
-    format: "yaml",
     compact: false,
     quiet: false,
     json: false,
@@ -28,6 +41,9 @@ export function parseArgv(
     flags.render = false;
   }
   for (const [name, definition] of Object.entries(definitions)) {
+    if (name === "format") {
+      continue;
+    }
     if (definition.default !== undefined) {
       flags[name] = definition.default;
     } else if (definition.type === "boolean") {
@@ -39,6 +55,32 @@ export function parseArgv(
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] as string;
     if (token === "-r") {
+      const aliasTarget = aliasMap.r;
+      if (aliasTarget !== undefined && aliasTarget !== "render") {
+        const definition = definitions[aliasTarget];
+        if (!definition) {
+          throw new Error("Unknown option: -r");
+        }
+        if (definition.type === "boolean") {
+          flags[aliasTarget] = true;
+          continue;
+        }
+        const value = argv[i + 1];
+        if (value === undefined || value.startsWith("-")) {
+          throw new Error(`Missing value for --${aliasTarget}`);
+        }
+        i++;
+        if (definition.type === "number") {
+          const parsed = Number(value);
+          if (!Number.isFinite(parsed)) {
+            throw new Error(`Invalid number for --${aliasTarget}: ${value}`);
+          }
+          flags[aliasTarget] = parsed;
+        } else {
+          flags[aliasTarget] = value;
+        }
+        continue;
+      }
       if (!allowRenderFlag) {
         throw new Error("Unknown option: -r");
       }
@@ -61,12 +103,22 @@ export function parseArgv(
       } else {
         key = body;
       }
+
+      if (key.startsWith("no-")) {
+        const baseKey = key.slice(3);
+        const baseDefinition = definitions[baseKey];
+        if (baseDefinition?.type === "boolean") {
+          flags[baseKey] = false;
+          continue;
+        }
+        throw new Error(`Unknown option: --${key}`);
+      }
     } else {
       const body = token.slice(1);
       if (body.length !== 1) {
         throw new Error(`Unknown option: ${token}`);
       }
-      key = body;
+      key = aliasMap[body] ?? body;
     }
 
     const definition = definitions[key];
@@ -96,6 +148,12 @@ export function parseArgv(
       continue;
     }
 
+    if (key === "format") {
+      flags.format = value as OutputFormat;
+      flags._formatExplicit = true;
+      continue;
+    }
+
     const existing = flags[key];
     if (
       key === "tag" &&
@@ -113,10 +171,6 @@ export function parseArgv(
 
     flags[key] = value;
   }
-
-  // --json implies compact JSON output, but does NOT override --format
-  // (which may be used for command-specific purposes like --format html).
-  // The json→format mapping is handled in cli.ts's run() instead.
 
   return { positionals, flags };
 }
