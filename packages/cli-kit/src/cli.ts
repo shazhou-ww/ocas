@@ -18,6 +18,8 @@ import type {
   OutputFormat,
   RunOptions,
   SchemaBinding,
+  SchemaMiddleware,
+  SchemaMorphism,
 } from "./types.js";
 
 interface InternalCommand {
@@ -360,8 +362,9 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         globalMiddleware,
         baseHandler,
       );
+      const { handler, yieldMorphism, returnMorphism } = composed;
 
-      const actionResult = await composed(ctx, actionFlags);
+      const actionResult = await handler(ctx, actionFlags);
       let finalValue: unknown;
       if (isAsyncGenerator(actionResult)) {
         const iterator = actionResult[Symbol.asyncIterator]();
@@ -376,8 +379,11 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
               "Command yielded but no .yields(...) schema was declared",
             );
           }
-          const validated = validateWithSchema(
+          const effectiveYieldSchema = yieldMorphism(
             command.yieldBinding.schema,
+          );
+          const validated = validateWithSchema(
+            effectiveYieldSchema,
             next.value,
           );
           if (!parsed.flags.quiet) {
@@ -395,8 +401,11 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         return 0;
       }
 
-      const validatedFinal = validateWithSchema(
+      const effectiveReturnSchema = returnMorphism(
         command.returnBinding.schema,
+      );
+      const validatedFinal = validateWithSchema(
+        effectiveReturnSchema,
         finalValue,
       );
       const returnType =
@@ -448,24 +457,57 @@ function isAsyncGenerator(
 }
 
 /**
- * Compose middleware into a single handler. Per-command middleware is applied
- * innermost-first (array index 0 ends up closest to the action); global
- * middleware is applied last so it is outermost (first to run on entry, last
- * on exit). The resulting handler is `globalN(...global1(perCommandN(...perCommand1(base))))`.
+ * Normalize a CliMiddleware (which may be a bare function or a full
+ * SchemaMiddleware pair) into the pair form. Bare functions become
+ * `{ run: fn }` with identity schema legs.
+ */
+function normalizeMiddleware(mw: CliMiddleware): SchemaMiddleware {
+  return typeof mw === "function" ? { run: mw } : mw;
+}
+
+/**
+ * Compose middleware into a single handler plus folded schema morphisms.
+ * Per-command middleware is applied innermost-first (array index 0 ends up
+ * closest to the action); global middleware is applied last so it is outermost
+ * (first to run on entry, last on exit). The resulting handler is
+ * `globalN(...global1(perCommandN(...perCommand1(base))))`.
+ *
+ * Schema morphisms fold in the same order as value flow on exit: per-command
+ * (index 0 → N) then global (index 0 → N). This ensures the effective schema
+ * matches the transformed value at validation time.
  */
 function composeMiddleware(
   perCommand: CliMiddleware[],
   global: CliMiddleware[],
   base: Handler,
-): Handler {
+): {
+  handler: Handler;
+  yieldMorphism: SchemaMorphism;
+  returnMorphism: SchemaMorphism;
+} {
   let handler = base;
-  for (const mw of perCommand) {
-    handler = mw(handler);
-  }
-  for (const mw of global) {
-    handler = mw(handler);
-  }
-  return handler;
+  let yieldMorphism: SchemaMorphism = (s) => s;
+  let returnMorphism: SchemaMorphism = (s) => s;
+
+  const apply = (mw: CliMiddleware) => {
+    const pair = normalizeMiddleware(mw);
+    handler = pair.run(handler);
+    if (pair.mapYield) {
+      const prev = yieldMorphism;
+      const map = pair.mapYield;
+      yieldMorphism = (s) => map(prev(s));
+    }
+    if (pair.mapReturn) {
+      const prev = returnMorphism;
+      const map = pair.mapReturn;
+      returnMorphism = (s) => map(prev(s));
+    }
+  };
+
+  for (const mw of perCommand) apply(mw);
+  for (const mw of global) apply(mw);
+
+  return { handler, yieldMorphism, returnMorphism };
 }
 
 function resolveCommand(
