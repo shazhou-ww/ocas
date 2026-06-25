@@ -64,17 +64,24 @@ describe("phase 2 cli-kit migration", () => {
     expect(asHtml.stdout).not.toContain("@ocas/output/has");
   });
 
-  test("render flag uses cli-kit plugin path and keeps envelope compatibility", async () => {
+  test("render flag uses cli-kit middleware path and keeps envelope compatibility", async () => {
     const source = readFileSync(
       resolve(import.meta.dirname, "../src/index.ts"),
       "utf-8",
     );
-    expect(source).toContain("ocasRenderPlugin(");
+    // The render behavior is now supplied by middleware, not the deprecated
+    // CliPlugin. The global middleware enables the -r/--render flag implicitly.
+    expect(source).toContain("renderMiddleware(");
+    expect(source).toContain("middleware:");
+    expect(source).not.toContain("ocasRenderPlugin(");
 
     const normal = runCliRaw(["has", "@ocas/schema"]);
     expect(normal.exitCode).toBe(0);
     expect(normal.stdout).toContain("@ocas/output/has");
 
+    // `has` returns a boolean, which the global render middleware declines to
+    // render (it only renders hash strings). So -r leaves the normal text
+    // output intact — exactly the old behavior.
     const rendered = runCliRaw([
       "has",
       "@ocas/schema",

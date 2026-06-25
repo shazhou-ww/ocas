@@ -9,10 +9,12 @@ import {
 } from "./schema.js";
 import type {
   CliContext,
+  CliMiddleware,
   CommandAction,
   CommandBuilder,
   CreateCliOptions,
   FlagDefinition,
+  Handler,
   OutputFormat,
   RunOptions,
   SchemaBinding,
@@ -27,6 +29,7 @@ interface InternalCommand {
   yieldBinding?: SchemaBinding;
   returnBinding?: SchemaBinding;
   action?: CommandAction;
+  middleware: CliMiddleware[];
   children: Map<string, InternalCommand>;
 }
 
@@ -171,11 +174,18 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
     path: [],
     args: [],
     flags: {},
+    middleware: [],
     children: new Map(),
   };
-  const allowRenderFlag = Boolean(
-    options.plugins?.some((plugin) => plugin.enableRenderFlag),
-  );
+  // The render flag (`-r`/`--render`) is enabled when a deprecated plugin
+  // declares `enableRenderFlag`, OR when any global middleware is registered
+  // (middleware is the new mechanism that consumes the flag). This keeps the
+  // flag implicit for middleware-based consumers while preserving the legacy
+  // plugin contract.
+  const allowRenderFlag =
+    Boolean(options.plugins?.some((plugin) => plugin.enableRenderFlag)) ||
+    (options.middleware?.length ?? 0) > 0;
+  const globalMiddleware = options.middleware ?? [];
 
   function wrap(node: InternalCommand): CommandBuilder {
     return {
@@ -218,6 +228,7 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
             path: [...node.path, name],
             args: [],
             flags: {},
+            middleware: [],
             children: new Map(),
           };
           node.children.set(name, child);
@@ -226,6 +237,10 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       },
       action(fn: CommandAction) {
         node.action = fn;
+        return this;
+      },
+      use(middleware: CliMiddleware) {
+        node.middleware.push(middleware);
         return this;
       },
     };
@@ -280,6 +295,9 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       if (!command.action) {
         throw new CliError("Command action is missing", "E_USAGE");
       }
+      // Capture the narrowed action so the middleware base handler (a closure)
+      // can invoke it without TypeScript widening it back to `| undefined`.
+      const action = command.action;
       if (!command.returnBinding) {
         throw new CliError(
           "Executable command requires .returns(...)",
@@ -323,14 +341,27 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         stderr: (text: string) => stderr.write(text),
       };
 
-      const actionResult = command.action(
-        args,
-        {
-          ...parsed.flags,
-          _positionals: parsed.positionals,
-        } as typeof parsed.flags,
-        ctx,
+      const actionFlags = {
+        ...parsed.flags,
+        _positionals: parsed.positionals,
+      } as typeof parsed.flags;
+
+      // Compose the middleware chain around the action. The base handler
+      // bridges the Handler signature `(ctx, flags)` to the action signature
+      // `(args, flags, ctx)`, closing over `args`. Per-command middleware
+      // (added via `.use()`) is applied innermost-first; global middleware
+      // (from `CreateCliOptions.middleware`) is applied outermost, so it runs
+      // first on entry and last on exit. Middleware may transform the return
+      // value or return `undefined` to bypass the envelope output below.
+      const baseHandler: Handler = async (handlerCtx, flags) =>
+        action(args, flags, handlerCtx);
+      const composed = composeMiddleware(
+        command.middleware,
+        globalMiddleware,
+        baseHandler,
       );
+
+      const actionResult = await composed(ctx, actionFlags);
       let finalValue: unknown;
       if (isAsyncGenerator(actionResult)) {
         const iterator = actionResult[Symbol.asyncIterator]();
@@ -414,6 +445,27 @@ function isAsyncGenerator(
       Symbol.asyncIterator
     ] === "function"
   );
+}
+
+/**
+ * Compose middleware into a single handler. Per-command middleware is applied
+ * innermost-first (array index 0 ends up closest to the action); global
+ * middleware is applied last so it is outermost (first to run on entry, last
+ * on exit). The resulting handler is `globalN(...global1(perCommandN(...perCommand1(base))))`.
+ */
+function composeMiddleware(
+  perCommand: CliMiddleware[],
+  global: CliMiddleware[],
+  base: Handler,
+): Handler {
+  let handler = base;
+  for (const mw of perCommand) {
+    handler = mw(handler);
+  }
+  for (const mw of global) {
+    handler = mw(handler);
+  }
+  return handler;
 }
 
 function resolveCommand(

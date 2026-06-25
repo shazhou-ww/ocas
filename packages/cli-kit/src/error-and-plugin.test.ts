@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 
-import { createCLI, ocasRenderPlugin } from "./index.js";
+import { createCLI, ocasRenderPlugin, renderMiddleware } from "./index.js";
 
 function createBuffers() {
   let stdout = "";
@@ -53,22 +53,124 @@ describe("error envelope and render plugin", () => {
     expect(err.value.command).toBe("explode");
   });
 
-  test("render flag is gated by render plugin", async () => {
-    const withoutPlugin = createCLI({ name: "ocas", version: "1.0.0" });
-    withoutPlugin
+  test("render flag is rejected without middleware or plugin", async () => {
+    const withoutAnything = createCLI({ name: "ocas", version: "1.0.0" });
+    withoutAnything
       .command("noop")
       .returns(z.object({ ok: z.boolean() }), "{{ok}}")
       .action(async () => ({ ok: true }));
 
-    expect(withoutPlugin.help()).not.toContain("--render");
+    expect(withoutAnything.help()).not.toContain("--render");
     const io1 = createBuffers();
-    const code1 = await withoutPlugin.run({
+    const code1 = await withoutAnything.run({
       argv: ["noop", "--render"],
       ...io1.out,
     });
     expect(code1).toBe(1);
     expect(io1.read().stderr).toContain("Unknown option");
+  });
 
+  test("renderMiddleware enables the flag and renders the return value", async () => {
+    let openedStore = false;
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [
+        renderMiddleware(
+          () => {
+            openedStore = true;
+            return { opened: true };
+          },
+          async () => "RENDERED",
+        ),
+      ],
+    });
+    let seenRenderFlag = false;
+    cli
+      .command("noop")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async (_args, flags) => {
+        seenRenderFlag = flags.render === true;
+        return { ok: true };
+      });
+
+    // The middleware is what enables the -r/--render flag now.
+    expect(cli.help()).toContain("--render");
+    const io = createBuffers();
+    const code = await cli.run({ argv: ["noop", "--render"], ...io.out });
+    expect(code).toBe(0);
+    expect(seenRenderFlag).toBe(true);
+    // The store opener ran (lazily, only because --render was set).
+    expect(openedStore).toBe(true);
+    // The render fn output replaced the envelope.
+    expect(io.read().stdout).toBe("RENDERED\n");
+    expect(io.read().stdout).not.toContain('"type"');
+  });
+
+  test("renderMiddleware skips non-renderable results (no --render, no store open)", async () => {
+    let openedStore = false;
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [
+        renderMiddleware(
+          () => {
+            openedStore = true;
+            return { opened: true };
+          },
+          async () => "RENDERED",
+        ),
+      ],
+    });
+    cli
+      .command("noop")
+      .returns(z.object({ ok: z.boolean() }), "{{ok}}")
+      .action(async () => ({ ok: true }));
+
+    const io = createBuffers();
+    const code = await cli.run({ argv: ["noop"], ...io.out });
+    expect(code).toBe(0);
+    // Without --render the store opener must not run.
+    expect(openedStore).toBe(false);
+    // Normal envelope output is untouched (default YAML format).
+    expect(io.read().stdout).toContain("@ocas/noop");
+  });
+
+  test("renderMiddleware renderFn returning undefined bypasses render (passthrough)", async () => {
+    let openedStore = false;
+    const cli = createCLI({
+      name: "ocas",
+      version: "1.0.0",
+      middleware: [
+        renderMiddleware(
+          () => {
+            openedStore = true;
+            return { opened: true };
+          },
+          // A render fn that declines to render (e.g. the value is not a hash)
+          // signals this by returning undefined.
+          async () => undefined,
+        ),
+      ],
+    });
+    cli
+      .command("has")
+      .returns(z.boolean(), "{{value}}")
+      .action(async () => true);
+
+    const io = createBuffers();
+    const code = await cli.run({
+      argv: ["has", "--render", "--format", "text"],
+      ...io.out,
+    });
+    expect(code).toBe(0);
+    // Store was opened (the middleware only knows after asking the render fn),
+    // but the render fn declined, so the normal text output is produced.
+    expect(openedStore).toBe(true);
+    expect(io.read().stdout.trim()).toBe("true");
+  });
+
+  test("deprecated ocasRenderPlugin still enables the render flag (backward compat)", async () => {
     const withPlugin = createCLI({
       name: "ocas",
       version: "1.0.0",
