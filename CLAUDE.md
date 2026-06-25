@@ -4,13 +4,14 @@ Object Content Addressable Store — self-describing CAS with JSON Schema typed 
 
 ## Project Structure
 
-Monorepo with 3 packages under `packages/`:
+Monorepo with 4 packages under `packages/`:
 
 | Package | Directory | Description |
 |---------|-----------|-------------|
 | `@ocas/core` | `packages/core` | Core CAS engine — hashing, schema, store, verify, bootstrap |
 | `@ocas/fs` | `packages/fs` | Filesystem-backed CAS store |
 | `@ocas/cli` | `packages/cli` | CLI tool (`ocas` binary) |
+| `@ocas/cli-kit` | `packages/cli-kit` | Schema-driven CLI framework with structured output |
 
 ## Tech Stack
 
