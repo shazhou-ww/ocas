@@ -194,6 +194,14 @@ cli.command("var").command("set")  // defines `mycli var set`
 
 Commands can be nested arbitrarily deep. A command with children is a **group** and cannot be executed directly.
 
+#### `.describe(text)` — Add a command description
+
+```ts
+cli.command("search").describe("Search the index").arg("query")
+```
+
+Optional. The description appears in `--help` output for the command.
+
 #### `.arg(name)` — Declare a positional argument
 
 ```ts
@@ -214,14 +222,32 @@ cli.command("search")
 
 **Flag types:** `"string"` | `"number"` | `"boolean"`
 
+**Short aliases** — declare a single-char alias next to the long flag; help renders it as `-s, --scene`:
+
+```ts
+cli.command("start").flag("scene", { type: "string", alias: "s" });
+// `mycli start -s lobby`  ===  `mycli start --scene lobby`
+```
+
+**Boolean negation** — any boolean flag can be set to `false` with a `--no-` prefix:
+
+```ts
+cli.command("start").flag("network", { type: "boolean", default: true });
+// `mycli start --no-network`  →  flags.network === false
+```
+
+`--no-<unknown>` or `--no-` on a non-boolean flag still raises `Unknown option`.
+
 **Built-in flags** (always available):
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--help` / `-h` | boolean | `false` | Print command usage and exit `0` (intercepted before parsing) |
 | `--format` | string | `"yaml"` | Output format: `yaml`, `json`, `text`, `html` |
 | `--compact` | boolean | `false` | Minified JSON output |
 | `--json` | boolean | `false` | Shorthand for `--format json --compact` |
 | `--quiet` | boolean | `false` | Suppress yield output on stderr |
+| `--no-<flag>` | — | — | Negate any boolean flag |
 
 #### `.yields(schema, template, options?)` — Declare yield schema
 
@@ -246,6 +272,17 @@ Required when your action uses `yield`. If the action yields but no `.yields()` 
 ```
 
 **Required** for every executable (leaf) command. Without `.returns()`, the command fails with `"Executable command requires .returns(...)"`.
+
+**Per-command default format** — pass `defaultFormat` to opt a command out of the global YAML default:
+
+```ts
+.returns(StatusSchema, "{{state}}", { defaultFormat: "text" })
+// `mycli status`               → plain text (template render)
+// `mycli status --format yaml`  → YAML envelope (explicit flag wins)
+// `mycli status --json`         → JSON envelope (--json always wins)
+```
+
+Output-format precedence (highest first): **`--json` → explicit `--format` → `defaultFormat` → `yaml`**. Inside an action, `flags.format` is always the user's **raw** `--format` value (or `undefined` when omitted) — never the resolved wire format — so a command can treat `--format html|text|tree` as a domain argument independently of the output encoding.
 
 #### `.action(fn)` — Define command logic
 
@@ -295,6 +332,8 @@ interface CliContext {
     info:  (tag: string, msg: string) => void;
     warn:  (tag: string, msg: string) => void;
   };
+  stdout: (text: string) => void;               // direct write to stdout
+  stderr: (text: string) => void;               // direct write to stderr
 }
 ```
 
@@ -337,6 +376,20 @@ Each log record:
 ```json
 {"ts":"2026-06-25T10:30:00.000Z","pid":12345,"level":"info","tag":"ABCDEFGH","msg":"starting operation"}
 ```
+
+### `ctx.stdout` / `ctx.stderr`
+
+Direct write channels to the process streams, independent of the file-based `ctx.log`. Use them for immediate human-facing diagnostics from long-running commands (servers, watchers) that need to surface output on the terminal:
+
+```ts
+.action(async (_args, _flags, ctx) => {
+  ctx.stderr("listening on :8080\n"); // straight to stderr
+  ctx.stdout("ready\n");              // straight to stdout
+  // ...
+});
+```
+
+`ctx.log` (structured JSONL → file) and `ctx.stdout`/`ctx.stderr` (raw text → console) are separate: audit logs and human diagnostics no longer compete for the same channel. In tests, these route to the `stdout`/`stderr` buffers passed to `cli.run()`.
 
 ## Templates
 
@@ -539,6 +592,7 @@ cli.command("tag")
 interface FlagDefinition {
   type: "string" | "number" | "boolean";
   default?: string | number | boolean;
+  alias?: string;   // single-char short alias, e.g. "s" for --scene
 }
 ```
 
@@ -546,7 +600,7 @@ interface FlagDefinition {
 
 ```ts
 interface ParsedFlags extends Record<string, unknown> {
-  format: "yaml" | "json" | "text" | "html";
+  format?: "yaml" | "json" | "text" | "html";  // user's raw --format, undefined if omitted
   compact: boolean;
   quiet: boolean;
   json: boolean;
@@ -554,6 +608,8 @@ interface ParsedFlags extends Record<string, unknown> {
   _positionals: string[];  // all positional arguments
 }
 ```
+
+> `format` holds the user's **raw** `--format` value (or `undefined`). The resolved output format (which honors `--json`, `defaultFormat`, and the `yaml` fallback) is applied internally when rendering the final envelope and is not written back into `flags.format`.
 
 ## License
 
