@@ -138,8 +138,15 @@ function formatHelp(
   if (command.children.size > 0) {
     lines.push("");
     lines.push("Commands:");
+    const maxLen = Math.max(
+      ...Array.from(command.children.values()).map((c) => c.name.length),
+    );
     for (const child of command.children.values()) {
-      lines.push(`  ${child.name}`);
+      const desc = child.description ?? "";
+      const pad = " ".repeat(Math.max(2, maxLen - child.name.length + 2));
+      lines.push(
+        desc.length > 0 ? `  ${child.name}${pad}${desc}` : `  ${child.name}`,
+      );
     }
   }
 
@@ -155,12 +162,14 @@ function formatHelp(
 
   for (const [name, definition] of Object.entries(command.flags)) {
     const flagLine = formatFlagLine(name, definition, allowRenderFlag);
+    const desc = definition.description ?? "";
+    const suffix = desc.length > 0 ? `  ${desc}` : "";
     if (definition.type === "string") {
-      lines.push(`${flagLine} <value>`);
+      lines.push(`${flagLine} <value>${suffix}`);
     } else if (definition.type === "number") {
-      lines.push(`${flagLine} <number>`);
+      lines.push(`${flagLine} <number>${suffix}`);
     } else {
-      lines.push(flagLine);
+      lines.push(`${flagLine}${suffix}`);
     }
   }
 
