@@ -7,6 +7,7 @@ export interface FlagDefinition {
   type: FlagType;
   default?: string | number | boolean;
   alias?: string;
+  description?: string;
 }
 
 export interface ParsedFlags extends Record<string, unknown> {
@@ -89,7 +90,7 @@ export interface SchemaMiddleware {
 export type CliMiddleware = ((handler: Handler) => Handler) | SchemaMiddleware;
 
 export interface CommandBuilder {
-  arg(name: string): CommandBuilder;
+  arg(name: string, description?: string): CommandBuilder;
   describe(text: string): CommandBuilder;
   flag(name: string, definition: FlagDefinition): CommandBuilder;
   yields(
@@ -99,7 +100,7 @@ export interface CommandBuilder {
   ): CommandBuilder;
   returns(
     schema: z.ZodType<unknown>,
-    template: string,
+    formatsOrTemplate: string | Record<string, FormatRenderer>,
     options?: { name?: string; defaultFormat?: OutputFormat },
   ): CommandBuilder;
   command(name: string): CommandBuilder;
@@ -136,9 +137,11 @@ export interface RunOptions {
   stderr?: { write: (text: string) => void };
 }
 
+export type FormatRenderer = string | ((value: unknown) => string);
+
 export interface SchemaBinding {
   schema: z.ZodType<unknown>;
-  template: string;
+  formats: Record<string, FormatRenderer>;
   name?: string;
   defaultFormat?: OutputFormat;
 }

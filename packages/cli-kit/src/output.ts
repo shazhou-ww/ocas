@@ -1,5 +1,5 @@
 import { renderTemplate } from "./render.js";
-import type { OutputFormat } from "./types.js";
+import type { FormatRenderer, OutputFormat } from "./types.js";
 
 export function envelopeToNdjson(type: string, value: unknown): string {
   return `${JSON.stringify({ type, value })}\n`;
@@ -10,10 +10,14 @@ export function renderFinalOutput(
   compact: boolean,
   type: string,
   value: unknown,
-  template: string,
+  formats: Record<string, FormatRenderer>,
 ): string {
-  if (format === "text" || format === "html") {
-    return `${renderTemplate(template, value)}\n`;
+  const renderer = formats[format];
+  if (renderer !== undefined) {
+    if (typeof renderer === "function") {
+      return renderer(value);
+    }
+    return `${renderTemplate(renderer, value)}\n`;
   }
   const envelope = { type, value };
   if (format === "json") {

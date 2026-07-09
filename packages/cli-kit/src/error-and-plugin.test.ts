@@ -27,11 +27,7 @@ describe("error envelope and render plugin", () => {
     const code = await cli.run({ argv: ["boom"], ...io.out });
 
     expect(code).toBe(1);
-    const err = JSON.parse(io.read().stderr.trim());
-    expect(err).toEqual({
-      type: "@ocas/error",
-      value: { message: "msg", code: "E_CODE", command: "boom" },
-    });
+    expect(io.read().stderr.trim()).toBe("Error: msg");
   });
 
   test("thrown exceptions are normalized into error envelope", async () => {
@@ -47,10 +43,7 @@ describe("error envelope and render plugin", () => {
     const code = await cli.run({ argv: ["explode"], ...io.out });
 
     expect(code).toBe(1);
-    const err = JSON.parse(io.read().stderr.trim());
-    expect(err.type).toBe("@ocas/error");
-    expect(err.value.message).toContain("kaboom");
-    expect(err.value.command).toBe("explode");
+    expect(io.read().stderr.trim()).toContain("Error: kaboom");
   });
 
   test("render flag is rejected without middleware or plugin", async () => {
@@ -132,8 +125,8 @@ describe("error envelope and render plugin", () => {
     expect(code).toBe(0);
     // Without --render the store opener must not run.
     expect(openedStore).toBe(false);
-    // Normal envelope output is untouched (default YAML format).
-    expect(io.read().stdout).toContain("@ocas/noop");
+    // Normal text output is untouched (default text format).
+    expect(io.read().stdout.trim()).toBe("true");
   });
 
   test("renderMiddleware renderFn returning undefined bypasses render (passthrough)", async () => {

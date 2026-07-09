@@ -218,17 +218,17 @@ describe("cli-kit capability gaps (#230)", () => {
       expect(io.read().stdout).toContain("value:");
     });
 
-    test("commands without defaultFormat still default to yaml", async () => {
+    test("commands without defaultFormat default to text", async () => {
       const cli = createCLI({ name: "ocas", version: "1.0.0" });
       cli
-        .command("yaml")
+        .command("plain")
         .returns(z.object({ ok: z.boolean() }), "{{ok}}")
         .action(async () => ({ ok: true }));
 
       const io = createBuffers();
-      await cli.run({ argv: ["yaml"], ...io.out });
+      await cli.run({ argv: ["plain"], ...io.out });
 
-      expect(io.read().stdout).toContain('type: "@ocas/yaml"');
+      expect(io.read().stdout.trim()).toBe("true");
     });
 
     test("action sees the user's raw --format, not the resolved wire format", async () => {

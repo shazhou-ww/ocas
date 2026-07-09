@@ -9,6 +9,7 @@ export type {
   CommandAction,
   CommandBuilder,
   CreateCliOptions,
+  FormatRenderer,
   Handler,
   ParsedFlags,
   RunOptions,

@@ -56,24 +56,31 @@ describe("io channels and schema naming", () => {
   });
 
   test("respects --quiet and format switches", async () => {
+    const defaultIo = createBuffers();
+    await buildCli().run({ argv: ["var", "set", "x"], ...defaultIo.out });
+    expect(defaultIo.read().stdout.trim()).toBe("Q=x");
+
     const yamlIo = createBuffers();
-    await buildCli().run({ argv: ["var", "set", "x"], ...yamlIo.out });
+    await buildCli().run({
+      argv: ["var", "set", "x", "--format", "yaml"],
+      ...yamlIo.out,
+    });
     expect(yamlIo.read().stdout).toContain('type: "@custom/result"');
 
-    const textIo = createBuffers();
+    const quietIo = createBuffers();
     await buildCli().run({
       argv: ["var", "set", "x", "--format", "text", "--quiet"],
-      ...textIo.out,
+      ...quietIo.out,
     });
-    expect(textIo.read().stdout.trim()).toBe("Q=x");
-    expect(textIo.read().stderr).toBe("");
+    expect(quietIo.read().stdout.trim()).toBe("Q=x");
+    expect(quietIo.read().stderr).toBe("");
 
     const htmlIo = createBuffers();
     await buildCli().run({
-      argv: ["var", "set", "x", "--format", "html", "--quiet"],
+      argv: ["var", "set", "x", "--format", "html"],
       ...htmlIo.out,
     });
-    expect(htmlIo.read().stdout.trim()).toBe("Q=x");
+    expect(htmlIo.read().stdout).toContain('type: "@custom/result"');
   });
 
   test("default schema names when no override", async () => {

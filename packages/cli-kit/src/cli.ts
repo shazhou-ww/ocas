@@ -14,6 +14,7 @@ import type {
   CommandBuilder,
   CreateCliOptions,
   FlagDefinition,
+  FormatRenderer,
   Handler,
   OutputFormat,
   RunOptions,
@@ -26,7 +27,7 @@ interface InternalCommand {
   name: string;
   path: string[];
   description?: string;
-  args: string[];
+  args: Array<{ name: string; description?: string }>;
   flags: Record<string, FlagDefinition>;
   yieldBinding?: SchemaBinding;
   returnBinding?: SchemaBinding;
@@ -84,7 +85,16 @@ function resolveOutputFormat(
   if (commandDefaultFormat !== undefined) {
     return commandDefaultFormat;
   }
-  return "yaml";
+  return "text";
+}
+
+function normalizeFormats(
+  formatsOrTemplate: string | Record<string, FormatRenderer>,
+): Record<string, FormatRenderer> {
+  if (typeof formatsOrTemplate === "string") {
+    return { text: formatsOrTemplate };
+  }
+  return formatsOrTemplate;
 }
 
 function formatFlagLine(
@@ -106,6 +116,7 @@ function formatHelp(
   cliName: string,
   command: InternalCommand,
   allowRenderFlag: boolean,
+  version?: string,
 ): string {
   const lines: string[] = [];
   const path =
@@ -116,7 +127,7 @@ function formatHelp(
       command.name === "$root" ? "<command>" : "<subcommand>";
     lines.push(`Usage: ${path} ${subcommandHint} [options]`);
   } else if (command.args.length > 0) {
-    const argList = command.args.map((arg) => `<${arg}>`).join(" ");
+    const argList = command.args.map((a) => `<${a.name}>`).join(" ");
     lines.push(`Usage: ${path} ${argList} [options]`);
   } else {
     lines.push(`Usage: ${path} [options]`);
@@ -131,36 +142,56 @@ function formatHelp(
     lines.push("");
     lines.push("Arguments:");
     for (const arg of command.args) {
-      lines.push(`  <${arg}>`);
+      const desc = arg.description ? `  ${arg.description}` : "";
+      lines.push(`  <${arg.name}>${desc}`);
     }
   }
 
   if (command.children.size > 0) {
     lines.push("");
     lines.push("Commands:");
+    const maxLen = Math.max(
+      ...Array.from(command.children.values()).map((c) => c.name.length),
+    );
     for (const child of command.children.values()) {
-      lines.push(`  ${child.name}`);
+      const desc = child.description ?? "";
+      const pad = " ".repeat(Math.max(2, maxLen - child.name.length + 2));
+      lines.push(
+        desc.length > 0 ? `  ${child.name}${pad}${desc}` : `  ${child.name}`,
+      );
     }
   }
 
   lines.push("");
   lines.push("Options:");
   lines.push("  -h, --help         Show help");
-  lines.push("  --format <yaml|json|text|html>");
-  lines.push("  --compact");
-  lines.push("  --quiet");
+  if (version !== undefined && command.name === "$root") {
+    lines.push("  -v, --version      Show version");
+  }
+  // Only show --format when the command has a return binding
+  if (command.returnBinding) {
+    const declaredFormats = command.returnBinding.formats
+      ? Object.keys(command.returnBinding.formats)
+      : [];
+    const supportedFormats = [
+      ...new Set(["text", ...declaredFormats, "json", "yaml"]),
+    ].sort();
+    lines.push(`  --format <${supportedFormats.join("|")}>`);
+  }
   if (allowRenderFlag) {
     lines.push("  -r, --render");
   }
 
   for (const [name, definition] of Object.entries(command.flags)) {
     const flagLine = formatFlagLine(name, definition, allowRenderFlag);
+    const desc = definition.description ?? "";
+    const suffix = desc.length > 0 ? `  ${desc}` : "";
     if (definition.type === "string") {
-      lines.push(`${flagLine} <value>`);
+      lines.push(`${flagLine} <value>${suffix}`);
     } else if (definition.type === "number") {
-      lines.push(`${flagLine} <number>`);
+      lines.push(`${flagLine} <number>${suffix}`);
     } else {
-      lines.push(flagLine);
+      lines.push(`${flagLine}${suffix}`);
     }
   }
 
@@ -191,8 +222,10 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
 
   function wrap(node: InternalCommand): CommandBuilder {
     return {
-      arg(name: string) {
-        node.args.push(name);
+      arg(name: string, description?: string) {
+        node.args.push(
+          description !== undefined ? { name, description } : { name },
+        );
         return this;
       },
       describe(text: string) {
@@ -206,15 +239,15 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       yields(schema, template, config) {
         node.yieldBinding = {
           schema,
-          template,
+          formats: { text: template },
           ...(config?.name !== undefined ? { name: config.name } : {}),
         };
         return this;
       },
-      returns(schema, template, config) {
+      returns(schema, formatsOrTemplate, config) {
         node.returnBinding = {
           schema,
-          template,
+          formats: normalizeFormats(formatsOrTemplate),
           ...(config?.name !== undefined ? { name: config.name } : {}),
           ...(config?.defaultFormat !== undefined
             ? { defaultFormat: config.defaultFormat }
@@ -260,7 +293,7 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       ...(code !== undefined ? { code } : {}),
       command,
     });
-    stderr.write(envelopeToNdjson(`@${options.name}/error`, payload));
+    stderr.write(`Error: ${message}\n`);
     return 1;
   }
 
@@ -272,7 +305,9 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
     try {
       if (wantsHelp(argv)) {
         const { command } = resolveCommand(root, stripHelp(argv));
-        stdout.write(formatHelp(options.name, command, allowRenderFlag));
+        stdout.write(
+          formatHelp(options.name, command, allowRenderFlag, options.version),
+        );
         return 0;
       }
 
@@ -282,7 +317,11 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         if (token !== undefined) {
           throw new CliError(`Unknown command: ${token}`, "E_USAGE");
         }
-        throw new CliError("No command selected", "E_USAGE");
+        // No command given — show help
+        stdout.write(
+          `${formatHelp(options.name, root, allowRenderFlag, options.version)}\n`,
+        );
+        return 0;
       }
       if (command.children.size > 0) {
         const nextToken = rest.find((part) => !part.startsWith("-"));
@@ -292,7 +331,11 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
             "E_USAGE",
           );
         }
-        throw new CliError("Command is not executable", "E_USAGE");
+        // Group command without subcommand — show help
+        stdout.write(
+          `${formatHelp(options.name, command, allowRenderFlag, options.version)}\n`,
+        );
+        return 0;
       }
       if (!command.action) {
         throw new CliError("Command action is missing", "E_USAGE");
@@ -309,7 +352,10 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
 
       const parsed = parseArgv(rest, command.flags, allowRenderFlag);
       if (parsed.positionals.length < command.args.length) {
-        throw new CliError("Missing positional arguments", "E_USAGE");
+        stdout.write(
+          `${formatHelp(options.name, command, allowRenderFlag, options.version)}\n`,
+        );
+        return 1;
       }
 
       const outputFormat = resolveOutputFormat(
@@ -328,8 +374,8 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       delete parsed.flags._formatExplicit;
 
       const args: Record<string, string> = {};
-      command.args.forEach((name, idx) => {
-        args[name] = parsed.positionals[idx] as string;
+      command.args.forEach((argDef, idx) => {
+        args[argDef.name] = parsed.positionals[idx] as string;
       });
 
       const logger = createLogger(options.name, options.homeDir);
@@ -401,24 +447,29 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
         return 0;
       }
 
-      const effectiveReturnSchema = returnMorphism(
-        command.returnBinding.schema,
-      );
-      const validatedFinal = validateWithSchema(
-        effectiveReturnSchema,
-        finalValue,
-      );
       const returnType =
         command.returnBinding.name ??
         defaultReturnSchemaName(options.name, command.path);
       const outputCompact = parsed.flags.json || parsed.flags.compact;
+
+      // For text format with a function renderer, pass the raw action result
+      // (schema parse strips non-index array properties like _total/_offset)
+      const renderer = command.returnBinding.formats[outputFormat];
+      const outputValue =
+        typeof renderer === "function"
+          ? finalValue
+          : validateWithSchema(
+              returnMorphism(command.returnBinding.schema),
+              finalValue,
+            );
+
       stdout.write(
         renderFinalOutput(
           outputFormat,
           outputCompact,
           returnType,
-          validatedFinal,
-          command.returnBinding.template,
+          outputValue,
+          command.returnBinding.formats,
         ),
       );
       return 0;
@@ -437,7 +488,7 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
   }
 
   function help(): string {
-    return formatHelp(options.name, root, allowRenderFlag);
+    return formatHelp(options.name, root, allowRenderFlag, options.version);
   }
 
   return Object.assign(wrap(root), { run, help });
