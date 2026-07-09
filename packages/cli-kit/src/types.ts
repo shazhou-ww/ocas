@@ -7,6 +7,7 @@ export interface FlagDefinition {
   type: FlagType;
   default?: string | number | boolean;
   alias?: string;
+  description?: string;
 }
 
 export interface ParsedFlags extends Record<string, unknown> {
