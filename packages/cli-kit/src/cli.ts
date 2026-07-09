@@ -44,12 +44,6 @@ class CliError extends Error {
   }
 }
 
-const errorPayloadSchema = z.object({
-  message: z.string(),
-  code: z.string().optional(),
-  command: z.string(),
-});
-
 function wantsHelp(tokens: string[]): boolean {
   return tokens.some((token) => token === "--help" || token === "-h");
 }
@@ -259,17 +253,17 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
 
   function emitError(
     stderr: { write: (text: string) => void },
-    commandPath: string[],
+    stdout: { write: (text: string) => void },
     message: string,
     code?: string,
+    helpCommand?: InternalCommand,
   ): number {
-    const command = commandPath.join(" ");
-    const payload = validateWithSchema(errorPayloadSchema, {
-      message,
-      ...(code !== undefined ? { code } : {}),
-      command,
-    });
-    stderr.write(envelopeToNdjson(`@${options.name}/error`, payload));
+    stderr.write(`Error: ${message}\n`);
+    if (code === "E_USAGE" && helpCommand !== undefined) {
+      stdout.write(
+        `\n${formatHelp(options.name, helpCommand, allowRenderFlag)}`,
+      );
+    }
     return 1;
   }
 
@@ -432,16 +426,14 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       );
       return 0;
     } catch (error) {
+      const helpCmd = tryResolveCommand(root, argv);
       if (error instanceof CliError) {
-        const path = tryResolvePath(root, argv);
-        return emitError(stderr, path, error.message, error.code);
+        return emitError(stderr, stdout, error.message, error.code, helpCmd);
       }
       if (error instanceof Error) {
-        const path = tryResolvePath(root, argv);
-        return emitError(stderr, path, error.message);
+        return emitError(stderr, stdout, error.message, undefined, helpCmd);
       }
-      const path = tryResolvePath(root, argv);
-      return emitError(stderr, path, String(error));
+      return emitError(stderr, stdout, String(error), undefined, helpCmd);
     }
   }
 
@@ -536,10 +528,13 @@ function resolveCommand(
   return { command: current, rest: argv.slice(index) };
 }
 
-function tryResolvePath(root: InternalCommand, argv: string[]): string[] {
+function tryResolveCommand(
+  root: InternalCommand,
+  argv: string[],
+): InternalCommand {
   try {
-    return resolveCommand(root, argv).command.path;
+    return resolveCommand(root, argv).command;
   } catch {
-    return [];
+    return root;
   }
 }
