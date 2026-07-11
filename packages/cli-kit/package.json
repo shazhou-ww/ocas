@@ -25,6 +25,7 @@
     "src"
   ],
   "dependencies": {
+    "liquidjs": "^10.27.0",
     "zod": "^4.1.12"
   },
   "repository": {

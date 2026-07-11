@@ -1,25 +1,14 @@
+import { Liquid } from "liquidjs";
 import type { CliMiddleware, CliPlugin } from "./types.js";
 
-function lookupPath(value: unknown, key: string): unknown {
-  const parts = key.split(".");
-  let current: unknown = value;
-  for (const part of parts) {
-    if (current === null || typeof current !== "object") {
-      if (part === "value" && parts.length === 1) {
-        return current;
-      }
-      return "";
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
+const engine = new Liquid();
 
 export function renderTemplate(template: string, value: unknown): string {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_m, key) => {
-    const resolved = lookupPath(value, key);
-    return resolved === undefined || resolved === null ? "" : String(resolved);
-  });
+  if (template === "") return "";
+  // Wrap non-object values so Liquid can access them as {{ value }}
+  const ctx =
+    value !== null && typeof value === "object" ? value : { value };
+  return engine.parseAndRenderSync(template, ctx as Record<string, unknown>);
 }
 
 /**
