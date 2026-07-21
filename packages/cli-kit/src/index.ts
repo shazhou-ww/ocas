@@ -9,10 +9,12 @@ export type {
   CommandAction,
   CommandBuilder,
   CreateCliOptions,
+  FormatFunctors,
   Handler,
   ParsedFlags,
   RunOptions,
   SchemaBinding,
   SchemaMiddleware,
   SchemaMorphism,
+  TemplateSpec,
 } from "./types.js";

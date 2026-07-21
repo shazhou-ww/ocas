@@ -89,18 +89,36 @@ export interface SchemaMiddleware {
  */
 export type CliMiddleware = ((handler: Handler) => Handler) | SchemaMiddleware;
 
+/**
+ * Per-format rendering functions. When `template` is an object instead of a
+ * LiquidJS template string, each key is an output format whose value is a
+ * function that receives the resolved payload and returns the rendered string.
+ * Formats not listed fall through to the default envelope renderer.
+ */
+export type FormatFunctors = Partial<
+  Record<OutputFormat, (value: unknown) => string>
+>;
+
+/**
+ * The `template` parameter accepted by `.returns()` / `.yields()`.
+ * - `string` — LiquidJS template rendered for text/html formats.
+ * - `FormatFunctors` — per-format render functions.
+ */
+export type TemplateSpec = string | FormatFunctors;
+
 export interface CommandBuilder {
-  arg(name: string): CommandBuilder;
+  alias(...names: string[]): CommandBuilder;
+  arg(name: string, description?: string): CommandBuilder;
   describe(text: string): CommandBuilder;
   flag(name: string, definition: FlagDefinition): CommandBuilder;
   yields(
     schema: z.ZodType<unknown>,
-    template: string,
+    template: TemplateSpec,
     options?: { name?: string },
   ): CommandBuilder;
   returns(
     schema: z.ZodType<unknown>,
-    template: string,
+    template: TemplateSpec,
     options?: { name?: string; defaultFormat?: OutputFormat },
   ): CommandBuilder;
   command(name: string): CommandBuilder;
@@ -139,7 +157,7 @@ export interface RunOptions {
 
 export interface SchemaBinding {
   schema: z.ZodType<unknown>;
-  template: string;
+  template: TemplateSpec;
   name?: string;
   defaultFormat?: OutputFormat;
 }

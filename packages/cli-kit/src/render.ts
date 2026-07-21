@@ -6,8 +6,7 @@ const engine = new Liquid();
 export function renderTemplate(template: string, value: unknown): string {
   if (template === "") return "";
   // Wrap non-object values so Liquid can access them as {{ value }}
-  const ctx =
-    value !== null && typeof value === "object" ? value : { value };
+  const ctx = value !== null && typeof value === "object" ? value : { value };
   return engine.parseAndRenderSync(template, ctx as Record<string, unknown>);
 }
 
