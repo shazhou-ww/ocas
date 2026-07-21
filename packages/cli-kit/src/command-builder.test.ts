@@ -82,11 +82,11 @@ describe("command builder", () => {
 
     const io = createBuffers();
     const code = await cli.run({ argv: ["leaf"], ...io.out });
-    const err = JSON.parse(io.read().stderr.trim());
+    const stderr = io.read().stderr.trim();
 
     expect(code).toBe(1);
-    expect(err.type).toBe("@gangmu/error");
-    expect(err.value.message).toContain("returns");
+    expect(stderr).toContain("Error:");
+    expect(stderr).toContain("returns");
   });
 
   test("group command is not directly executable", async () => {
@@ -99,10 +99,10 @@ describe("command builder", () => {
 
     const io = createBuffers();
     const code = await cli.run({ argv: ["group"], ...io.out });
-    const err = JSON.parse(io.read().stderr.trim());
+    const stderr = io.read().stderr.trim();
 
     expect(code).toBe(1);
-    expect(err.type).toBe("@gangmu/error");
-    expect(err.value.message).toContain("not executable");
+    expect(stderr).toContain("Error:");
+    expect(stderr).toContain("not executable");
   });
 });

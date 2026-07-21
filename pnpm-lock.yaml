@@ -54,6 +54,9 @@ importers:
 
   packages/cli-kit:
     dependencies:
+      liquidjs:
+        specifier: ^10.27.0
+        version: 10.27.0
       zod:
         specifier: ^4.1.12
         version: 4.4.3

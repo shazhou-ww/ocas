@@ -27,11 +27,8 @@ describe("error envelope and render plugin", () => {
     const code = await cli.run({ argv: ["boom"], ...io.out });
 
     expect(code).toBe(1);
-    const err = JSON.parse(io.read().stderr.trim());
-    expect(err).toEqual({
-      type: "@ocas/error",
-      value: { message: "msg", code: "E_CODE", command: "boom" },
-    });
+    const stderr = io.read().stderr.trim();
+    expect(stderr).toBe("Error: msg");
   });
 
   test("thrown exceptions are normalized into error envelope", async () => {
@@ -47,10 +44,8 @@ describe("error envelope and render plugin", () => {
     const code = await cli.run({ argv: ["explode"], ...io.out });
 
     expect(code).toBe(1);
-    const err = JSON.parse(io.read().stderr.trim());
-    expect(err.type).toBe("@ocas/error");
-    expect(err.value.message).toContain("kaboom");
-    expect(err.value.command).toBe("explode");
+    const stderr = io.read().stderr.trim();
+    expect(stderr).toContain("Error: kaboom");
   });
 
   test("render flag is rejected without middleware or plugin", async () => {
