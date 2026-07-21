@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { parseArgv } from "./args.js";
 import { createLogger } from "./log.js";
 import { envelopeToNdjson, renderFinalOutput } from "./output.js";
@@ -26,6 +25,7 @@ interface InternalCommand {
   name: string;
   path: string[];
   description?: string;
+  aliases: string[];
   args: string[];
   flags: Record<string, FlagDefinition>;
   yieldBinding?: SchemaBinding;
@@ -136,10 +136,16 @@ function formatHelp(
       ...Array.from(command.children.values()).map((c) => c.name.length),
     );
     for (const child of command.children.values()) {
+      const aliasStr =
+        child.aliases.length > 0
+          ? ` (aliases: ${child.aliases.join(", ")})`
+          : "";
       const desc = child.description ?? "";
       const pad = " ".repeat(Math.max(2, maxLen - child.name.length + 2));
       lines.push(
-        desc.length > 0 ? `  ${child.name}${pad}${desc}` : `  ${child.name}`,
+        desc.length > 0
+          ? `  ${child.name}${pad}${desc}${aliasStr}`
+          : `  ${child.name}${aliasStr}`,
       );
     }
   }
@@ -177,6 +183,7 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
   const root: InternalCommand = {
     name: "$root",
     path: [],
+    aliases: [],
     args: [],
     flags: {},
     middleware: [],
@@ -231,6 +238,7 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
           child = {
             name,
             path: [...node.path, name],
+            aliases: [],
             args: [],
             flags: {},
             middleware: [],
@@ -239,6 +247,10 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
           node.children.set(name, child);
         }
         return wrap(child);
+      },
+      alias(...names: string[]) {
+        node.aliases.push(...names);
+        return this;
       },
       action(fn: CommandAction) {
         node.action = fn;
@@ -283,17 +295,23 @@ export function createCLI(options: CreateCliOptions): CommandBuilder & {
       if (command === root) {
         const token = argv.find((part) => !part.startsWith("-"));
         if (token !== undefined) {
-          throw new CliError(`Unknown command: ${token}`, "E_USAGE");
+          const suggestion = suggestCommand(root, token);
+          const msg = suggestion
+            ? `Unknown command: ${token}. Did you mean '${suggestion}'?`
+            : `Unknown command: ${token}`;
+          throw new CliError(msg, "E_USAGE");
         }
         throw new CliError("No command selected", "E_USAGE");
       }
       if (command.children.size > 0) {
         const nextToken = rest.find((part) => !part.startsWith("-"));
         if (nextToken !== undefined) {
-          throw new CliError(
-            `Unknown ${command.path.join(" ")} subcommand: ${nextToken}`,
-            "E_USAGE",
-          );
+          const suggestion = suggestCommand(command, nextToken);
+          const prefix = command.path.join(" ");
+          const msg = suggestion
+            ? `Unknown ${prefix} subcommand: ${nextToken}. Did you mean '${suggestion}'?`
+            : `Unknown ${prefix} subcommand: ${nextToken}`;
+          throw new CliError(msg, "E_USAGE");
         }
         throw new CliError("Command is not executable", "E_USAGE");
       }
@@ -511,6 +529,51 @@ function composeMiddleware(
   return { handler, yieldMorphism, returnMorphism };
 }
 
+/**
+ * Levenshtein distance between two strings.
+ */
+function editDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  // Single-row DP to avoid 2D array and non-null assertions
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const curr = [i] as number[];
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        (prev[j] ?? 0) + 1,
+        (curr[j - 1] ?? 0) + 1,
+        (prev[j - 1] ?? 0) + cost,
+      );
+    }
+    prev = curr;
+  }
+  return prev[n] ?? 0;
+}
+
+/**
+ * Suggest the closest command name (including aliases) if edit distance <= 2.
+ */
+function suggestCommand(
+  parent: InternalCommand,
+  token: string,
+): string | undefined {
+  let best: string | undefined;
+  let bestDist = 3; // threshold
+  for (const child of parent.children.values()) {
+    const candidates = [child.name, ...child.aliases];
+    for (const name of candidates) {
+      const dist = editDistance(token, name);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = name;
+      }
+    }
+  }
+  return best;
+}
+
 function resolveCommand(
   root: InternalCommand,
   argv: string[],
@@ -520,7 +583,17 @@ function resolveCommand(
   while (index < argv.length) {
     const token = argv[index] as string;
     if (token.startsWith("-")) break;
-    const next = current.children.get(token);
+    // Direct match
+    let next = current.children.get(token);
+    // Alias lookup
+    if (!next) {
+      for (const child of current.children.values()) {
+        if (child.aliases.includes(token)) {
+          next = child;
+          break;
+        }
+      }
+    }
     if (!next) break;
     current = next;
     index++;

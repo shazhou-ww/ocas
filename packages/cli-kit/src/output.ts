@@ -1,5 +1,5 @@
 import { renderTemplate } from "./render.js";
-import type { OutputFormat } from "./types.js";
+import type { FormatFunctors, OutputFormat, TemplateSpec } from "./types.js";
 
 export function envelopeToNdjson(type: string, value: unknown): string {
   return `${JSON.stringify({ type, value })}\n`;
@@ -10,9 +10,17 @@ export function renderFinalOutput(
   compact: boolean,
   type: string,
   value: unknown,
-  template: string,
+  template: TemplateSpec,
 ): string {
-  if (format === "text" || format === "html") {
+  // Functor path: if template is an object with per-format functions
+  if (typeof template === "object" && template !== null) {
+    const functors = template as FormatFunctors;
+    const fn = functors[format];
+    if (fn !== undefined) {
+      return `${fn(value)}\n`;
+    }
+    // No functor for this format — fall through to default envelope
+  } else if (format === "text" || format === "html") {
     return `${renderTemplate(template, value)}\n`;
   }
   const envelope = { type, value };
