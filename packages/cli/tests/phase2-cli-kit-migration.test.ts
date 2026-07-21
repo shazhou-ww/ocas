@@ -93,14 +93,10 @@ describe("phase 2 cli-kit migration", () => {
     expect(rendered.stdout.trim()).toBe("true");
   });
 
-  test("failures are structured envelopes on stderr", async () => {
+  test("failures are plain text errors on stderr", async () => {
     const failure = await runCli(["unknown-cmd"]);
     expect(failure.exitCode).not.toBe(0);
-    const parsed = JSON.parse(failure.stderr) as {
-      type: string;
-      value: { message: string; command: string };
-    };
-    expect(parsed.type).toBe("@ocas/error");
-    expect(parsed.value.message).toContain("Unknown");
+    expect(failure.stderr).toContain("Error:");
+    expect(failure.stderr).toContain("Unknown");
   });
 });
