@@ -1,5 +1,29 @@
 # @ocas/cli
 
+## 0.7.2 — 2026-07-21
+
+- Add middleware system (function decorator pattern). Replaces the hollow `CliPlugin`
+  capability declaration with composable middleware that supplies behavior directly.
+  
+  - **@ocas/cli-kit**: new `CliMiddleware` / `Handler` types, `CreateCliOptions.middleware`
+    (global, outermost), `CommandBuilder.use()` (per-command, innermost-first), and a
+    `renderMiddleware(openStore, renderFn)` factory. The render flag is now enabled
+    implicitly by the presence of middleware. `CliPlugin` and `ocasRenderPlugin` are
+    kept as deprecated exports for backward compatibility.
+  - **@ocas/cli**: render behavior moves out of ~18 per-command `if (flags.render)`
+    blocks into a global `renderMiddleware` (renders returned hashes) plus small
+    per-command `.use()` middlewares (for `renderDirectAsync`-style commands). No
+    user-facing behavior change.
+- Add command aliases, fuzzy unknown-command suggestions, and multi-format template returns.
+  
+  - **@ocas/cli-kit**: `.alias(...names)` on `CommandBuilder` registers alternate names
+    resolved during dispatch. `TemplateSpec = string | FormatFunctors` allows per-format
+    render functions in `.returns()`/`.yields()`. Levenshtein-based "Did you mean?" suggestions
+    for unknown commands (edit distance ≤ 2). Help output shows aliases.
+  - **@ocas/cli**: update snapshots and test for plain text error output (post-#241 alignment).
+  
+  Closes #243, #244
+
 ## 0.7.0 — 2026-06-24
 
 - ## Phase 3: eliminate invokeLegacy, migrate all commands to native cli-kit
