@@ -387,7 +387,7 @@ exports[`Phase 3: Variable System > 3.10 var delete removes variable 1`] = `
 }
 `;
 
-exports[`Phase 3: Variable System > 3.11 var get deleted variable returns not found 1`] = `"{"type":"@ocas/error","value":{"message":"Error: Variable not found: name=@myapp/config, schema=FRBAB1BF0ZBCS","command":"var get"}}"`;
+exports[`Phase 3: Variable System > 3.11 var get deleted variable returns not found 1`] = `"Error: Error: Variable not found: name=@myapp/config, schema=FRBAB1BF0ZBCS"`;
 
 exports[`Phase 4: Template System > 4.1 template set registers template 1`] = `
 {
@@ -427,13 +427,13 @@ exports[`Phase 4: Template System > 4.4 template delete removes template 1`] = `
 }
 `;
 
-exports[`Phase 4: Template System > 4.5 template get deleted template returns not found 1`] = `"{"type":"@ocas/error","value":{"message":"Error: Template not found for schema: FRBAB1BF0ZBCS","command":"template get"}}"`;
+exports[`Phase 4: Template System > 4.5 template get deleted template returns not found 1`] = `"Error: Error: Template not found for schema: FRBAB1BF0ZBCS"`;
 
-exports[`Phase 7: Edge Cases > 7.1 get non-existent hash errors gracefully 1`] = `"{"type":"@ocas/error","value":{"message":"Node not found: AAAAAAAAAAAAA","command":"get"}}"`;
+exports[`Phase 7: Edge Cases > 7.1 get non-existent hash errors gracefully 1`] = `"Error: Node not found: AAAAAAAAAAAAA"`;
 
-exports[`Phase 7: Edge Cases > 7.3 var set empty name errors 1`] = `"{"type":"@ocas/error","value":{"message":"Usage: ocas var set <name> <hash> [--tag <tag>...]","command":"var set"}}"`;
+exports[`Phase 7: Edge Cases > 7.3 var set empty name errors 1`] = `"Error: Usage: ocas var set <name> <hash> [--tag <tag>...]"`;
 
-exports[`Phase 7: Edge Cases > 7.4 var set name with invalid chars errors 1`] = `"{"type":"@ocas/error","value":{"message":"Error: Invalid variable name \\"invalid name!\\": Name must follow @scope/name format (e.g. @myapp/config)","command":"var set"}}"`;
+exports[`Phase 7: Edge Cases > 7.4 var set name with invalid chars errors 1`] = `"Error: Error: Invalid variable name "invalid name!": Name must follow @scope/name format (e.g. @myapp/config)"`;
 
 exports[`Phase 7: Edge Cases > 7.5 no subcommand shows help text 1`] = `
 "Usage: ocas [--home <path>] [--json] <command> [args]

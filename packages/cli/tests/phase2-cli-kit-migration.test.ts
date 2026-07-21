@@ -39,11 +39,10 @@ describe("phase 2 cli-kit migration", () => {
     expect(source).not.toContain("switch (cmd)");
   });
 
-  test("default output is yaml envelope and formats still work", async () => {
+  test("default output is text and formats still work", async () => {
     const base = runCliRaw(["has", "@ocas/schema"]);
     expect(base.exitCode).toBe(0);
-    expect(base.stdout).toContain('type: "@ocas/output/has"');
-    expect(base.stdout).toContain("value: true");
+    expect(base.stdout.trim()).toBe("true");
 
     const asJson = runCliRaw(["has", "@ocas/schema", "--format", "json"]);
     expect(asJson.exitCode).toBe(0);
@@ -61,7 +60,6 @@ describe("phase 2 cli-kit migration", () => {
     const asHtml = runCliRaw(["has", "@ocas/schema", "--format", "html"]);
     expect(asHtml.exitCode).toBe(0);
     expect(asHtml.stdout.trim().length).toBeGreaterThan(0);
-    expect(asHtml.stdout).not.toContain("@ocas/output/has");
   });
 
   test("render flag uses cli-kit middleware path and keeps envelope compatibility", async () => {
@@ -77,7 +75,7 @@ describe("phase 2 cli-kit migration", () => {
 
     const normal = runCliRaw(["has", "@ocas/schema"]);
     expect(normal.exitCode).toBe(0);
-    expect(normal.stdout).toContain("@ocas/output/has");
+    expect(normal.stdout.trim()).toBe("true");
 
     // `has` returns a boolean, which the global render middleware declines to
     // render (it only renders hash strings). So -r leaves the normal text
@@ -93,14 +91,10 @@ describe("phase 2 cli-kit migration", () => {
     expect(rendered.stdout.trim()).toBe("true");
   });
 
-  test("failures are structured envelopes on stderr", async () => {
+  test("failures are plain text on stderr", async () => {
     const failure = await runCli(["unknown-cmd"]);
     expect(failure.exitCode).not.toBe(0);
-    const parsed = JSON.parse(failure.stderr) as {
-      type: string;
-      value: { message: string; command: string };
-    };
-    expect(parsed.type).toBe("@ocas/error");
-    expect(parsed.value.message).toContain("Unknown");
+    expect(failure.stderr).toMatch(/^Error: /);
+    expect(failure.stderr).toContain("Unknown");
   });
 });
